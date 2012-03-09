@@ -325,8 +325,8 @@ exit:
 	if(envp->hDispatch)
 		frame_disp_delete(envp->hDispatch);
 
-	buffer_exit();
 	alg_exit();
+	buffer_exit();
 
 	return status;
 	
