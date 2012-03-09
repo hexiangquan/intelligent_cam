@@ -587,7 +587,8 @@ exit:
 
 	if(env.hImgConv)
 		img_conv_delete(env.hImgConv);
-	
+
+	DBG("capture thread exit...");
 	pthread_exit(0);
 }
 

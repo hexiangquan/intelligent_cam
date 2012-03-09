@@ -32,6 +32,7 @@
 #include "buffer.h"
 #include "capture_thr.h"
 #include "img_enc_thr.h"
+#include "signal.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -80,6 +81,8 @@ typedef struct {
 	ParamsMngHandle hParamsMng;
 	FrameDispHandle	hDispatch;
 }MainEnv;
+
+static Bool s_exit = FALSE;
 
 /*****************************************************************************
  Prototype    : threads_create
@@ -150,6 +153,8 @@ static void threads_delete(MainEnv *envp, MsgHandle hMsg)
 	Int32 i = 0;
 	MsgHeader msg;
 
+	DBG("delete threads...");
+
 	/* send msg to all tasks to exit */
 	msg.cmd = APPCMD_EXIT;
 	msg.index = 0;
@@ -201,6 +206,29 @@ static Int32 msg_process(CommonMsg *msg, MainEnv *envp)
 }
 
 /*****************************************************************************
+ Prototype    : sig_handler
+ Description  : Signal handler
+ Input        : int sig  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/9
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static void sig_handler(int sig)
+{
+	if(sig == SIGINT || sig == SIGABRT) {
+		DBG("got INT signal");
+		s_exit = TRUE;
+	}
+} 
+
+/*****************************************************************************
  Prototype    : main_loop
  Description  : main loop
  Input        : SetupParams *params  
@@ -247,16 +275,19 @@ static Int32 main_loop(MainEnv *envp)
 
 	/* create frame dispatch module */
 	FrameDispInfo info;
-
 	info.hParamsMng = envp->hParamsMng;
 	info.savePath = envp->savePath;
 	envp->hDispatch = frame_disp_create(FT_SRV_UNCONNECTED, FRAME_ENC_ON, &info);
+
+	/* catch signals */
+	DBG("enable signal");
+	signal(SIGINT, sig_handler);
 
 	/* create threads */
 	status = threads_create(envp);
 
 	/* start main loop */
-	while(!envp->exit) {
+	while(!s_exit && !envp->exit) {
 		/* feed dog */
 
 		/* recv msg */
