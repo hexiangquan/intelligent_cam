@@ -424,8 +424,10 @@ static Int32 capture_alloc_buf(CapHandle hCap, CapAttrs *attrs)
 	Int32 i;
 
 	hCap->capBufs = calloc(attrs->bufNum, sizeof(CapBuf));
-	if(!hCap->capBufs)
+	if(!hCap->capBufs) {
+		ERR("alloc cap bufs array failed...");
 		return E_NOMEM;
+	}
 
 	allocAttrs->alignment = 256;
 	allocAttrs->flags = CMEM_NONCACHED;
@@ -726,7 +728,7 @@ static Int32 capture_init(CapHandle hCap, CapAttrs *attrs)
 		return E_IO;
     }
 
-	DBG("setting data format");
+	//DBG("setting data format");
 	hCap->fdCap = fdCap;
 	if (capture_set_data_format(hCap, attrs) < 0) {
 		ERR("SetDataFormat failed");
@@ -734,7 +736,7 @@ static Int32 capture_init(CapHandle hCap, CapAttrs *attrs)
 		return E_IO;
 	}
 
-	DBG("initializing capture buffers");
+	//DBG("initializing capture buffers");
 	if (capture_init_buf(hCap, attrs) < 0) {
 		DBG("InitCaptureBuffers failed");
 		close(fdCap);

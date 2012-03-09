@@ -105,6 +105,7 @@ static Int32 threads_create(MainEnv *envp)
 	assert(capArg);
 
 	capArg->hParamsMng = envp->hParamsMng;
+	capArg->hDispatch = envp->hDispatch;
 	err = pthread_create(&envp->pid[0], NULL, capture_thr, capArg);
 	if(err < 0) {
 		free(capArg);

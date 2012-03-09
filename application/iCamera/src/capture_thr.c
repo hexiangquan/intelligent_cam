@@ -129,6 +129,7 @@ static Int32 capture_thr_init(CapThrArg *arg, CapThrEnv *envp)
 	capAttrs.mode = 
 		(workMode.capMode == CAM_CAP_MODE_CONTINUE) ? CAP_MODE_CONT : CAP_MODE_TRIG;
 	capAttrs.userAlloc = TRUE;
+	capAttrs.bufNum = CAP_BUF_NUM;
 
 	/* create capture object */
 	envp->hCap = capture_create(&capAttrs);
@@ -157,7 +158,7 @@ static Int32 capture_thr_init(CapThrArg *arg, CapThrEnv *envp)
 	}
 
 	envp->hMsg = msg_create(MSG_CAP, dstMsgName, 0);
-	if(!envp->hImgConv) {
+	if(!envp->hMsg) {
 		ERR("create msg handle failed...");
 		return E_IO;
 	}
@@ -339,8 +340,7 @@ static Int32 cap_thr_run(CapThrEnv *envp)
 		imgMsg->dimension.colorSpace = envp->convDynParams.outAttrs[0].pixFmt;
 	}
 
-	static int cnt = 0;
-	DBG("<%d> cap run ok...", cnt++);
+	DBG("<%d> cap run ok...", imgMsg->index);
 
 free_buf:
 
@@ -483,7 +483,7 @@ static Int32 msg_process(CapThrEnv *envp, CommonMsg *msgBuf)
 	MsgHeader 	*msgHdr = &msgBuf->header;
 	
 	err = msg_recv(envp->hMsg, msgBuf, sizeof(CommonMsg));
-	if(err)
+	if(err < 0)
 		return err;
 
 	switch(msgHdr->cmd) {

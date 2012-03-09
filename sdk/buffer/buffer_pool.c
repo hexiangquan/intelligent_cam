@@ -25,8 +25,6 @@
 #include "buffer.h"
 #include "log.h"
 #include <pthread.h>
-	
-#define BUF_DBG
 
 /*----------------------------------------------*
  * external variables                           *
@@ -55,6 +53,8 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
+/* Uncomment this to print debug info */
+// #define BUF_DBG
 
 /*----------------------------------------------*
  * routines' implementations                    *

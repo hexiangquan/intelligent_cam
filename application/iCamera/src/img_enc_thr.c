@@ -158,8 +158,6 @@ static Int32 img_enc_thr_run(ImgEncThrEnv *envp, ImgMsg *msg)
 	JpgEncInArgs	inArgs;
 	JpgEncOutArgs	outArgs;
 	Int32			dispFlags = 0;
-
-	DBG("jpg enc got a new frame");
 	
 	hBufIn = msg->hBuf;
 	inBuf.buf = buffer_get_user_addr(msg->hBuf);
@@ -170,6 +168,7 @@ static Int32 img_enc_thr_run(ImgEncThrEnv *envp, ImgMsg *msg)
 	hBufOut = buf_pool_alloc_wait(envp->hPoolEnc, BUF_ALLOC_TIMEOUT);
 	if(!hBufOut) {
 		/* alloc buffer failed, use buf for save */
+		DBG("save dir to local file system");
 		dispFlags |= FD_FLAG_SAVE_ONLY | FD_FLAG_NOT_FREE_BUF;
 		hBufOut = envp->hBufSave;
 	}
@@ -206,7 +205,7 @@ static Int32 img_enc_thr_run(ImgEncThrEnv *envp, ImgMsg *msg)
 	msg->hBuf = hBufOut;
 	buffer_set_bytes_used(hBufOut, outArgs.bytesGenerated);
 
-	DBG("jpg enc run ok");
+	DBG("<%d> jpg enc run ok", msg->index);
 
 	/* dispatch jpeg data */
 	//err = frame_disp_run(envp->hDispatch, envp->hMsg, &msg, NULL, dispFlags);
@@ -221,7 +220,7 @@ err_quit:
 	if(hBufIn)
 		buf_pool_free(hBufIn);
 	
-	if(!hBufOut && !dispFlags)
+	if(hBufOut && !dispFlags)
 		buf_pool_free(hBufOut);
 
 	return err;
@@ -286,34 +285,34 @@ static Int32 img_enc_params_update(ImgEncThrEnv *envp)
 *****************************************************************************/
 static Int32 msg_process(ImgEncThrEnv *envp, CommonMsg *msgBuf)
 {
-	Int32 err;
+	Int32 ret;
 
 	/* recv msg */
-	err = msg_recv(envp->hMsg, msgBuf, sizeof(CommonMsg));
-	if(err) {
-		ERR("recv msg err: %s", str_err(err));
-		return err;
+	ret = msg_recv(envp->hMsg, msgBuf, sizeof(CommonMsg));
+	if(ret < 0) {
+		ERR("img enc thr recv msg err: %s", str_err(ret));
+		return ret;
 	}
 
 	/* process msg */
 	MsgHeader *msgHdr = &msgBuf->header;
 	switch(msgHdr->cmd) {
 	case APPCMD_NEW_DATA:
-		err = img_enc_thr_run(envp, (ImgMsg *)msgBuf);
+		ret = img_enc_thr_run(envp, (ImgMsg *)msgBuf);
 		break;
 	case APPCMD_SET_IMG_ENC_PARAMS:
-		err = img_enc_params_update(envp);
+		ret = img_enc_params_update(envp);
 		break;
 	case APPCMD_EXIT:
 		envp->exit = TRUE;
 		break;
 	default:
 		ERR("unkown cmd: 0x%X", (unsigned int)msgHdr->cmd);
-		err = E_UNSUPT;
+		ret = E_UNSUPT;
 		break;
 	}
 
-	return err;
+	return ret;
 }
 
 /*****************************************************************************

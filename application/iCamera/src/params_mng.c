@@ -628,6 +628,7 @@ static Int32 get_jpg_enc_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size)
 	dynParams->height = appCfg->imgEncParams.height;
 	dynParams->quality = appCfg->imgEncParams.encQuality;
 	dynParams->rotation = appCfg->imgEncParams.rotation;
+	dynParams->inputFormat = FMT_YUV_420SP;
 
 	if(!dynParams->width || !dynParams->height) {
 		Int32 err = wait_cap_info_set(hParamsMng);
@@ -640,8 +641,7 @@ static Int32 get_jpg_enc_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size)
 		dynParams->width = hParamsMng->capInputInfo.width;
 		dynParams->height = hParamsMng->capInputInfo.height;
 	}
-		
-
+	
 	return E_NO;
 }
 
