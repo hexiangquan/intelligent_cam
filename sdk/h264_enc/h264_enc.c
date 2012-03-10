@@ -49,7 +49,7 @@ typedef struct _H264EncObj {
 	//XDM_BufDesc				outBufDesc; 
 	Int32					inBufOffset[3];	/* Offset for input buffer */
 	Int32					inputChromaFmt;	/* Input chroma format */
-}H264EncObj, *H264EncHandle;
+}H264EncAlgObj, *H264EncAlgHandle;
 
 /*----------------------------------------------*
  * project-wide global variables                *
@@ -81,7 +81,7 @@ const H264EncDynParams H264ENC_DYN_DEFAULT = {
 	.frameRate = 25,
 	.targetBitRate = 2000000,
 	.intraFrameInterval = 30,
-	.interFrameInterval = 30,
+	.interFrameInterval = 300,
 	.forceFrame = VID_NA_FRAME,
 	.intraFrameQP = 28,
 	.interFrameQP = 28,
@@ -110,7 +110,7 @@ const H264EncDynParams H264ENC_DYN_DEFAULT = {
 /*****************************************************************************
  Prototype    : h264_enc_set_dyn_params
  Description  : Set dynamic params for h264 encode
- Input        : H264EncHandle hH264Enc        
+ Input        : H264EncAlgHandle hH264Enc        
                 H264EncDynParams *dynParams  
  Output       : None
  Return Value : static
@@ -123,7 +123,7 @@ const H264EncDynParams H264ENC_DYN_DEFAULT = {
     Modification : Created function
 
 *****************************************************************************/
-static Int32 h264_enc_set_dyn_params(H264EncHandle hH264Enc, H264EncDynParams *dynParams)
+static Int32 h264_enc_set_dyn_params(H264EncAlgHandle hH264Enc, H264EncDynParams *dynParams)
 {		
 	/** Set up dynamic parameters (can be changed before each call to jpeg processing)
 	  * Parameters in structure dynamicParams are default image encode parameters required by XDM
@@ -234,7 +234,7 @@ static Int32 h264_enc_set_dyn_params(H264EncHandle hH264Enc, H264EncDynParams *d
     Modification : Created function
 
 *****************************************************************************/
-static Ptr h264_enc_init(const Ptr init, const Ptr dyn)
+static Ptr h264_encode_init(const Ptr init, const Ptr dyn)
 {
 	H264EncInitParams *initParams = (H264EncInitParams *)init;
 
@@ -243,7 +243,7 @@ static Ptr h264_enc_init(const Ptr init, const Ptr dyn)
 
 	/* Alloc mem for handle */
 	VIDENC1_Handle 	handle = NULL;
-	H264EncHandle   hH264Enc = calloc(1, sizeof(H264EncObj));
+	H264EncAlgHandle   hH264Enc = calloc(1, sizeof(H264EncAlgObj));
 	if(!hH264Enc)
 		goto exit;
 	
@@ -318,9 +318,9 @@ exit:
     Modification : Created function
 
 *****************************************************************************/
-static Int32 h264_enc_process(Ptr algHandle, AlgBuf *inBuf, Ptr inArgsPtr, AlgBuf *outBuf, Ptr outArgsPtr)
+static Int32 h264_encode_process(Ptr algHandle, AlgBuf *inBuf, Ptr inArgsPtr, AlgBuf *outBuf, Ptr outArgsPtr)
 {
-	H264EncHandle hH264Enc = (H264EncHandle)algHandle;
+	H264EncAlgHandle hH264Enc = (H264EncAlgHandle)algHandle;
 	
 	if(!algHandle || !hH264Enc->algHandle || !inBuf || !outBuf || !inArgsPtr || !outArgsPtr)
 		return E_INVAL;
@@ -403,9 +403,9 @@ static Int32 h264_enc_process(Ptr algHandle, AlgBuf *inBuf, Ptr inArgsPtr, AlgBu
     Modification : Created function
 
 *****************************************************************************/
-static Int32 h264_enc_control(Ptr algHandle, Int32 cmd, Ptr args)
+static Int32 h264_encode_control(Ptr algHandle, Int32 cmd, Ptr args)
 {
-	H264EncHandle hH264Enc = (H264EncHandle)algHandle;
+	H264EncAlgHandle hH264Enc = (H264EncAlgHandle)algHandle;
 	
 	if(!algHandle || !hH264Enc->algHandle)
 		return E_INVAL;
@@ -439,9 +439,9 @@ static Int32 h264_enc_control(Ptr algHandle, Int32 cmd, Ptr args)
     Modification : Created function
 
 *****************************************************************************/
-static Int32 h264_enc_exit(Ptr algHandle)
+static Int32 h264_encode_exit(Ptr algHandle)
 {
-	H264EncHandle hH264Enc = (H264EncHandle)algHandle;
+	H264EncAlgHandle hH264Enc = (H264EncAlgHandle)algHandle;
 
 	if(!hH264Enc || !hH264Enc->algHandle)
 		return E_INVAL;
@@ -454,9 +454,9 @@ static Int32 h264_enc_exit(Ptr algHandle)
 
 /* structure for alg functions */
 const AlgFxns H264ENC_ALG_FXNS = {
-	.algInit = h264_enc_init,
-	.algProcess = h264_enc_process,
-	.algControl = h264_enc_control,
-	.algExit = h264_enc_exit,
+	.algInit = h264_encode_init,
+	.algProcess = h264_encode_process,
+	.algControl = h264_encode_control,
+	.algExit = h264_encode_exit,
 };
 

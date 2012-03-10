@@ -24,6 +24,7 @@
 #include "img_convert.h"
 #include "capture.h"
 #include "jpg_enc.h"
+#include "h264_enc.h"
 #include "osd.h"
 
 /*----------------------------------------------*
@@ -592,6 +593,7 @@ static Int32 get_stream2_out_attrs(ParamsMngHandle hParamsMng, void *data, Int32
 			outAttrs->width = hParamsMng->capInputInfo.width;
 			outAttrs->height = hParamsMng->capInputInfo.height;
 		}
+		outAttrs->pixFmt = FMT_YUV_420SP;
 	} else 
 		outAttrs->enbale = FALSE;
 
@@ -646,6 +648,56 @@ static Int32 get_jpg_enc_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size)
 }
 
 /*****************************************************************************
+ Prototype    : get_h264_enc_dyn
+ Description  : get h.264 encode dyn params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/10
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_h264_enc_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(H264EncDynParams)) 
+		return E_INVAL;
+	
+	H264EncDynParams *dynParams = (H264EncDynParams *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+	ConvOutAttrs vidOutAttrs;
+
+	/* get video resolution */
+	get_video_out_attrs(hParamsMng, &vidOutAttrs, sizeof(vidOutAttrs));
+
+	/* set to default first */
+	*dynParams = H264ENC_DYN_DEFAULT;
+
+	/* set according to cfg */
+	dynParams->width = vidOutAttrs.width;
+	dynParams->height = vidOutAttrs.height;
+	dynParams->frameRate = appCfg->h264EncParams.frameRate;
+	dynParams->targetBitRate = appCfg->h264EncParams.bitRate * 1000;
+	dynParams->intraFrameInterval = appCfg->h264EncParams.IPRatio;
+	dynParams->maxQP = appCfg->h264EncParams.QPMax;
+	dynParams->minQP = appCfg->h264EncParams.QPMin;
+	dynParams->initQP = appCfg->h264EncParams.QPInit;
+	dynParams->rateCtrlMode = appCfg->h264EncParams.rateControl;
+	if(appCfg->h264EncParams.forceIFrame)
+		dynParams->forceFrame = VID_I_FRAME;
+	dynParams->maxBitrateCVBR = appCfg->h264EncParams.bitRate * 2000;
+	
+	return E_NO;
+}
+
+
+/*****************************************************************************
  Prototype    : get_img_osd_dyn
  Description  : get osd dyn params
  Input        : ParamsMngHandle hParamsMng  
@@ -680,7 +732,7 @@ static Int32 get_img_osd_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size)
 	else if(appCfg->imgEncParams.rotation == 270)
 		dynParams->mode = OSD_MODE_32x32_ROTATE_L;
 	else {
-		if(appCfg->osdParams.imgOsd.size = CAM_OSD_SIZE_32x16)
+		if(appCfg->osdParams.imgOsd.size == CAM_OSD_SIZE_32x16)
 			dynParams->mode = OSD_MODE_32x16;
 		else
 			dynParams->mode = OSD_MODE_32x32; 
@@ -701,6 +753,47 @@ static Int32 get_img_osd_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size)
 	return E_NO;
 }
 
+/*****************************************************************************
+ Prototype    : get_vid_osd_dyn
+ Description  : get osd params for video
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/10
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_vid_osd_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(OsdDynParams)) 
+		return E_INVAL;
+	
+	OsdDynParams *dynParams = (OsdDynParams *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+	ConvOutAttrs vidOutAttrs;
+
+	/* get video out attrs */
+	get_video_out_attrs(hParamsMng, &vidOutAttrs, sizeof(vidOutAttrs));
+
+	dynParams->size = sizeof(OsdDynParams);
+	dynParams->width = vidOutAttrs.width;
+	dynParams->height = vidOutAttrs.height;
+	dynParams->imgFormat = FMT_YUV_420SP;
+	dynParams->color = appCfg->osdParams.vidOsd.color;
+	if(appCfg->osdParams.vidOsd.size == CAM_OSD_SIZE_32x16)
+		dynParams->mode = OSD_MODE_32x16;
+	else
+		dynParams->mode = OSD_MODE_32x32;
+	
+	return E_NO;
+}
 
 /*****************************************************************************
  Prototype    : set_cap_input_info
@@ -794,8 +887,14 @@ Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void 
 	case PMCMD_G_JPGENCDYN:
 		ret = get_jpg_enc_dyn(hParamsMng, arg, size);
 		break;
+	case PMCMD_G_H264ENCDYN:
+		ret = get_h264_enc_dyn(hParamsMng, arg, size);
+		break;
 	case PMCMD_G_IMGOSDDYN:
 		ret = get_img_osd_dyn(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_VIDOSDDYN:
+		ret = get_vid_osd_dyn(hParamsMng, arg, size);
 		break;
 	default:
 		ret = E_UNSUPT;

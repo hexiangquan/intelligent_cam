@@ -54,7 +54,7 @@
  *----------------------------------------------*/
 #define CAP_DEVICE		"/dev/video0"
 #define CAP_BUF_NUM		3
-#define POOL_BUF_NUM	2
+#define POOL_BUF_NUM	4
 
 #define CAPTHR_STAT_CONV_EN			(1 << 0)
 #define CAPTHR_STAT_CAP_STARTED		(1 << 1)
@@ -146,6 +146,8 @@ static Int32 capture_thr_init(CapThrArg *arg, CapThrEnv *envp)
 
 	envp->status |= CAPTHR_STAT_CONV_EN;
 	frame_disp_set_encode_mode(envp->hDispatch, FRAME_ENC_ON);
+	if(workMode.capMode == CAM_CAP_MODE_CONTINUE)
+		envp->encImg = TRUE;
 	
 	/* Create msg handle */
 	const char *dstMsgName = MSG_VID_ENC;
@@ -197,9 +199,14 @@ static Int32 capture_thr_init(CapThrArg *arg, CapThrEnv *envp)
 		envp->imgMsg.dimension = envp->inputInfo;
 	}
 
+	DBG("cap out size: %u X %u", envp->imgMsg.dimension.width, envp->imgMsg.dimension.height);
+
 	/* check if we need 2nd stream */
 	params_mng_control(envp->hParamsMng, PMCMD_G_2NDSTREAMATTRS, 
 		&envp->stream2OutAttrs, sizeof(ConvOutAttrs));
+
+	DBG("stream2 enable: %d", envp->stream2OutAttrs.enbale);
+	DBG("stream2 res: %u X %u", envp->stream2OutAttrs.width, envp->stream2OutAttrs.height);
 	
 	/* create buffer pool */
 	bufSize = pConvDynParams->outAttrs[0].width * pConvDynParams->outAttrs[0].height * 3/2;
@@ -305,6 +312,7 @@ static Int32 cap_thr_run(CapThrEnv *envp)
 								&envp->stream2OutAttrs);
 		if(err) {
 			ERR("imgConv config for img enc err.");
+			buf_pool_free(hBuf);
 			goto free_buf;
 		}
 
@@ -314,6 +322,7 @@ static Int32 cap_thr_run(CapThrEnv *envp)
 		err = img_conv_process(envp->hImgConv, &inBuf, NULL, &outBuf, NULL);
 		if(err) {
 			ERR("imgConv for img enc err.");
+			buf_pool_free(hBuf);
 			goto free_buf;
 		}
 
@@ -334,6 +343,7 @@ static Int32 cap_thr_run(CapThrEnv *envp)
 								&envp->convDynParams);
 		if(err) {
 			ERR("imgConv set back configerr.");
+			buf_pool_free(hBuf);
 		}
 		imgMsg->dimension.width = envp->convDynParams.outAttrs[0].width;
 		imgMsg->dimension.height = envp->convDynParams.outAttrs[0].height;

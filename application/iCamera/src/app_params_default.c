@@ -109,7 +109,7 @@ const AppParams c_appParamsDef = {
 	.h264EncParams = {
 		.resolution = H264_RES_1280X720,
 		.frameRate = 30,
-		.rateControl = H264_RC_CVBR,
+		.rateControl = CAM_H264_RC_CVBR,
 		.forceIFrame = 0,
 		.bitRate = 2000,
 		.IPRatio = 30,
@@ -122,7 +122,7 @@ const AppParams c_appParamsDef = {
 		.flags = 0,
 	},
 	.workMode = {
-		.format = CAM_FMT_JPEG,
+		.format = CAM_FMT_JPEG_H264,
 		.resType = CAM_RES_FULL_FRAME,
 		.capMode = CAM_CAP_MODE_CONTINUE,
 		.flags = 0,

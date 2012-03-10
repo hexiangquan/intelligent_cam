@@ -43,6 +43,7 @@ typedef struct _ImgMsg {
 	Int32			index;				/* Frame index */
 	ImgDimension	dimension;			/* Format info of image */
 	CamDateTime		timeStamp;			/* Capture time */
+	Int32			frameType;			/* Frame type for video */
 }ImgMsg;
 
 

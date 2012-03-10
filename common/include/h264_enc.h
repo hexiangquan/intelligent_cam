@@ -149,6 +149,7 @@ typedef struct _H264EncOutArgs {
 	Int32	outputID;		/* Output ID corresponding to the encoder buffer */
 }H264EncOutArgs;
 
+typedef AlgHandle	H264EncHandle;
 /*----------------------------------------------*
  * internal routine prototypes                  *
  *----------------------------------------------*/
@@ -174,6 +175,9 @@ extern const H264EncDynParams H264ENC_DYN_DEFAULT;
  *----------------------------------------------*/
  
 /* Only support ALG_CMD_SET_DYN_PARAMS command */
+enum H264EncCmd {
+	H264ENC_CMD_SET_DYN_PARAMS = ALG_CMD_SET_DYN_PARAMS,
+};
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -187,6 +191,19 @@ extern "C"{
 
 /* Functions of this module */
 extern const AlgFxns H264ENC_ALG_FXNS;
+
+/* Macros for easy use of h.264 encode alg */
+#define h264_enc_create(initParams, dynParams)	\
+	alg_create(&H264ENC_ALG_FXNS, initParams, dynParams)
+
+#define h264_enc_delete(handle) \
+	alg_delete(handle)
+
+#define h264_enc_process(handle, inBuf, inArgs, outBuf, outArgs) \
+	alg_process(handle, inBuf, inArgs, outBuf, outArgs)
+
+#define h264_enc_control(handle, cmd, args) \
+	alg_control(handle, cmd, args)
 
 #ifdef __cplusplus
 #if __cplusplus

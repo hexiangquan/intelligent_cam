@@ -337,7 +337,7 @@ static Int32 img_convert_set_out_attrs(ImgConvHandle hConv, ConvOutAttrs *outAtt
 		return E_INVAL;
 	}
 
-	if(outAttrs->enbale && ALIGNED(outAttrs->width, 16)) {
+	if(outAttrs->enbale && !ALIGNED(outAttrs->width, 16)) {
 		ERR("width must align to 16");
 		return E_INVAL;
 	}

@@ -32,7 +32,8 @@
 #include "buffer.h"
 #include "capture_thr.h"
 #include "img_enc_thr.h"
-#include "signal.h"
+#include <signal.h>
+#include "vid_enc_thr.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -128,6 +129,19 @@ static Int32 threads_create(MainEnv *envp)
 		ERRSTR("create img enc thread failed...");
 		return E_NOMEM;
 	}
+
+	/* create video encode thread */
+	VidEncThrArg *vidEncArg = malloc(sizeof(VidEncThrArg));
+	assert(vidEncArg);
+
+	vidEncArg->hDispatch = envp->hDispatch;
+	vidEncArg->hParamsMng = envp->hParamsMng;
+	err = pthread_create(&envp->pid[2], NULL, vid_enc_thr, vidEncArg);
+	if(err < 0) {
+		free(vidEncArg);
+		ERRSTR("create vid enc thread failed...");
+		return E_NOMEM;
+	}
 	
 	return E_NO;
 }
@@ -150,7 +164,7 @@ static Int32 threads_create(MainEnv *envp)
 *****************************************************************************/
 static void threads_delete(MainEnv *envp, MsgHandle hMsg)
 {
-	Int32 i = 0;
+	//Int32 i = 0;
 	MsgHeader msg;
 
 	DBG("delete threads...");
@@ -160,14 +174,13 @@ static void threads_delete(MainEnv *envp, MsgHandle hMsg)
 	msg.index = 0;
 	msg.dataLen = 0;
 	msg.magicNum = MSG_MAGIC_SEND;
-	msg_send(hMsg, MSG_CAP, &msg, sizeof(msg));
 	msg_send(hMsg, MSG_IMG_ENC, &msg, sizeof(msg));
+	pthread_join(envp->pid[1], NULL);
+	msg_send(hMsg, MSG_VID_ENC, &msg, sizeof(msg));
+	pthread_join(envp->pid[2], NULL);
+	msg_send(hMsg, MSG_CAP, &msg, sizeof(msg));
+	pthread_join(envp->pid[0], NULL);
 
-	/* wait all threads exit */
-	while(envp->pid[i]) {
-		pthread_join(envp->pid[i], NULL);
-		i++;
-	}
 }
 
 /*****************************************************************************
@@ -280,8 +293,8 @@ static Int32 main_loop(MainEnv *envp)
 	envp->hDispatch = frame_disp_create(FT_SRV_UNCONNECTED, FRAME_ENC_ON, &info);
 
 	/* catch signals */
-	DBG("enable signal");
-	signal(SIGINT, sig_handler);
+	//DBG("enable signal");
+	//signal(SIGINT, sig_handler);
 
 	/* create threads */
 	status = threads_create(envp);
@@ -326,7 +339,6 @@ exit:
 		frame_disp_delete(envp->hDispatch);
 
 	alg_exit();
-	buffer_exit();
 
 	return status;
 	

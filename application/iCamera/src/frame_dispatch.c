@@ -84,23 +84,22 @@ Int32 frame_disp_delete(FrameDispHandle hFrameDisp)
 *****************************************************************************/
 static Int32 free_frame_buf(BufHandle hBuf, Int32 flags)
 {
-	if(flags & FD_FLAG_NOT_FREE_BUF) {
-		/* free buffer */
-		BufPoolHandle hPool;
+	if(flags & FD_FLAG_NOT_FREE_BUF)
+		return E_NO;
+	
+	/* free buffer */
+	BufPoolHandle hPool;
 
-		/* try get pool of this buffer */
-		hPool = buffer_get_pool(hBuf);
+	/* try get pool of this buffer */
+	hPool = buffer_get_pool(hBuf);
 
-		if(hPool) {
-			/* belong to a pool, put back */
-			return buf_pool_free(hBuf);
-		} else {
-			/* free to heap */
-			return buffer_free(hBuf);
-		}
+	if(hPool) {
+		/* belong to a pool, put back */
+		return buf_pool_free(hBuf);
+	} else {
+		/* free to heap */
+		return buffer_free(hBuf);
 	}
-
-	return E_NO;
 }
 
 /*****************************************************************************

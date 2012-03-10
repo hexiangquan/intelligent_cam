@@ -298,6 +298,32 @@ typedef struct {
 /* 
   * H.264 encode params  
   */
+
+enum eCamH264RateControl
+{
+	CAM_H264_RC_CBR = 0, 	/**< constant Bitrate rate control */
+	CAM_H264_RC_VBR,		/**< Variable Bitrate control.*/
+	CAM_H264_RC_FQP,		/**< Constant quality, fixed QP */
+	CAM_H264_RC_CVBR,		/**< Constrained variable bitrate */
+	CAM_H264_RC_FFS,		/**< Fixed  Frame  size  Rate  Control */
+	CAM_H264_RC_CUSTOM_CBR,	/**< customized version of CBR,  
+						  	*    reduce the breathing artifacts in encoded videos
+						  	*/
+	CAM_H264_RC_CUSTOM_VBR,	/**< customized version of VBR, targeted for sequences 
+						 	 *	 with varying complexity distribution 
+						  	*/
+	CAM_H264_RC_MAX,
+};
+
+enum eCamH264Resolution
+{
+	H264_RES_1920X1080 = 0,		//1080P
+	H264_RES_1280X720 = 1,		// 720P
+	H264_RES_1600X1200 = 2,		//200W
+	H264_RES_720X480 = 3,		//D1
+	H264_RES_MAX,
+};
+
 typedef struct {
 	Uint8	resolution;			//H.264 video resolution, see eH264 Resolution
 	Uint8	frameRate;			//Encode frame rate, 1~30fps
@@ -313,31 +339,6 @@ typedef struct {
 	Uint16	videoLen;			//Time of a video file after one trigger
 	Uint32	flags;				//Reserved for future use 
 } CamH264Params;
-
-enum eH264Resolution
-{
-	H264_RES_1920X1080 = 0,		//1080P
-	H264_RES_1280X720 = 1,		// 720P
-	H264_RES_1600X1200 = 2,		//200W
-	H264_RES_720X480 = 3,		//D1
-	H264_RES_MAX,
-};
-
-enum eH264RateControl
-{
-	H264_RC_CBR = 0, 	/**< constant Bitrate rate control */
-	H264_RC_VBR,		/**< Variable Bitrate control.*/
-	H264_RC_FQP,		/**< Constant quality, fixed QP */
-	H264_RC_CVBR,		/**< Constrained variable bitrate */
-	H264_RC_FFS,		/**< Fixed  Frame  size  Rate  Control */
-	H264_RC_CUSTOM_CBR,	/**< customized version of CBR,  
-						  *    reduce the breathing artifacts in encoded videos
-						  */
-	H264_RC_CUSTOM_VBR,	/**< customized version of VBR, targeted for sequences 
-						  *	 with varying complexity distribution 
-						  */
-	H264_RC_MAX,
-};
 
 /* 
   * Analog video params 

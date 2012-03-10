@@ -144,6 +144,8 @@ typedef enum {
 	PMCMD_G_JPGENCDYN,
 	PMCMD_S_CAPINFO,	/* This cmd should be set before any other thread cmds */
 	PMCMD_G_IMGOSDDYN,
+	PMCMD_G_H264ENCDYN,
+	PMCMD_G_VIDOSDDYN,
 	
 }ParamsMngCtrlCmd;
 

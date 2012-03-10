@@ -198,6 +198,7 @@ static Int32 img_enc_thr_run(ImgEncThrEnv *envp, ImgMsg *msg)
 
 	/* free input buffer */
 	buf_pool_free(hBufIn);
+	hBufIn = NULL;
 
 	/* modify frame info */
 	msg->dimension.colorSpace = FMT_JPG;

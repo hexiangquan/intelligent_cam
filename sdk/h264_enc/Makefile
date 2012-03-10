@@ -129,6 +129,7 @@ $(EXEC_OBJ): $(OBJ_DIR)/%.o: %.c $(HEADERS)
 #install_$(TARGET):
 install:
 	-cp -p $(LIB) $(LIB_INSTALL_DIR)
+	-cp -p $(LIB) $(SDK_LIB_DIR)
 	-cp -p $(LIB_HEADER) $(SDK_INC_DIR)
 	-cp -p $(EXEC) $(EXEC_INSTALL_PATH)
 	-cp -p $(TEST_INPUT) $(EXEC_INSTALL_PATH)

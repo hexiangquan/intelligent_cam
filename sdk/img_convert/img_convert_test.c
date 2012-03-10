@@ -166,7 +166,9 @@ static Bool main_loop(TestParams *params)
 			else
 				convDynParams.ctrlFlags |= CONV_FLAG_NF_EN;
 
+			gettimeofday(&tmStart,NULL);
 			err = alg_set_dynamic_params(hImgConv, &convDynParams);
+			gettimeofday(&tmEnd,NULL); 
 			if(err) {
 				ERR("set dyn params failed....");
 				goto exit;
@@ -174,6 +176,9 @@ static Bool main_loop(TestParams *params)
 				DBG("res switched to %u X %u", 
 					convDynParams.outAttrs[0].width, convDynParams.outAttrs[0].height);
 			}
+
+			timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+			DBG("  set dyn params cost: %.3f ms", timeUse/1000);
 			
 		}
 

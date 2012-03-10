@@ -1004,7 +1004,7 @@ Int32 capture_get_frame(CapHandle hCap, FrameBuf *frameBuf)
 	
 	 
 	/* Fill frameBuf info */
-	frameBuf->index = hCap->capIndex++;
+	frameBuf->index = ++(hCap->capIndex);
 	frameBuf->timeStamp = v4l2buf.timestamp;
 	frameBuf->dataBuf = (void *)v4l2buf.m.userptr;
 	frameBuf->bufSize = hCap->bufSize;
