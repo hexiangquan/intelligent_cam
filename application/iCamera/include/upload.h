@@ -1,0 +1,217 @@
+/******************************************************************************
+
+  Copyright (C), 2001-2011, DCN Co., Ltd.
+
+ ******************************************************************************
+  File Name     : upload.h
+  Version       : Initial Draft
+  Author        : Sun
+  Created       : 2012/3/10
+  Last Modified :
+  Description   : upload.c header file
+  Function List :
+  History       :
+  1.Date        : 2012/3/10
+    Author      : Sun
+    Modification: Created file
+
+******************************************************************************/
+#ifndef __UPLOAD_H__
+#define __UPLOAD_H__
+
+#include "common.h"
+
+/*----------------------------------------------*
+ * external variables                           *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * external routine prototypes                  *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * internal routine prototypes                  *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * project-wide global variables                *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * module-wide global variables                 *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * constants                                    *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * macros                                       *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * routines' implementations                    *
+ *----------------------------------------------*/
+
+typedef struct UploadObj *UploadHandle;
+
+typedef struct _UploadFxns {
+	/* create function, returns sub object handle  */
+	void *(*create)(void *params, Uint32 size);
+
+	/* Connect server, 1st: sub object handle, 2nd: timeout, ms */
+	Int32  (*connect)(void *handle, Uint32 timeoutMs);
+
+	/* Disconnect server, 1st: sub object handle */
+	Int32  (*disconnect)(void *handle);
+
+	/* Send a frame,, 1st: sub object handle, 2nd: frame data, 3rd: data len */
+	Int32  (*sendFrame)(void *handle, const void *data, Uint32 len);
+
+	/* Send heart beat, , 1st: sub object handle, can be NULL */
+	Int32  (*sendHeartBeat)(void *handle);
+	
+	/* Set params, , 1st: sub object handle, 2nd: New Init params */	
+	Int32  (*setParams)(void *handle, const void *params);
+
+	/* Delete param, 1st: sub object handle*/
+	Int32  (*delete)(void *handle);
+}UploadFxns;
+
+#ifdef __cplusplus
+#if __cplusplus
+extern "C"{
+#endif
+#endif /* __cplusplus */
+
+/*****************************************************************************
+ Prototype    : upload_create
+ Description  : create upload module
+ Input        : const UploadFxns *fxns  
+                void *params            
+                Uint32 size             
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/10
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern UploadHandle upload_create(const UploadFxns *fxns, void *params, Uint32 size);
+
+/*****************************************************************************
+ Prototype    : upload_delete
+ Description  : delete upload module
+ Input        : UploadHandle hUpload  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/10
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 upload_delete(UploadHandle hUpload);
+
+/*****************************************************************************
+ Prototype    : upload_connect
+ Description  : connect server
+ Input        : UploadHandle hUpload  
+                Uint32 timeoutMs      
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/10
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 upload_connect(UploadHandle hUpload, Uint32 timeoutMs);
+
+/*****************************************************************************
+ Prototype    : upload_disconnect
+ Description  : disconnect server
+ Input        : UploadHandle hUpload  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/10
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 upload_disconnect(UploadHandle hUpload);
+
+/*****************************************************************************
+ Prototype    : upload_get_connect_status
+ Description  : get if the server is connected
+ Input        : UploadHandle hUpload  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/10
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Bool upload_get_connect_status(UploadHandle hUpload);
+
+/*****************************************************************************
+ Prototype    : upload_send_heartbeat
+ Description  : keep connect with server
+ Input        : UploadHandle hUpload  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/10
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 upload_send_heartbeat(UploadHandle hUpload);
+
+/*****************************************************************************
+ Prototype    : upload_set_params
+ Description  : update params
+ Input        : UploadHandle hUpload  
+                Ptr params            
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/10
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 upload_set_params(UploadHandle hUpload, Ptr params);
+
+#ifdef __cplusplus
+#if __cplusplus
+}
+#endif
+#endif /* __cplusplus */
+
+
+#endif /* __UPLOAD_H__ */
