@@ -195,7 +195,7 @@ typedef enum
   * TCP image recv server info 
   */
 typedef struct {
-	Uint8	serverIP[16];	//Image server IP
+	Int8	serverIP[16];	//Image server IP
 	Uint16	serverPort;		//Image server listen port
 	Uint16	flag;			//control flag, reserved
 } CamTcpImageServerInfo;

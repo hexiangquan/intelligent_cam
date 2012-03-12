@@ -60,7 +60,7 @@ CPP_FLAGS ?=
 # Link libs and options
 LD_FLAGS += -L$(SDK_LIB_DIR)
 LD_LIBS := -lpthread -lm -lbuf -lalg -lcapture -lcrc -lmsg -limgconv
-LD_LIBS += -ljpgenc -llog -losd -lh264enc
+LD_LIBS += -ljpgenc -llog -losd -lh264enc -lnetproto -lnetutils
 
 # Comment this out if you want to see full compiler and linker output.
 #override VERBOSE = @

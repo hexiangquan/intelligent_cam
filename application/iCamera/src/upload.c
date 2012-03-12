@@ -253,7 +253,7 @@ Bool upload_get_connect_status(UploadHandle hUpload)
     Modification : Created function
 
 *****************************************************************************/
-Int32 upload_send_frame(UploadHandle hUpload, Ptr data, Uint32 len)
+Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data)
 {
 	if(!hUpload)
 		return E_INVAL;
@@ -266,7 +266,7 @@ Int32 upload_send_frame(UploadHandle hUpload, Ptr data, Uint32 len)
 		return E_CONNECT;
 	}
 
-	return hUpload->fxns->sendFrame(hUpload->handle, data, len);
+	return hUpload->fxns->sendFrame(hUpload->handle, data);
 }
 
 
@@ -317,7 +317,7 @@ Int32 upload_send_heartbeat(UploadHandle hUpload)
     Modification : Created function
 
 *****************************************************************************/
-Int32 upload_set_params(UploadHandle hUpload, Ptr params)
+Int32 upload_set_params(UploadHandle hUpload, Ptr params, Int32 size)
 {
 	if(!hUpload)
 		return E_INVAL;
@@ -328,7 +328,7 @@ Int32 upload_set_params(UploadHandle hUpload, Ptr params)
 	if(hUpload->isConnected)
 		upload_disconnect(hUpload);
 
-	return hUpload->fxns->setParams(hUpload->handle, params);
+	return hUpload->fxns->setParams(hUpload->handle, params, size);
 }
 
 

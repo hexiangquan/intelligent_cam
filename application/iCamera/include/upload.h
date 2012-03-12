@@ -20,6 +20,7 @@
 #define __UPLOAD_H__
 
 #include "common.h"
+#include "app_msg.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -66,13 +67,13 @@ typedef struct _UploadFxns {
 	Int32  (*disconnect)(void *handle);
 
 	/* Send a frame,, 1st: sub object handle, 2nd: frame data, 3rd: data len */
-	Int32  (*sendFrame)(void *handle, const void *data, Uint32 len);
+	Int32  (*sendFrame)(void *handle, const ImgMsg *frame);
 
 	/* Send heart beat, , 1st: sub object handle, can be NULL */
 	Int32  (*sendHeartBeat)(void *handle);
 	
 	/* Set params, , 1st: sub object handle, 2nd: New Init params */	
-	Int32  (*setParams)(void *handle, const void *params);
+	Int32  (*setParams)(void *handle, const void *params, Int32 size);
 
 	/* Delete param, 1st: sub object handle*/
 	Int32  (*delete)(void *handle);
@@ -205,8 +206,9 @@ extern Int32 upload_send_heartbeat(UploadHandle hUpload);
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 upload_set_params(UploadHandle hUpload, Ptr params);
+extern Int32 upload_set_params(UploadHandle hUpload, Ptr params, Int32 size);
 
+extern Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data);
 #ifdef __cplusplus
 #if __cplusplus
 }
