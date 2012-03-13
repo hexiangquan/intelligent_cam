@@ -157,9 +157,8 @@ typedef enum _CamOsdSize {
   */
 #define MAX_ROAD_NAME_SIZE 		64
 
-typedef struct
-{
-	Uint8	roadName[MAX_ROAD_NAME_SIZE];	//road info
+typedef struct {
+	Int8	roadName[MAX_ROAD_NAME_SIZE];	//road info
 	Uint16	roadNum;						//Road Number
 	Uint16	directionNum;					//Direction Number
 	Uint16	devSN;							//Divice Serial Num
@@ -169,8 +168,7 @@ typedef struct
 /* 
   * RTP params for H.264 transfer 
   */
-typedef struct
-{
+typedef struct {
 	Int8	dstIp[16];		//Destination IP address
 	Uint16	dstPort;		//Destination port
 	Uint16	localPort;		//Local port for RTP sending
@@ -184,11 +182,11 @@ typedef struct
 /* 
   * Image upload type 
   */
-typedef enum
-{
+typedef enum {
 	CAM_UPLOAD_PROTO_TCP = 0,
 	CAM_UPLOAD_PROTO_FTP =1,	
 	CAM_UPLOAD_PROTO_NONE,		//don't upload, save to local file system
+	CAM_UPLOAD_PROTO_MAX
 } CamImageUploadProtocol;
 
 /* 
@@ -209,7 +207,7 @@ typedef struct {
 #define CAM_FTP_MAX_ROOT_DIR_LEN		64
 
 typedef struct {
-	Uint8	serverIP[16];						//Ftp server Ip
+	Int8	serverIP[16];						//Ftp server Ip
 	Uint16	serverPort;							//Listen port
 	Uint16	flag;								//Flag for other function
 	Int8	userName[CAM_FTP_MAX_USERNAME_LEN];	//User name

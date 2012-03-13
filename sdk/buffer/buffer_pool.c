@@ -213,6 +213,7 @@ static inline BufHandle buf_pool_find_free(BufPoolHandle hPool)
 		if(!(hBuf->flag & BUF_FLAG_USED)) {
 			hBuf->flag |= BUF_FLAG_USED;
 			hPool->useNum++;
+			//DBG("buf pool use: %d, total: %d", hPool->useNum, hPool->bufNum);
 			break;
 		}
 	}
@@ -244,7 +245,7 @@ BufHandle buf_pool_alloc(BufPoolHandle hPool)
 	pthread_mutex_lock(&hPool->mutex);
 
 	/* Wait condition if no free buffer available */
-	while(hPool->useNum >= hPool->bufNum) {
+	if(hPool->useNum >= hPool->bufNum) {
 		#ifdef BUF_DBG
 		DBG("wait buf available for this pool.");
 		#endif
@@ -418,8 +419,8 @@ Int32 buf_pool_free(BufHandle hBuf)
 		DBG("free buf, Send signal....");
 		#endif
 		pthread_mutex_unlock(&hPool->mutex);
-		pthread_cond_signal(&hPool->cond);
-		//pthread_cond_broadcast(&hPool->cond);
+		//pthread_cond_signal(&hPool->cond);
+		pthread_cond_broadcast(&hPool->cond);
 		return err;
 	} else {
 		if(hPool->useNum)

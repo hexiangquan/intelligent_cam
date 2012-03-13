@@ -66,7 +66,8 @@ clean:
 	@rm -vf $(LIB) $(EXEC) *.o *~ $(LIB_PATH)/*.o
 
 install:
-	cp -p $(LIB) $(LIB_INSTALL_DIR)
-	cp -p $(LIB_HEADER) $(SDK_INC_DIR)
-	cp -p $(EXEC) $(EXEC_INSTALL_PATH)
+	-cp -p $(LIB) $(LIB_INSTALL_DIR)
+	-cp -p $(LIB) $(SDK_LIB_DIR)
+	-cp -p $(LIB_HEADER) $(SDK_INC_DIR)
+	-cp -p $(EXEC) $(EXEC_INSTALL_PATH)
 

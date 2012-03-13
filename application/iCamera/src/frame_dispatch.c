@@ -2,12 +2,13 @@
 #include "log.h"
 #include "cam_time.h"
 #include <sys/stat.h>
-
+#include "capture.h"
 
 struct FrameDispObj {
 	FrameTxStatus	txStat;
 	FrameEncMode	encMode;
 	FrameDispInfo	info;
+	CapHandle		hCap;
 };
 
 /*****************************************************************************
@@ -41,6 +42,30 @@ FrameDispHandle frame_disp_create(FrameTxStatus curStat, FrameEncMode encMode, F
 	return hFrameDisp;
 }
 
+/*****************************************************************************
+ Prototype    : frame_disp_set_capture_handle
+ Description  : set capture handle
+ Input        : FrameDispHandle hDispatch  
+                CapHandle hCap             
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/13
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 frame_disp_register_capture(FrameDispHandle hDispatch, CapHandle hCap)
+{
+	if(!hDispatch || !hCap)
+		return E_INVAL;
+
+	hDispatch->hCap = hCap;
+	return E_NO;
+}
 
 /*****************************************************************************
  Prototype    : frame_disp_delete
@@ -82,23 +107,28 @@ Int32 frame_disp_delete(FrameDispHandle hFrameDisp)
     Modification : Created function
 
 *****************************************************************************/
-static Int32 free_frame_buf(BufHandle hBuf, Int32 flags)
+static Int32 free_frame_buf(FrameDispHandle hDispatch, ImgMsg *img, Int32 flags)
 {
-	if(flags & FD_FLAG_NOT_FREE_BUF)
+	if(flags & FD_FLAG_NOT_FREE_BUF) {
 		return E_NO;
+	}
+
+	if(flags & FD_FLAG_RAW_FRAME) {
+		return capture_free_frame(hDispatch->hCap, &img->rawFrame);
+	}
 	
 	/* free buffer */
 	BufPoolHandle hPool;
 
 	/* try get pool of this buffer */
-	hPool = buffer_get_pool(hBuf);
+	hPool = buffer_get_pool(img->hBuf);
 
 	if(hPool) {
 		/* belong to a pool, put back */
-		return buf_pool_free(hBuf);
+		return buf_pool_free(img->hBuf);
 	} else {
 		/* free to heap */
-		return buffer_free(hBuf);
+		return buffer_free(img->hBuf);
 	}
 }
 
@@ -227,18 +257,22 @@ static Int32 jpg_save(FrameDispHandle hFrameDisp, ImgMsg *frameBuf)
 *****************************************************************************/
 static Int32 jpg_dispatch(FrameDispHandle hFrameDisp, MsgHandle hMsg, ImgMsg *frameBuf, const char *dstMsgName, Int32 flags)
 {
-	Int32 err = E_IO;
-	
-	if(hFrameDisp->txStat == FT_SRV_CONNECTED && !(flags & FD_FLAG_SAVE_ONLY)) {
-		/* send msg to next task */
-		err = msg_send(hMsg, dstMsgName, frameBuf, sizeof(ImgMsg));
+	Int32 err = E_NO;
+
+	if(hMsg) {
+		err = E_CONNECT;
+		if(hFrameDisp->txStat == FT_SRV_CONNECTED && !(flags & FD_FLAG_SAVE_ONLY)) {
+			/* send msg to next task */
+			err = msg_send(hMsg, dstMsgName, frameBuf, sizeof(ImgMsg));
+			if(!err)
+				return E_NO;
+		}
 	}
 
-	if(err)
+	if(err || (flags & FD_FLAG_SAVE_ONLY))
 		err = jpg_save(hFrameDisp, frameBuf);
 
-
-	err = free_frame_buf(frameBuf->hBuf, flags);
+	err = free_frame_buf(hFrameDisp, frameBuf, flags);
 
 	return err;
 }
@@ -267,7 +301,7 @@ static Int32 h264_dispatch(FrameDispHandle hFrameDisp, MsgHandle hMsg, ImgMsg *f
 
 	/* using RTP to send */
 
-	err = free_frame_buf(frameBuf->hBuf, flags);
+	err = free_frame_buf(hFrameDisp, frameBuf, flags);
 
 	return err;
 }
@@ -295,16 +329,19 @@ static Int32 raw_dispatch(FrameDispHandle hFrameDisp, MsgHandle hMsg, ImgMsg *fr
 {
 	Int32 err = E_MODE;
 
-	if(hFrameDisp->encMode == FRAME_ENC_ON) {
-		/* send msg to encode */
-		err = msg_send(hMsg, dstMsgName, frameBuf, sizeof(ImgMsg));
-	} else if(hFrameDisp->txStat == FT_SRV_CONNECTED) {
-		/* send msg for net tx */
-		err = msg_send(hMsg, dstMsgName, frameBuf, sizeof(ImgMsg));
+	if(hMsg) {
+		if(hFrameDisp->encMode == FRAME_ENC_ON) {
+			/* send msg to encode */
+			err = msg_send(hMsg, dstMsgName, frameBuf, sizeof(ImgMsg));
+		} else if(hFrameDisp->txStat == FT_SRV_CONNECTED) {
+			/* send msg for net tx */
+			err = msg_send(hMsg, dstMsgName, frameBuf, sizeof(ImgMsg));
+		}
 	}
 
-	if(err)
-		err = free_frame_buf(frameBuf->hBuf, flags);
+	if(err) {
+		err = free_frame_buf(hFrameDisp, frameBuf, flags);
+	}
 
 	return err;
 }
@@ -347,7 +384,7 @@ Int32 frame_disp_run(FrameDispHandle hFrameDisp, MsgHandle hMsg, ImgMsg *frameBu
 		break;
 	default:
 		WARN("unsupport fmt, just free buffer");
-		free_frame_buf(frameBuf->hBuf, flags);
+		free_frame_buf(hFrameDisp, frameBuf, flags);
 		ret = E_UNSUPT;
 		break;
 	}

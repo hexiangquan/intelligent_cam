@@ -7,7 +7,7 @@
 #define HOST_NAME		"hdcam"
 #define DNS_SERVER		"192.168.0.1"
 #define SERVER_IP		"192.168.0.25"
-#define TCP_SRV_PORT	5678
+#define TCP_SRV_PORT	9300
 #define OSD_STRING		"HDCAM"
 #define ROAD_NAME		OSD_STRING
 #define RTP_PORT		5400

@@ -26,6 +26,8 @@
 ******************************************************************************/
 #include "upload.h"
 #include "log.h"
+#include "tcp_upload.h"
+#include "ftp_upload.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -63,7 +65,9 @@ struct UploadObj {
 	const UploadFxns	*fxns;
 	Bool				isConnected;
 	void				*handle;
+	Uint32				connectTimeout;
 };
+
 
 /*****************************************************************************
  Prototype    : upload_create
@@ -82,15 +86,10 @@ struct UploadObj {
     Modification : Created function
 
 *****************************************************************************/
-UploadHandle upload_create(const UploadFxns *fxns, void *params, Uint32 size)
+UploadHandle upload_create(CamImageUploadProtocol protol, void *params, Uint32 reConTimeout)
 {
 	UploadHandle hUpload;
 
-	if(!fxns || !fxns->create) {
-		ERR("fxns must set");
-		return NULL;
-	}
-	
 	hUpload = calloc(1, sizeof(struct UploadObj));
 	if(!hUpload) {
 		ERR("alloc memory failed.");
@@ -98,12 +97,27 @@ UploadHandle upload_create(const UploadFxns *fxns, void *params, Uint32 size)
 	}
 
 	hUpload->isConnected = FALSE;
-	hUpload->fxns = fxns;
+	hUpload->connectTimeout = reConTimeout;
 
-	hUpload->handle = fxns->create(params, size);
-	if(!hUpload->handle) {
-		ERR("create sub object failed.");
-		goto err_quit;
+	switch(protol) {
+	case CAM_UPLOAD_PROTO_TCP:
+		hUpload->fxns = &TCP_UPLOAD_FXNS;
+		break;
+	case CAM_UPLOAD_PROTO_FTP:
+		hUpload->fxns = &FTP_UPLOAD_FXNS;
+		break;
+	case CAM_UPLOAD_PROTO_NONE:
+	default:
+		hUpload->fxns = NULL;
+		break;
+	}
+
+	if(hUpload->fxns && hUpload->fxns->create) {
+		hUpload->handle = hUpload->fxns->create(params);
+		if(!hUpload->handle) {
+			ERR("create sub object failed.");
+			goto err_quit;
+		}
 	}
 
 	return hUpload;
@@ -138,7 +152,7 @@ Int32 upload_delete(UploadHandle hUpload)
 	if(hUpload->isConnected)
 		upload_disconnect(hUpload);
 
-	if(hUpload->fxns->delete)
+	if(hUpload->fxns && hUpload->fxns->delete)
 		hUpload->fxns->delete(hUpload->handle);
 	
 	free(hUpload);
@@ -169,12 +183,16 @@ Int32 upload_connect(UploadHandle hUpload, Uint32 timeoutMs)
 	if(!hUpload)
 		return E_INVAL;
 
-	if(!hUpload->fxns->connect)
-		return E_CONNECT;
+	if(!hUpload->fxns || !hUpload->fxns->connect) {
+		hUpload->isConnected = FALSE;
+		return E_UNSUPT;
+	}
 
-	if(!hUpload->isConnected)
-		if((err = hUpload->fxns->connect(hUpload->handle, timeoutMs)))
-			return err;
+	if(hUpload->isConnected)
+		upload_disconnect(hUpload);
+		
+	if((err = hUpload->fxns->connect(hUpload->handle, timeoutMs)))
+		return err;
 
 	hUpload->isConnected = TRUE;
 
@@ -203,7 +221,7 @@ Int32 upload_disconnect(UploadHandle hUpload)
 	if(!hUpload)
 		return E_INVAL;
 
-	if(!hUpload->fxns->disconnect)
+	if(!hUpload->fxns || !hUpload->fxns->disconnect)
 		return E_NO;
 
 	if(hUpload->isConnected &&
@@ -258,12 +276,15 @@ Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data)
 	if(!hUpload)
 		return E_INVAL;
 
-	if(!hUpload->fxns->sendFrame)
+	if(!hUpload->fxns || !hUpload->fxns->sendFrame)
 		return E_TRANS;
 
 	if(!hUpload->isConnected) {
-		ERR("not connected server");
-		return E_CONNECT;
+		Int32 err = upload_connect(hUpload, hUpload->connectTimeout);
+		if(err) {
+			ERR("not connected server");
+			return err;
+		}
 	}
 
 	return hUpload->fxns->sendFrame(hUpload->handle, data);
@@ -290,7 +311,7 @@ Int32 upload_send_heartbeat(UploadHandle hUpload)
 	if(!hUpload)
 		return E_INVAL;
 
-	if(!hUpload->fxns->sendHeartBeat)
+	if(!hUpload->fxns || !hUpload->fxns->sendHeartBeat)
 		return E_NO;
 
 	if(!hUpload->isConnected) {
@@ -317,18 +338,18 @@ Int32 upload_send_heartbeat(UploadHandle hUpload)
     Modification : Created function
 
 *****************************************************************************/
-Int32 upload_set_params(UploadHandle hUpload, Ptr params, Int32 size)
+Int32 upload_set_params(UploadHandle hUpload, Ptr params)
 {
 	if(!hUpload)
 		return E_INVAL;
 
-	if(!hUpload->fxns->setParams)
+	if(!hUpload->fxns || !hUpload->fxns->setParams)
 		return E_NO;
 
 	if(hUpload->isConnected)
 		upload_disconnect(hUpload);
 
-	return hUpload->fxns->setParams(hUpload->handle, params, size);
+	return hUpload->fxns->setParams(hUpload->handle, params);
 }
 
 

@@ -361,6 +361,25 @@ static inline Int32 set_sock_send_timeout(int sockfd, Uint32 timeoutSec)
 	return E_NO;
 }
 
+/*****************************************************************************
+ Prototype    : get_local_ip
+ Description  : get local IP
+ Input        : Int8* buf      
+                Int32 bufSize  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 get_local_ip(Int8* buf, Int32 bufSize);
+
+
 #ifdef __cplusplus
 #if __cplusplus
 }

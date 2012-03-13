@@ -4,6 +4,7 @@
 #include "msg.h"
 #include "buffer.h"
 #include "cam_params.h"
+#include "capture.h"
 
 #define MSG_MAX_LEN		1024
 
@@ -14,6 +15,9 @@
 #define MSG_IMG_ENC		MSG_ROOT"/msgImgEnc"
 #define MSG_VID_ENC		MSG_ROOT"/msgVidEnc"
 #define MSG_IMG_TX		MSG_ROOT"/msgImgTx"
+
+/* enable crc check sum of data between threads */
+//#define CRC_EN
 
 
 /* Cmd of this application */
@@ -27,6 +31,7 @@ typedef enum _AppCmd {
 	APPCMD_SET_IMG_ENC_PARAMS,	//set encode params for image enc thread
 	APPCMD_SET_VID_ENC_PARAMS,	//set encode params for h.264 enc thread
 	APPCMD_SET_WORK_MODE,		//set work mode
+	APPCMD_SET_UPLOAD_PARAMS,	//set img upload params
 	APPCMD_MAX
 }AppCmd;
 
@@ -40,6 +45,7 @@ typedef struct _CommonMsg {
 typedef struct _ImgMsg {
 	MsgHeader		header;				/* Msg header, must be the first field */
 	BufHandle		hBuf;				/* Buffer handle */
+	FrameBuf		rawFrame;			/* raw frame if the format is not encoded */
 	Int32			index;				/* Frame index */
 	ImgDimension	dimension;			/* Format info of image */
 	CamDateTime		timeStamp;			/* Capture time */

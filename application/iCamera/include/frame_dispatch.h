@@ -52,6 +52,9 @@
 #define FD_FLAG_SAVE_ONLY		(1 << 0)	//directly save to local file system
 #define FD_FLAG_NOT_FREE_BUF	(1 << 1)	//do not free buffer after dispatch
 
+#define FD_FLAG_RAW_FRAME		(1 << 16)	// this frame is just captured
+#define FD_FLAG_POOL_FRAME		(1 << 17)	// this frame is after encode
+
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -171,6 +174,24 @@ extern Int32 frame_disp_set_tx_status(FrameDispHandle hFrameDisp, FrameTxStatus 
 
 *****************************************************************************/
 extern Int32 frame_disp_set_encode_mode(FrameDispHandle hFrameDisp, FrameEncMode mode);
+
+/*****************************************************************************
+ Prototype    : frame_disp_set_capture_handle
+ Description  : set capture handle
+ Input        : FrameDispHandle hDispatch  
+                CapHandle hCap             
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/13
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 frame_disp_register_capture(FrameDispHandle hDispatch, CapHandle hCap);
 
 #ifdef __cplusplus
 #if __cplusplus

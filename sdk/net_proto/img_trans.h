@@ -16,6 +16,16 @@ typedef struct {
 	Uint32		imageLen;			// len of image
 }ImgHdrInfo;
 
+/* image format supported */
+enum ImageType
+{
+	IMGTYPE_RAW = 0,
+	IMGTYPE_YUV,
+	IMGTYPE_JPEG,
+	IMGTYPE_H264
+};
+
+
 #ifdef __cplusplus
 #if __cplusplus
 extern "C"{

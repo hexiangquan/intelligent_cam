@@ -34,6 +34,7 @@
 #include "img_enc_thr.h"
 #include <signal.h>
 #include "vid_enc_thr.h"
+#include "img_snd_thr.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -81,6 +82,7 @@ typedef struct {
 	pthread_t	pid[CAM_MAX_THREAD_NUM];
 	ParamsMngHandle hParamsMng;
 	FrameDispHandle	hDispatch;
+	CapHandle		hCap;
 }MainEnv;
 
 static Bool s_exit = FALSE;
@@ -142,7 +144,21 @@ static Int32 threads_create(MainEnv *envp)
 		ERRSTR("create vid enc thread failed...");
 		return E_NOMEM;
 	}
-	
+
+#if 1
+	/* create image send thread */
+	ImgSndThrArg *imgSndArg = malloc(sizeof(ImgSndThrArg));
+	assert(imgSndArg);
+
+	imgSndArg->hDispatch = envp->hDispatch;
+	imgSndArg->hParamsMng = envp->hParamsMng;
+	err = pthread_create(&envp->pid[3], NULL, img_snd_thr, imgSndArg);
+	if(err < 0) {
+		free(imgSndArg);
+		ERRSTR("create img snd thread failed...");
+		return E_NOMEM;
+	}
+#endif
 	return E_NO;
 }
 
@@ -178,6 +194,8 @@ static void threads_delete(MainEnv *envp, MsgHandle hMsg)
 	pthread_join(envp->pid[1], NULL);
 	msg_send(hMsg, MSG_VID_ENC, &msg, sizeof(msg));
 	pthread_join(envp->pid[2], NULL);
+	//msg_send(hMsg, MSG_IMG_TX, &msg, sizeof(msg));
+	//pthread_join(envp->pid[3], NULL);
 	msg_send(hMsg, MSG_CAP, &msg, sizeof(msg));
 	pthread_join(envp->pid[0], NULL);
 
@@ -262,7 +280,7 @@ static Int32 main_loop(MainEnv *envp)
 	MsgHandle 		hMsg = NULL;
 	CommonMsg		msgBuf;
 	CamDateTime		curTime;
-
+	
 	/* init modules */
 	status = alg_init();
 	status |= buffer_init();
@@ -337,6 +355,9 @@ exit:
 
 	if(envp->hDispatch)
 		frame_disp_delete(envp->hDispatch);
+
+	if(envp->hCap)
+		capture_delete(envp->hCap);
 
 	alg_exit();
 

@@ -1,12 +1,70 @@
+/******************************************************************************
+
+  Copyright (C), 2001-2011, DCN Co., Ltd.
+
+ ******************************************************************************
+  File Name     : img_enc_thr.c
+  Version       : Initial Draft
+  Author        : Sun
+  Created       : 2012/3/13
+  Last Modified :
+  Description   : send image data thread
+  Function List :
+              img_enc_params_update
+              img_enc_thr
+              img_enc_thr_init
+              img_enc_thr_run
+              msg_process
+  History       :
+  1.Date        : 2012/3/13
+    Author      : Sun
+    Modification: Created file
+
+******************************************************************************/
 #include "img_enc_thr.h"
 #include "jpg_enc.h"
 #include "add_osd.h"
 #include "log.h"
+#include "crc16.h"
 
+/*----------------------------------------------*
+ * external variables                           *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * external routine prototypes                  *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * internal routine prototypes                  *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * project-wide global variables                *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * module-wide global variables                 *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * constants                                    *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * macros                                       *
+ *----------------------------------------------*/
 #define IMG_MAX_WIDTH		3144
 #define IMG_MAX_HEIGHT		2560
 #define ENC_POOL_BUF_NUM	3
 #define BUF_ALLOC_TIMEOUT	100		//ms
+
+/*----------------------------------------------*
+ * routines' implementations                    *
+ *----------------------------------------------*/
+
+
+
 
 /* thread environment */
 typedef struct {
@@ -164,11 +222,17 @@ static Int32 img_enc_thr_run(ImgEncThrEnv *envp, ImgMsg *msg)
 	inBuf.bufSize = buffer_get_size(msg->hBuf);
 	assert(inBuf.buf && inBuf.bufSize);
 
+#ifdef CRC_EN
+	Int32 crc = crc16(inBuf.buf, msg->dimension.size);
+	if(crc != msg->header.param[0])
+		ERR("crc check error");
+#endif
+
 	/* Alloc buffer for encoded data */
 	hBufOut = buf_pool_alloc_wait(envp->hPoolEnc, BUF_ALLOC_TIMEOUT);
 	if(!hBufOut) {
 		/* alloc buffer failed, use buf for save */
-		DBG("save dir to local file system");
+		DBG("save file to local file system");
 		dispFlags |= FD_FLAG_SAVE_ONLY | FD_FLAG_NOT_FREE_BUF;
 		hBufOut = envp->hBufSave;
 	}
@@ -197,6 +261,8 @@ static Int32 img_enc_thr_run(ImgEncThrEnv *envp, ImgMsg *msg)
 	}
 
 	/* free input buffer */
+	static int cnt = 0;
+	DBG("<%d>jpg enc free raw buf", ++cnt);
 	buf_pool_free(hBufIn);
 	hBufIn = NULL;
 
@@ -205,15 +271,18 @@ static Int32 img_enc_thr_run(ImgEncThrEnv *envp, ImgMsg *msg)
 	msg->dimension.size = outArgs.bytesGenerated;
 	msg->hBuf = hBufOut;
 	buffer_set_bytes_used(hBufOut, outArgs.bytesGenerated);
-
-	DBG("<%d> jpg enc run ok", msg->index);
+#ifdef CRC_EN
+	msg->header.param[0] = crc16(outBuf.buf, outArgs.bytesGenerated);
+#endif
 
 	/* dispatch jpeg data */
-	//err = frame_disp_run(envp->hDispatch, envp->hMsg, &msg, NULL, dispFlags);
-	//if(err) {
-		//ERR("dispatch jpeg data failed");
+	err = frame_disp_run(envp->hDispatch, envp->hMsg, msg, NULL, dispFlags);
+	if(err) {
+		ERR("dispatch jpeg data failed");
 		goto err_quit;
-	//}
+	}
+
+	//DBG("<%d> jpg enc run ok", msg->index);
 
 	return E_NO;
 

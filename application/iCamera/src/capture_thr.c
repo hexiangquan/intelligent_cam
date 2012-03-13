@@ -24,6 +24,7 @@
 #include "app_msg.h"
 #include <sys/select.h>
 #include "cam_time.h"
+#include "crc16.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -52,9 +53,9 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
-#define CAP_DEVICE		"/dev/video0"
-#define CAP_BUF_NUM		3
-#define POOL_BUF_NUM	4
+#define CAP_DEVICE			"/dev/video0"
+#define CAP_BUF_NUM			3
+#define POOL_BUF_NUM		4
 
 #define CAPTHR_STAT_CONV_EN			(1 << 0)
 #define CAPTHR_STAT_CAP_STARTED		(1 << 1)
@@ -142,6 +143,10 @@ static Int32 capture_thr_init(CapThrArg *arg, CapThrEnv *envp)
 
 	/* set capture info to params manager */
 	ret = params_mng_control(envp->hParamsMng, PMCMD_S_CAPINFO, &envp->inputInfo, sizeof(CapInputInfo));
+	assert(ret == E_NO);
+
+	/* register capture handle for frame dispatch */
+	ret = frame_disp_register_capture(envp->hDispatch, envp->hCap);
 	assert(ret == E_NO);
 
 	envp->status |= CAPTHR_STAT_CONV_EN;
@@ -255,6 +260,8 @@ static Int32 cap_thr_run(CapThrEnv *envp)
 	}
 
 	/* get buffer from pool */
+	static int cnt = 0;
+	DBG("cap alloc buf: %d", ++cnt);
 	BufHandle hBuf = buf_pool_alloc(envp->hBufPool);
 	if(!hBuf) {
 		ERR("cap run alloc buffer failed");
@@ -270,12 +277,16 @@ static Int32 cap_thr_run(CapThrEnv *envp)
 		inBuf.bufSize = capFrame.bufSize;
 		outBuf.buf = buffer_get_user_addr(hBuf);
 		outBuf.bufSize = buffer_get_size(hBuf);
-
+		
 		err = img_conv_process(envp->hImgConv, &inBuf, NULL, &outBuf, NULL);
 		if(err) {
 			ERR("imgConv err.");
 			goto free_buf;
 		}
+		
+#ifdef CRC_EN
+		imgMsg->header.param[0] = crc16(outBuf.buf, imgMsg->dimension.size);
+#endif
 	} else {
 		err = buffer_copy(buffer_get_user_addr(hBuf), capFrame.dataBuf, capFrame.bytesUsed);
 		if(err) {
@@ -287,9 +298,10 @@ static Int32 cap_thr_run(CapThrEnv *envp)
 	/* send to next task */
 	imgMsg->hBuf = hBuf;
 	imgMsg->index = capFrame.index;
+	
 	cam_convert_time(&capFrame.timeStamp, &imgMsg->timeStamp);
 
-	err = frame_disp_run(envp->hDispatch, envp->hMsg, imgMsg, NULL, 0);
+	err = frame_disp_run(envp->hDispatch, envp->hMsg, imgMsg, NULL, FD_FLAG_POOL_FRAME);
 	if(err) {
 		ERR("cap run, send msg failed");
 		buf_pool_free(hBuf);
@@ -298,6 +310,8 @@ static Int32 cap_thr_run(CapThrEnv *envp)
 	/* check if 2nd stream convert needed */
 	if((envp->status & CAPTHR_STAT_CONV_EN) && 
 		envp->stream2OutAttrs.enbale && envp->encImg) {
+
+		DBG("cap alloc buf: %d", ++cnt);
 		/* alloc again for img enc */
 		hBuf = buf_pool_alloc(envp->hBufPool);
 		if(!hBuf) {
@@ -330,8 +344,8 @@ static Int32 cap_thr_run(CapThrEnv *envp)
 		imgMsg->dimension.width = envp->stream2OutAttrs.width;
 		imgMsg->dimension.height = envp->stream2OutAttrs.height;
 		imgMsg->dimension.colorSpace = envp->stream2OutAttrs.pixFmt;
-		
-		err = frame_disp_run(envp->hDispatch, envp->hMsg, imgMsg, MSG_IMG_ENC, 0);
+
+		err = frame_disp_run(envp->hDispatch, envp->hMsg, imgMsg, MSG_IMG_ENC, FD_FLAG_POOL_FRAME);
 		if(err) {
 			ERR("cap run, send msg failed");
 			buf_pool_free(hBuf);
@@ -342,7 +356,7 @@ static Int32 cap_thr_run(CapThrEnv *envp)
 								CONV_CMD_SET_DYN_PARAMS, 
 								&envp->convDynParams);
 		if(err) {
-			ERR("imgConv set back configerr.");
+			ERR("imgConv set back config err.");
 			buf_pool_free(hBuf);
 		}
 		imgMsg->dimension.width = envp->convDynParams.outAttrs[0].width;
@@ -350,9 +364,12 @@ static Int32 cap_thr_run(CapThrEnv *envp)
 		imgMsg->dimension.colorSpace = envp->convDynParams.outAttrs[0].pixFmt;
 	}
 
-	DBG("<%d> cap run ok...", imgMsg->index);
+	//DBG("<%d> cap run ok...", imgMsg->index);
 
 free_buf:
+
+	if(hBuf)
+		buf_pool_free(hBuf);
 
 	capture_free_frame(envp->hCap, &capFrame);
 	return err;

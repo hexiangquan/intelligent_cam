@@ -58,7 +58,7 @@ typedef struct UploadObj *UploadHandle;
 
 typedef struct _UploadFxns {
 	/* create function, returns sub object handle  */
-	void *(*create)(void *params, Uint32 size);
+	void *(*create)(void *params);
 
 	/* Connect server, 1st: sub object handle, 2nd: timeout, ms */
 	Int32  (*connect)(void *handle, Uint32 timeoutMs);
@@ -73,7 +73,7 @@ typedef struct _UploadFxns {
 	Int32  (*sendHeartBeat)(void *handle);
 	
 	/* Set params, , 1st: sub object handle, 2nd: New Init params */	
-	Int32  (*setParams)(void *handle, const void *params, Int32 size);
+	Int32  (*setParams)(void *handle, const void *params);
 
 	/* Delete param, 1st: sub object handle*/
 	Int32  (*delete)(void *handle);
@@ -102,7 +102,7 @@ extern "C"{
     Modification : Created function
 
 *****************************************************************************/
-extern UploadHandle upload_create(const UploadFxns *fxns, void *params, Uint32 size);
+extern UploadHandle upload_create(CamImageUploadProtocol protol, void *params, Uint32 reConTimeout);
 
 /*****************************************************************************
  Prototype    : upload_delete
@@ -206,9 +206,26 @@ extern Int32 upload_send_heartbeat(UploadHandle hUpload);
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 upload_set_params(UploadHandle hUpload, Ptr params, Int32 size);
+extern Int32 upload_set_params(UploadHandle hUpload, Ptr params);
 
+/*****************************************************************************
+ Prototype    : upload_send_frame
+ Description  : send one frame
+ Input        : UploadHandle hUpload  
+                const ImgMsg *data    
+ Output       : None
+ Return Value : extern
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
 extern Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data);
+
 #ifdef __cplusplus
 #if __cplusplus
 }

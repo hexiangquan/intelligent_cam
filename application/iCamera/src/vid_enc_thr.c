@@ -171,6 +171,8 @@ static Int32 vid_enc_thr_run(VidEncThrEnv *envp, ImgMsg *msg)
 	}
 
 	/* free input buffer */
+	static int cnt = 0;
+	DBG("<%d>h264 free raw buf",++cnt);
 	buf_pool_free(hBufIn);
 	hBufIn = NULL;
 
@@ -181,7 +183,7 @@ static Int32 vid_enc_thr_run(VidEncThrEnv *envp, ImgMsg *msg)
 	msg->hBuf = hBufOut;
 	buffer_set_bytes_used(hBufOut, outArgs.bytesGenerated);
 
-	DBG("<%d> h264 enc run ok", msg->index);
+	//DBG("<%d> h264 enc run ok", msg->index);
 
 	/* dispatch h.264 data */
 	err = frame_disp_run(envp->hDispatch, envp->hMsg, msg, NULL, dispFlags);

@@ -27,6 +27,10 @@
 ******************************************************************************/
 #include "sysnet.h"
 #include "net_utils.h"
+#include <ifaddrs.h>
+#include <netinet/in.h> 
+#include <arpa/inet.h>
+
 
 /*----------------------------------------------*
  * external variables                           *
@@ -311,5 +315,91 @@ exit:
 	return E_IO;
 }
 
+/*****************************************************************************
+ Prototype    : get_local_ip
+ Description  : get local IP
+ Input        : Int8* buf      
+                Int32 bufSize  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 get_local_ip(Int8* buf, Int32 bufSize)
+{
+#if 0
+	Int32 i = 0;
+	int sockfd;
+	struct ifconf ifconf;
+	struct ifreq *ifreq;
+	char* ip;
+	
+	/* init ifconf */
+	ifconf.ifc_len = 512;
+	ifconf.ifc_buf = buf;
+
+	if((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+		ERRSTR("create sock failed");
+		return E_IO;
+	}
+
+	/* get interface info */
+	ioctl(sockfd, SIOCGIFCONF, &ifconf);
+
+	close(sockfd);
+
+	/* parse info */
+	ifreq = (struct ifreq*)buf;
+	for(i= (ifconf.ifc_len/sizeof(struct ifreq)); i > 0; i--) {
+		ip = inet_ntoa(((struct sockaddr_in*)&(ifreq->ifr_addr))->sin_addr);
+
+		/* skip local loop ip */
+		if(strcmp(ip, "127.0.0.1")==0) {
+			ifreq++;
+			continue;
+		}
+		
+		strncpy(buf,ip, bufSize);
+		return E_NO;
+	}
+
+	/* can't find local IP */
+	return E_NOTEXIST;
+#else
+	struct ifaddrs 	*ifAddrStruct = NULL;
+	void 			*tmpAddrPtr = NULL;
+	Int32			ret = E_NOTEXIST;
+
+	getifaddrs(&ifAddrStruct);
+
+	while(ifAddrStruct) {
+		/* check it is IP4 */
+		if(ifAddrStruct->ifa_addr->sa_family == AF_INET) {
+			/* is a valid IP4 Address */
+			tmpAddrPtr=&((struct sockaddr_in *)ifAddrStruct->ifa_addr)->sin_addr;
+			inet_ntop(AF_INET, tmpAddrPtr, buf, bufSize);
+			//_D("%s IP Address %s", ifAddrStruct->ifa_name, buf);
+			if(strcmp(buf, "127.0.0.1")) {
+				ret = E_NO;
+				break;
+			}
+		} else if(ifAddrStruct->ifa_addr->sa_family==AF_INET6) {
+			/* is a valid IP6 Address */
+			tmpAddrPtr=&((struct sockaddr_in *)ifAddrStruct->ifa_addr)->sin_addr;
+			inet_ntop(AF_INET6, tmpAddrPtr, buf, bufSize);
+			//_D("%s IP Address %s", ifAddrStruct->ifa_name, buf); 
+		} 
+		
+		ifAddrStruct = ifAddrStruct->ifa_next;
+	}
+	return ret;
+#endif
+}
 
 

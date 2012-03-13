@@ -56,6 +56,12 @@ static void main_loop(const char *serverIp, Uint16 port)
 	else
 		DBG("Sendto ok...");
 
+	char ipBuf[32];
+
+	err = get_local_ip(ipBuf, sizeof(ipBuf));
+	assert(err == E_NO);
+	DBG("get local ip: %s", ipBuf);
+
 exit:
 
 	if(sockTcp > 0)

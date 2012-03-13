@@ -26,6 +26,8 @@
 #include "jpg_enc.h"
 #include "h264_enc.h"
 #include "osd.h"
+#include "tcp_upload.h"
+#include "ftp_upload.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -322,6 +324,121 @@ static Int32 get_osd_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 	/* Copy data */
 	*(CamOsdParams *)data = hParamsMng->appParams.osdParams;
 	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_img_trans_protol
+ Description  : set image trans protol
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_img_trans_protol(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(Uint32)) 
+		return E_INVAL;
+
+	/* Validate data */
+	Uint32 protol = *(Uint32 *)data;
+
+	if( protol > CAM_UPLOAD_PROTO_MAX) {
+		ERR("invalid img upload protol");
+		return E_INVAL;
+	}
+	
+	hParamsMng->appParams.imgTransType = protol;
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_img_trans_protol
+ Description  : get img upload protol
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_img_trans_protol(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamImageUploadProtocol)) 
+		return E_INVAL;
+
+	/* Copy data */
+	*(CamImageUploadProtocol *)data = hParamsMng->appParams.imgTransType;
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_img_upload_params
+ Description  : get image upload params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_img_upload_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data) 
+		return E_INVAL;
+
+	AppParams 	*appCfg = &hParamsMng->appParams;
+	Int32		err = E_NO;
+
+	switch(appCfg->imgTransType) {
+	case CAM_UPLOAD_PROTO_FTP:
+		if(size < sizeof(FtpUploadParams))
+			err = E_NOMEM;
+		else {
+			FtpUploadParams *params = (FtpUploadParams *)data;
+			params->srvInfo = appCfg->ftpSrvInfo;
+			params->roadInfo = appCfg->roadInfo;
+			params->size = sizeof(FtpUploadParams);
+		}
+		break;
+	case CAM_UPLOAD_PROTO_TCP:
+		if(size < sizeof(ImgTcpUploadParams))
+			err = E_NOMEM;
+		else {
+			ImgTcpUploadParams *params = (ImgTcpUploadParams *)data;
+			params->srvInfo = appCfg->tcpImgSrvInfo;
+			params->devInfo = appCfg->devInfo;
+			params->size = sizeof(ImgTcpUploadParams);
+		}
+		break;
+	case CAM_UPLOAD_PROTO_NONE:
+	default:
+		break;
+	}
+
+	return err;
 }
 
 /*****************************************************************************
@@ -895,6 +1012,15 @@ Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void 
 		break;
 	case PMCMD_G_VIDOSDDYN:
 		ret = get_vid_osd_dyn(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_IMGTRANSPROTO:
+		ret = set_img_trans_protol(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_IMGTRANSPROTO:
+		ret = get_img_trans_protol(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_IMGUPLOADPARAMS:
+		ret = get_img_upload_params(hParamsMng, arg, size);
 		break;
 	default:
 		ret = E_UNSUPT;
