@@ -28,6 +28,8 @@
 #include "osd.h"
 #include "tcp_upload.h"
 #include "ftp_upload.h"
+#include "version.h"
+#include "linux/types.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -60,6 +62,14 @@ extern const AppParams c_appParamsDef;
  * macros                                       *
  *----------------------------------------------*/
 #define PM_FLAG_CAPINFO_SET		(1 << 0)
+#define PM_CMD_MASK				(0xFFFF0000)
+
+typedef Int32 (*PmCtrlFxn)(ParamsMngHandle hParamsMng, void *data, Int32 size);
+
+typedef struct {
+	ParamsMngCtrlCmd 	cmd;
+	PmCtrlFxn			fxn;
+}PmCtrlInfo;
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -70,7 +80,9 @@ struct ParamsMngObj {
 	AppParams		appParams;		//Params
 	CapInputInfo	capInputInfo;	//capture input info, set at run time
 	Int32			flags;			//status flags 
+	CamWorkStatus	workStatus;		//current work status
 	pthread_mutex_t	mutex;			//mutex for lock
+	const char		*cfgFile;		//name of cfg file
 	FILE			*fp;			//file for read/write params
 };
 
@@ -146,10 +158,14 @@ ParamsMngHandle params_mng_create(const char *cfgFile)
 	}
 	
 	hParamsMng->fp = fp;
+	hParamsMng->cfgFile = cfgFile;
 
 	return hParamsMng;
 
 exit:
+
+	if(fp)
+		fclose(fp);
 
 	if(hParamsMng)
 		free(hParamsMng);
@@ -185,6 +201,57 @@ Int32 params_mng_delete(ParamsMngHandle hParamsMng)
 	free(hParamsMng);
 
 	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : params_mng_write_back
+ Description  : write back current params
+ Input        : ParamsMngHandle hParamsMng  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 params_mng_write_back(ParamsMngHandle hParamsMng)
+{
+	if(!hParamsMng)
+		return E_INVAL;
+
+	Int32 ret = E_NO;
+
+	pthread_mutex_lock(&hParamsMng->mutex);
+	
+	/* write back current params */
+	Uint8 *buf = (Uint8 *)(&hParamsMng->appParams) + sizeof(Uint32) * 3;
+
+	hParamsMng->appParams.dataLen = sizeof(AppParams) - 3 * sizeof(Uint32);
+	hParamsMng->appParams.crc = crc16(buf, hParamsMng->appParams.dataLen);
+
+	if(!hParamsMng->fp) {
+		hParamsMng->fp = fopen(hParamsMng->cfgFile, "wb+");
+		if(!hParamsMng->fp) {
+			ERRSTR("open cfg file failed");
+			ret = E_IO;
+			goto exit;
+		}	
+	}
+
+	ret = fwrite(&hParamsMng->appParams, sizeof(AppParams), 1, hParamsMng->fp);
+	if(ret < 0) {
+		ERRSTR("write cfg file err");
+		ret = E_IO;
+	}
+
+exit:
+	pthread_mutex_unlock(&hParamsMng->mutex);
+	return ret;
+	
 }
 
 /*****************************************************************************
@@ -327,8 +394,8 @@ static Int32 get_osd_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 }
 
 /*****************************************************************************
- Prototype    : set_img_trans_protol
- Description  : set image trans protol
+ Prototype    : set_img_enc_params
+ Description  : set img encode params
  Input        : ParamsMngHandle hParamsMng  
                 void *data                  
                 Int32 size                  
@@ -338,31 +405,33 @@ static Int32 get_osd_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/12
+  1.Date         : 2012/3/15
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-static Int32 set_img_trans_protol(ParamsMngHandle hParamsMng, void *data, Int32 size)
+static Int32 set_img_enc_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 {
-	if(!data || size != sizeof(Uint32)) 
+	if(!data || size != sizeof(CamImgEncParams)) 
 		return E_INVAL;
 
 	/* Validate data */
-	Uint32 protol = *(Uint32 *)data;
+	CamImgEncParams *params = (CamImgEncParams *)data;
 
-	if( protol > CAM_UPLOAD_PROTO_MAX) {
-		ERR("invalid img upload protol");
+	if( params->encQuality > 100 || 
+		(params->rotation != 0 && params->rotation != 90 && params->rotation != 270) ||
+		!ALIGNED(params->width, 16) || !ALIGNED(params->height, 8)) {
+		ERR("invalid img enc params, rotation must be 0, 90 or 270, qaulity must less than 100, width must multi of 16");
 		return E_INVAL;
 	}
-	
-	hParamsMng->appParams.imgTransType = protol;
+
+	hParamsMng->appParams.imgEncParams = *params;
 	return E_NO;
 }
 
 /*****************************************************************************
- Prototype    : get_img_trans_protol
- Description  : get img upload protol
+ Prototype    : get_img_enc_params
+ Description  : get img encode params
  Input        : ParamsMngHandle hParamsMng  
                 void *data                  
                 Int32 size                  
@@ -372,18 +441,18 @@ static Int32 set_img_trans_protol(ParamsMngHandle hParamsMng, void *data, Int32 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/12
+  1.Date         : 2012/3/15
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-static Int32 get_img_trans_protol(ParamsMngHandle hParamsMng, void *data, Int32 size)
+static Int32 get_img_enc_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 {
-	if(!data || size < sizeof(CamImageUploadProtocol)) 
+	if(!data || size < sizeof(CamImgEncParams)) 
 		return E_INVAL;
 
 	/* Copy data */
-	*(CamImageUploadProtocol *)data = hParamsMng->appParams.imgTransType;
+	*(CamImgEncParams *)data = hParamsMng->appParams.imgEncParams;
 	return E_NO;
 }
 
@@ -500,6 +569,70 @@ static inline Int32 get_img_adj_params(ParamsMngHandle hParamsMng, void *data, I
 
 	/* Copy data */
 	*(CamImgEnhanceParams *)data = hParamsMng->appParams.imgAdjParams;
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_h264_params
+ Description  : set h.264 params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_h264_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamH264Params)) 
+		return E_INVAL;
+
+	/* Validate data */
+	CamH264Params *params = (CamH264Params *)data;
+	if( params->resolution >= H264_RES_MAX || 
+		params->frameRate > 60 ||
+		params->rateControl >= CAM_H264_RC_MAX ||
+		params->QPMin > params->QPMax ||
+		params->QPMin > 51 || params->QPMax > 51) {
+		ERR("invalid h264 params");
+		return E_INVAL;
+	}
+
+	hParamsMng->appParams.h264EncParams = *params;
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_h264_params
+ Description  : get h.264 params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_h264_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamH264Params)) 
+		return E_INVAL;
+
+	/* Copy data */
+	*(CamH264Params *)data = hParamsMng->appParams.h264EncParams;
 	return E_NO;
 }
 
@@ -943,6 +1076,1535 @@ static Int32 set_cap_input_info(ParamsMngHandle hParamsMng, void *data, Int32 si
 }
 
 /*****************************************************************************
+ Prototype    : get_version_info
+ Description  : get software version
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_version_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamVersionInfo)) 
+		return E_INVAL;
+
+	/* Copy data */
+	CamVersionInfo *version = (CamVersionInfo *)data;
+	version->armVer = ICAM_VERSION;
+	version->dspVer = ICAM_VERSION;
+	version->fpgaVer = ICAM_VERSION;
+	
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_work_status
+ Description  : get  work status
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_work_status(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamWorkStatus)) 
+		return E_INVAL;
+
+	/* Copy data */
+	*(CamWorkStatus *)data = hParamsMng->workStatus;
+	
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_work_status
+ Description  : set work status
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_work_status(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamWorkStatus)) 
+		return E_INVAL;
+
+	if(*(CamWorkStatus *)data >= WORK_STATUS_MAX)
+		return E_INVAL;
+
+	/* Copy data */
+	hParamsMng->workStatus = *(CamWorkStatus *)data;
+	
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_network_info
+ Description  : set network info
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_network_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamNetworkInfo)) 
+		return E_INVAL;
+
+	CamNetworkInfo *info = (CamNetworkInfo *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	appCfg->networkInfo = *info;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_network_info
+ Description  : get network info
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_network_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamNetworkInfo)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamNetworkInfo *)data = appCfg->networkInfo;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_dev_info
+ Description  : set device info
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_dev_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamDeviceInfo)) 
+		return E_INVAL;
+
+	CamDeviceInfo *info = (CamDeviceInfo *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	appCfg->devInfo = *info;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_dev_info
+ Description  : get device info
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_dev_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamDeviceInfo)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamDeviceInfo *)data = appCfg->devInfo;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_road_info
+ Description  : set road info
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_road_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamRoadInfo)) 
+		return E_INVAL;
+
+	CamRoadInfo *info = (CamRoadInfo *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* nothing to validate */
+	
+	/* Copy data */
+	appCfg->roadInfo = *info;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_road_info
+ Description  : get road info
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_road_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamRoadInfo)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamRoadInfo *)data = appCfg->roadInfo;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_rtp_params
+ Description  : set rtp params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_rtp_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamRtpParams)) 
+		return E_INVAL;
+
+	CamRtpParams *params = (CamRtpParams *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if(!params->dstPort || !params->localPort || params->payloadType > 200) {
+		ERR("invalid rtp params");
+		return E_INVAL;
+	}
+	
+	/* Copy data */
+	appCfg->rtpParams = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_rtp_params
+ Description  : get rtp params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_rtp_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamRtpParams)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamRtpParams *)data = appCfg->rtpParams;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_tcp_srv_info
+ Description  : set tcp server info
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_tcp_srv_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamTcpImageServerInfo)) 
+		return E_INVAL;
+
+	CamTcpImageServerInfo *params = (CamTcpImageServerInfo *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if(!params->serverPort) {
+		ERR("invalid rtp params");
+		return E_INVAL;
+	}
+	
+	/* Copy data */
+	appCfg->tcpImgSrvInfo = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_tcp_srv_info
+ Description  : get tcp srv info
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_tcp_srv_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamTcpImageServerInfo)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamTcpImageServerInfo *)data = appCfg->tcpImgSrvInfo;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_ftp_srv_info
+ Description  : set ftp server info
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_ftp_srv_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamFtpImageServerInfo)) 
+		return E_INVAL;
+
+	CamFtpImageServerInfo *params = (CamFtpImageServerInfo *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if(!params->serverPort) {
+		ERR("invalid ftp params");
+		return E_INVAL;
+	}
+	
+	/* Copy data */
+	appCfg->ftpSrvInfo = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_ftp_srv_info
+ Description  : get ftp server info
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_ftp_srv_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamFtpImageServerInfo)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamFtpImageServerInfo *)data = appCfg->ftpSrvInfo;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_ntp_srv_info
+ Description  : set ntp server info
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_ntp_srv_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamNtpServerInfo)) 
+		return E_INVAL;
+
+	CamNtpServerInfo *params = (CamNtpServerInfo *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if(!params->serverPort) {
+		ERR("invalid ntp params");
+		return E_INVAL;
+	}
+	
+	/* Copy data */
+	appCfg->ntpSrvInfo = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_ntp_srv_info
+ Description  : get ntp server info
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_ntp_srv_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamNtpServerInfo)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamNtpServerInfo *)data = appCfg->ntpSrvInfo;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_exposure_params
+ Description  : set exposure params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_exposure_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamExprosureParam)) 
+		return E_INVAL;
+
+	CamExprosureParam *params = (CamExprosureParam *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if(params->globalGain > 1023) {
+		ERR("invalid exposure params");
+		return E_INVAL;
+	}
+	
+	/* Copy data */
+	appCfg->exposureParams = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_exposure_params
+ Description  : get exposure params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_exposure_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamExprosureParam)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamExprosureParam *)data = appCfg->exposureParams;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_rgb_gains
+ Description  : set rgb gains
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_rgb_gains(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamRGBGains)) 
+		return E_INVAL;
+
+	CamRGBGains *params = (CamRGBGains *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if(params->redGain > 512 || params->blueGain > 512) {
+		ERR("invalid exposure params");
+		return E_INVAL;
+	}
+	
+	/* Copy data */
+	appCfg->rgbGains = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_rgb_gains
+ Description  : get rgb gains
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_rgb_gains(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamRGBGains)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamRGBGains *)data = appCfg->rgbGains;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_drc_params
+ Description  : set drc params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_drc_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamDRCParam)) 
+		return E_INVAL;
+
+	CamDRCParam *params = (CamDRCParam *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	
+	/* Copy data */
+	appCfg->drcParams = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_drc_params
+ Description  : get drc params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_drc_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamDRCParam)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamDRCParam *)data = appCfg->drcParams;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : validate_region
+ Description  : validate region
+ Input        : ParamsMngHandle hParamsMng  
+                CamRect *rect               
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 validate_region(ParamsMngHandle hParamsMng, CamRect *rect)
+{
+	if( rect->startX > rect->endX || 
+		rect->startY > rect->endY ||
+		rect->startX > hParamsMng->capInputInfo.width || 
+		rect->startY > hParamsMng->capInputInfo.height) {
+		ERR("invalid region");
+			return E_INVAL;
+	}
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_light_regions
+ Description  : set traffic light regions
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_light_regions(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamTrafficLightRegions)) 
+		return E_INVAL;
+
+	CamTrafficLightRegions *params = (CamTrafficLightRegions *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	Int32  i;
+	for(i = 0; i < 3; i++) {
+		CamRect *rect = &params->region[i];
+		if(validate_region(hParamsMng, rect))
+			return E_INVAL;
+	}
+	
+	/* Copy data */
+	appCfg->correctRegs = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_light_regions
+ Description  : get traffic light regions
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_light_regions(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamTrafficLightRegions)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamTrafficLightRegions *)data = appCfg->correctRegs;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_io_cfg
+ Description  : set IO config params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_io_cfg(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamIoCfg)) 
+		return E_INVAL;
+
+	CamIoCfg *params = (CamIoCfg *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	
+	/* Copy data */
+	appCfg->ioCfg = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_io_cfg
+ Description  : get io config params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_io_cfg(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamIoCfg)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamIoCfg *)data = appCfg->ioCfg;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_strobe_params
+ Description  : set strobe params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_strobe_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamStrobeCtrlParam)) 
+		return E_INVAL;
+
+	CamStrobeCtrlParam *params = (CamStrobeCtrlParam *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if( params->switchMode >= CAM_STROBE_SWITCH_MAX || 
+		params->enStartHour > 23 || 
+		params->enStartMin > 59 ||
+		params->enEndHour > 23 || 
+		params->enEndMin > 59) {
+		ERR("invalid strobe params, time must be valid, hour[0-23], min[0-59]");
+		return E_INVAL;
+	}
+	
+	/* Copy data */
+	appCfg->strobeParams = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_strobe_params
+ Description  : get strobe params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_strobe_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamStrobeCtrlParam)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamStrobeCtrlParam *)data = appCfg->strobeParams;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_detector_params
+ Description  : set detector params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_detector_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamDetectorParam)) 
+		return E_INVAL;
+
+	CamDetectorParam *params = (CamDetectorParam *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if( params->detecotorId >= DETECTOR_MAX ) {
+		ERR("invalid detector id");
+		return E_INVAL;
+	}
+	
+	/* Copy data */
+	appCfg->detectorParams = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_detector_params
+ Description  : get detector params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_detector_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamDetectorParam)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamDetectorParam *)data = appCfg->detectorParams;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_upload_proto
+ Description  : set upload protocol
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_upload_proto(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamImageUploadProtocol)) 
+		return E_INVAL;
+
+	CamImageUploadProtocol protol = *(CamImageUploadProtocol *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if(protol >= CAM_UPLOAD_PROTO_MAX) {
+		ERR("invalid upload proto type");
+		return E_INVAL;
+	}
+	
+	/* Copy data */
+	appCfg->imgTransType = protol;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_upload_proto
+ Description  : get upload protocol
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_upload_proto(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamImageUploadProtocol)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamImageUploadProtocol *)data = appCfg->imgTransType;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_ae_params
+ Description  : set auto exposure params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_ae_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamAEParam)) 
+		return E_INVAL;
+
+	CamAEParam *params = (CamAEParam *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if( params->targetValue >= 255 || 
+		params->minShutterTime > params->maxShutterTime ||
+		params->minGainValue > params->maxGainValue || 
+		params->minAperture > params->maxAperture) {
+		ERR("invalid ae params");
+		return E_INVAL;
+	}
+
+	/* validate region */
+	Int32 i;
+	for(i = 0; i < CAM_AE_MAX_ROI_NUM; i++) {
+		if(validate_region(hParamsMng, &params->roi[i]))
+			return E_INVAL;
+	}
+	
+	/* Copy data */
+	appCfg->aeParams = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_ae_params
+ Description  : get auto exposure params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_ae_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamAEParam)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamAEParam *)data = appCfg->aeParams;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_awb_params
+ Description  : set awb params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_awb_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamAWBParam)) 
+		return E_INVAL;
+
+	CamAWBParam *params = (CamAWBParam *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if( params->minValueR >= params->maxValueR || 
+		params->minValueG >= params->maxValueG ||
+		params->minValueB >= params->maxValueB ) {
+		ERR("invalid awb params");
+		return E_INVAL;
+	}
+
+	/* Copy data */
+	appCfg->awbParams = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_awb_params
+ Description  : get awb params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_awb_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamAWBParam)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamAWBParam *)data = appCfg->awbParams;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_day_night_params
+ Description  : set day night mode params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_day_night_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamDayNightModeCfg)) 
+		return E_INVAL;
+
+	CamDayNightModeCfg *params = (CamDayNightModeCfg *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if( params->switchMethod >= CAM_DN_SWT_MAX || 
+		params->dayModeStartHour > 23 ||
+		params->dayModeStartMin > 59 ||
+		params->nightModeStartHour > 23 || 
+		params->nightModeStartMin > 59 ) {
+		ERR("invalid day night params");
+		return E_INVAL;
+	}
+
+	/* Copy data */
+	appCfg->dayNightCfg = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_day_night_params
+ Description  : get day night mode params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_day_night_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamAWBParam)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamDayNightModeCfg *)data = appCfg->dayNightCfg;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_av_params
+ Description  : set av params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_av_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamAVParam)) 
+		return E_INVAL;
+
+	CamAVParam *params = (CamAVParam *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if( params->avType >= AV_TYPE_MAX ) {
+		ERR("invalid av params");
+		return E_INVAL;
+	}
+
+	/* Copy data */
+	appCfg->avParams = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_av_params
+ Description  : get av params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_av_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamAVParam)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamAVParam *)data = appCfg->avParams;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : set_spec_cap_params
+ Description  : special capture params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_spec_cap_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamSpecCapParams)) 
+		return E_INVAL;
+
+	CamSpecCapParams *params = (CamSpecCapParams *)data;
+	AppParams *appCfg = &hParamsMng->appParams;
+
+	/* validate data */
+	if( params->globalGain >= 1023 ) {
+		ERR("invalid spec cap params");
+		return E_INVAL;
+	}
+
+	/* Copy data */
+	appCfg->specCapParams = *params;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_spec_cap_params
+ Description  : special capture params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_spec_cap_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamSpecCapParams)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamSpecCapParams *)data = appCfg->specCapParams;
+
+	return E_NO;
+}
+
+/* tables for control fxns */
+static const PmCtrlInfo g_paramsConfig[] = {
+	{.cmd = PMCMD_S_NETWORKINFO, .fxn = set_network_info,},
+	{.cmd = PMCMD_G_NETWORKINFO, .fxn = get_network_info,},
+	{.cmd = PMCMD_S_DEVINFO, .fxn = set_dev_info,},
+	{.cmd = PMCMD_G_DEVINFO, .fxn = get_dev_info,},
+	{.cmd = PMCMD_S_OSDPARAMS, .fxn = set_osd_params,},
+	{.cmd = PMCMD_G_OSDPARAMS, .fxn = get_osd_params,},
+	{.cmd = PMCMD_S_ROADINFO, .fxn = set_road_info,},
+	{.cmd = PMCMD_G_ROADINFO, .fxn = get_road_info,},
+	{.cmd = PMCMD_S_RTPPARAMS, .fxn = set_rtp_params,},
+	{.cmd = PMCMD_G_RTPPARAMS, .fxn = get_rtp_params,},
+	{.cmd = PMCMD_S_IMGTRANSPROTO, .fxn = set_upload_proto,},
+	{.cmd = PMCMD_G_IMGTRANSPROTO, .fxn = get_upload_proto,},
+	{.cmd = PMCMD_S_TCPSRVINFO, .fxn = set_tcp_srv_info,},
+	{.cmd = PMCMD_G_TCPSRVINFO, .fxn = get_tcp_srv_info,},
+	{.cmd = PMCMD_S_FTPSRVINFO, .fxn = set_ftp_srv_info,},
+	{.cmd = PMCMD_G_FTPSRVINFO, .fxn = get_ftp_srv_info,},
+	{.cmd = PMCMD_S_NTPSRVINFO, .fxn = set_ntp_srv_info,},
+	{.cmd = PMCMD_G_NTPSRVINFO, .fxn = get_ntp_srv_info,},
+	{.cmd = PMCMD_S_EXPPARAMS, .fxn = set_exposure_params,},
+	{.cmd = PMCMD_G_EXPPARAMS, .fxn = get_exposure_params,},
+	{.cmd = PMCMD_S_RGBGAINS, .fxn = set_rgb_gains,},
+	{.cmd = PMCMD_G_RGBGAINS, .fxn = get_rgb_gains,},
+	{.cmd = PMCMD_S_DRCPARAMS, .fxn = set_drc_params,},
+	{.cmd = PMCMD_G_DRCPARAMS, .fxn = get_drc_params,},
+	{.cmd = PMCMD_S_LIGHTCORRECT, .fxn = set_light_regions,},
+	{.cmd = PMCMD_G_LIGHTCORRECT, .fxn = get_light_regions,},
+	{.cmd = PMCMD_S_IMGADJPARAMS, .fxn = set_img_adj_params,},
+	{.cmd = PMCMD_G_IMGADJPARAMS, .fxn = get_img_adj_params,},
+	{.cmd = PMCMD_S_H264ENCPARAMS, .fxn = set_h264_params,},
+	{.cmd = PMCMD_G_H264ENCPARAMS, .fxn = get_h264_params,},
+	{.cmd = PMCMD_S_WORKMODE, .fxn = set_work_mode,},
+	{.cmd = PMCMD_G_WORKMODE, .fxn = get_work_mode,},
+	{.cmd = PMCMD_S_IMGENCPARAMS, .fxn = set_img_enc_params,},
+	{.cmd = PMCMD_G_IMGENCPARAMS, .fxn = get_img_enc_params,},
+	{.cmd = PMCMD_S_IOCFG, .fxn = set_io_cfg,},
+	{.cmd = PMCMD_G_IOCFG, .fxn = get_io_cfg,},
+	{.cmd = PMCMD_S_STROBEPARAMS, .fxn = set_strobe_params,},
+	{.cmd = PMCMD_G_STROBEPARAMS, .fxn = get_strobe_params,},
+	{.cmd = PMCMD_S_DETECTORPARAMS, .fxn = set_detector_params,},
+	{.cmd = PMCMD_G_DETECTORPARAMS, .fxn = get_detector_params,},
+	{.cmd = PMCMD_S_AEPARAMS, .fxn = set_ae_params,},
+	{.cmd = PMCMD_G_AEPARAMS, .fxn = get_ae_params,},
+	{.cmd = PMCMD_S_AWBPARAMS, .fxn = set_awb_params,},
+	{.cmd = PMCMD_G_AWBPARAMS, .fxn = get_awb_params,},
+	{.cmd = PMCMD_S_DAYNIGHTCFG, .fxn = set_day_night_params,},
+	{.cmd = PMCMD_G_DAYNIGHTCFG, .fxn = get_day_night_params,},
+	{.cmd = PMCMD_G_VERSION, .fxn = get_version_info,},
+	{.cmd = PMCMD_S_WORKSTATUS, .fxn = set_work_status,},
+	{.cmd = PMCMD_G_WORKSTATUS, .fxn = get_work_status,},
+	{.cmd = PMCMD_S_AVPARAMS, .fxn = set_av_params,},
+	{.cmd = PMCMD_G_AVPARAMS, .fxn = get_av_params,},
+	{.cmd = PMCMD_S_SPECCAPPARAMS, .fxn = set_spec_cap_params,},
+	{.cmd = PMCMD_G_SPECCAPPARAMS, .fxn = get_spec_cap_params,},
+	{.cmd = PMCMD_MAX0, .fxn = NULL,},
+};
+
+/* tables for params convert fxns */
+static const PmCtrlInfo g_paramsConvert[] = {
+	{.cmd = PMCMD_G_IMGCONVDYN, .fxn = get_img_conv_dyn,},
+	{.cmd = PMCMD_G_2NDSTREAMATTRS, .fxn = get_stream2_out_attrs, },
+	{.cmd = PMCMD_G_JPGENCDYN, .fxn = get_jpg_enc_dyn, },
+	{.cmd = PMCMD_S_CAPINFO, .fxn = set_cap_input_info, },
+	{.cmd = PMCMD_G_IMGOSDDYN, .fxn = get_img_osd_dyn, },
+	{.cmd = PMCMD_G_H264ENCDYN, .fxn = get_h264_enc_dyn, },
+	{.cmd = PMCMD_G_VIDOSDDYN, .fxn = get_vid_osd_dyn, },
+	{.cmd = PMCMD_G_IMGUPLOADPARAMS, .fxn = get_img_upload_params, },
+	{.cmd = PMCMD_MAX1, .fxn = NULL,},
+};
+
+
+/*****************************************************************************
  Prototype    : params_mng_control
  Description  : do params control
  Input        : ParamsMngHandle hParamsMng  
@@ -965,11 +2627,120 @@ Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void 
 	if(!hParamsMng)
 		return E_INVAL;
 
-	Int32 ret = E_NO;
-	
-	pthread_mutex_lock(&hParamsMng->mutex);
+	Int32 		ret;
+	Int32 		index;
+	PmCtrlFxn	ctrlFxn = NULL;
 
+	if((cmd & PM_CMD_MASK) == PMCMD_BASE0) {
+		index = cmd - PMCMD_BASE0;
+		if(cmd > PMCMD_MAX0 || g_paramsConfig[index].cmd != cmd) {
+			ERR("can't find fxn for cmd: 0x%X", (__u32)cmd);
+			return E_UNSUPT;
+		}
+		ctrlFxn = g_paramsConfig[index].fxn;
+	} else if((cmd & PM_CMD_MASK) == PMCMD_BASE1) {
+		index = cmd - PMCMD_BASE1;
+		if(cmd > PMCMD_MAX1 || g_paramsConvert[index].cmd != cmd) {
+			ERR("can't find fxn for cmd: 0x%X", (__u32)cmd);
+			return E_UNSUPT;
+		}
+		ctrlFxn = g_paramsConvert[index].fxn;
+	} else {
+		ERR("unsupported cmd: 0x%X", (__u32)cmd);
+		return E_UNSUPT;
+	}
+
+	assert(ctrlFxn);
+	pthread_mutex_lock(&hParamsMng->mutex);
+	ret = ctrlFxn(hParamsMng, arg, size);
+	pthread_mutex_unlock(&hParamsMng->mutex);
+
+#if 0
 	switch(cmd) {
+	case PMCMD_S_NETWORKINFO:
+		ret = set_network_info(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_NETWORKINFO:
+		ret = get_network_info(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_DEVINFO:
+		ret = set_dev_info(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_DEVINFO:
+		ret = get_dev_info(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_ROADINFO:
+		ret = set_road_info(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_ROADINFO:
+		ret = get_road_info(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_RTPPARAMS:
+		ret = set_rtp_params(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_RTPPARAMS:
+		ret = get_rtp_params(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_IMGTRANSPROTO:
+		ret = set_upload_proto(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_IMGTRANSPROTO:
+		ret = get_upload_proto(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_TCPSRVINFO:
+		ret = set_tcp_srv_info(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_TCPSRVINFO:
+		ret = get_tcp_srv_info(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_FTPSRVINFO:
+		ret = set_ftp_srv_info(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_FTPSRVINFO:
+		ret = get_ftp_srv_info(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_NTPSRVINFO:
+		ret = set_ntp_srv_info(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_NTPSRVINFO:
+		ret = get_ntp_srv_info(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_EXPPARAMS:
+		ret = set_exposure_params(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_EXPPARAMS:
+		ret = get_exposure_params(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_RGBGAINS:
+		ret = set_rgb_gains(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_RGBGAINS:
+		ret = get_rgb_gains(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_DRCPARAMS:
+		ret = set_drc_params(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_DRCPARAMS:
+		ret = get_drc_params(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_LIGHTCORRECT:
+		ret = set_light_regions(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_LIGHTCORRECT:
+		ret = get_light_regions(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_IMGADJPARAMS:
+		ret = set_img_adj_params(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_IMGADJPARAMS:
+		ret = get_img_adj_params(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_H264ENCPARAMS:
+		ret = set_h264_params(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_H264ENCPARAMS:
+		ret = get_h264_params(hParamsMng, arg, size);
+		break;
 	case PMCMD_S_AEPARAMS:
 		break;
 	case PMCMD_G_AEPARAMS:
@@ -989,12 +2760,7 @@ Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void 
 	case PMCMD_S_CAPINFO:
 		ret = set_cap_input_info(hParamsMng, arg, size);
 		break;
-	case PMCMD_S_IMGADJPARAMS:
-		ret = set_img_adj_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_IMGADJPARAMS:
-		ret = get_img_adj_params(hParamsMng, arg, size);
-		break;
+	
 	case PMCMD_G_IMGCONVDYN:
 		ret = get_img_conv_dyn(hParamsMng, arg, size);
 		break;
@@ -1022,6 +2788,15 @@ Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void 
 	case PMCMD_G_IMGUPLOADPARAMS:
 		ret = get_img_upload_params(hParamsMng, arg, size);
 		break;
+	case PMCMD_G_VERSION:
+		ret = get_version_info(hParamsMng, arg, size);
+		break;
+	case PMCMD_S_WORKSTATUS:
+		ret = set_work_status(hParamsMng, arg, size);
+		break;
+	case PMCMD_G_WORKSTATUS:
+		ret = get_work_status(hParamsMng, arg, size);
+		break;
 	default:
 		ret = E_UNSUPT;
 		ERR("unkown cmd: 0x%X", (unsigned int)cmd);
@@ -1029,6 +2804,7 @@ Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void 
 	}
 
 	pthread_mutex_unlock(&hParamsMng->mutex);
+#endif
 
 	return ret;
 }

@@ -370,7 +370,7 @@ static Int32 msg_process(ImgEncThrEnv *envp, CommonMsg *msgBuf)
 	case APPCMD_NEW_DATA:
 		ret = img_enc_thr_run(envp, (ImgMsg *)msgBuf);
 		break;
-	case APPCMD_SET_IMG_ENC_PARAMS:
+	case APPCMD_SET_ENC_PARAMS:
 		ret = img_enc_params_update(envp);
 		break;
 	case APPCMD_EXIT:

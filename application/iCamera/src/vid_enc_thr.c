@@ -275,7 +275,7 @@ static Int32 msg_process(VidEncThrEnv *envp, CommonMsg *msgBuf)
 	case APPCMD_NEW_DATA:
 		ret = vid_enc_thr_run(envp, (ImgMsg *)msgBuf);
 		break;
-	case APPCMD_SET_VID_ENC_PARAMS:
+	case APPCMD_SET_ENC_PARAMS:
 		ret = vid_enc_params_update(envp);
 		break;
 	case APPCMD_EXIT:

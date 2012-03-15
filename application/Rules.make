@@ -21,6 +21,12 @@ PRJ_DIR=/home/sun/work/HDCAM
 # Application root dir
 APP_ROOT=$(PRJ_DIR)/application
 
+# Application common include dir
+APP_INC_DIR=$(APP_ROOT)/common/include
+
+# Application common lib dir
+APP_LIB_DIR=$(APP_ROOT)/common/lib
+
 # Where to copy the resulting executables
 SDK_LIB_DIR=$(PRJ_DIR)/common/lib
 

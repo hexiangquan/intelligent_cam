@@ -65,7 +65,6 @@
  *----------------------------------------------*/
 #define PROGRAM_NAME		"iCamera"
 #define CONFIG_FILE			"./cam.cfg"
-#define FILE_SAVE_PATH		"/media/mmc"
 	
 #define CAM_MAX_THREAD_NUM	8
 

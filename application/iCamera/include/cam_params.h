@@ -363,7 +363,8 @@ typedef enum
 {
 	WORK_STATUS_IDLE = 0,		//Idle, do nothing
 	WORK_STATUS_RUNNING,		//Capturing and encoding
-	WORK_STATUS_UPDATING		//Updating program
+	WORK_STATUS_UPDATING,		//Updating program
+	WORK_STATUS_MAX,
 }CamWorkStatus;
 
 /* 
@@ -449,6 +450,7 @@ typedef struct {
 typedef enum {
 	CAM_STROBE_SWITCH_AUTO = 0, //switch automatically
 	CAM_STROBE_SWITCH_TIME, 	//switch according to system time
+	CAM_STROBE_SWITCH_MAX,
 }CamStrobeSwitchMode;
 
 typedef struct {
@@ -555,6 +557,7 @@ typedef enum {
 	CAM_DN_SWT_OFF = 0,		//don't switch
 	CAM_DN_SWT_AUTO = 1,	//switch according to environment light
 	CAM_DN_SWT_TIME = 2,	//switch according to time  
+	CAM_DN_SWT_MAX,
 }CamDayNightSwitchMethod;
 
 typedef struct {
@@ -564,6 +567,14 @@ typedef struct {
 	Uint8	nightModeStartHour;	//Night mode start hour, 0~23
 	Uint8	nightModeStartMin;	//Night mode start minute, 0~59
 } CamDayNightModeCfg;
+
+/* enum for capture control */
+typedef enum {
+	CAM_CAP_STOP = 0,
+	CAM_CAP_START = 1,
+	CAM_CAP_RESTART = 2,
+	CAM_CAP_MAX,
+}CamCapCtrl;
 
 /*
  * Cam local file params 

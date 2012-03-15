@@ -15,6 +15,8 @@
 #define MSG_IMG_ENC		MSG_ROOT"/msgImgEnc"
 #define MSG_VID_ENC		MSG_ROOT"/msgVidEnc"
 #define MSG_IMG_TX		MSG_ROOT"/msgImgTx"
+#define MSG_CTRL		MSG_ROOT"/msgCtrl"
+
 
 /* enable crc check sum of data between threads */
 //#define CRC_EN
@@ -24,14 +26,16 @@
 typedef enum _AppCmd {
 	APPCMD_EXIT = 0x1000,		//program exit
 	APPCMD_REBOOT,				//system reboot
-	APPCMD_CAP_RDY,				//capture is ready
+	APPCMD_CAP_EN,				//capture ctrl, start, stop, restart
 	APPCMD_NEW_DATA,			//new image data
 	APPCMD_SET_IMG_CONV,		//set img adjust params
 	APPCMD_SET_STREAM2,			//set 2nd stream params
-	APPCMD_SET_IMG_ENC_PARAMS,	//set encode params for image enc thread
-	APPCMD_SET_VID_ENC_PARAMS,	//set encode params for h.264 enc thread
+	APPCMD_SET_ENC_PARAMS,		//set encode params for image & h.264 enc thread
 	APPCMD_SET_WORK_MODE,		//set work mode
 	APPCMD_SET_UPLOAD_PARAMS,	//set img upload params
+	APPCMD_SET_TRIG_PARAMS,		//set trigger params
+	APPCMD_SET_AE_PARAMS,		//set auto exposure params
+	APPCMD_SET_AWB_PARAMS,		//set auto white balance params
 	APPCMD_MAX
 }AppCmd;
 

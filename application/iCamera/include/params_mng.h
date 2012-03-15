@@ -50,7 +50,10 @@
  * macros                                       *
  *----------------------------------------------*/
 
-#define APP_PARAMS_MAGIC		0xC00DBEEF
+#define APP_PARAMS_MAGIC	0xC00DBEEF
+
+#define FILE_SAVE_PATH		"/media/mmc"
+
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -85,13 +88,19 @@ typedef struct _AppParams {
 	CamAEParam				aeParams;			//auto exposure params
 	CamAWBParam				awbParams;			//auto white balance params
 	CamDayNightModeCfg		dayNightCfg;		//day night mode config
+	CamAVParam				avParams;			//analog video params
+	CamSpecCapParams		specCapParams;		//special capture params
 }AppParams;
 
 typedef struct ParamsMngObj *ParamsMngHandle;
 
+#define PMCMD_BASE0	0xABCD0000	
+#define PMCMD_BASE1	0xBCDA0000	
+
+
 /* Command ID */
 typedef enum {
-	PMCMD_S_NETWORKINFO = 0xABCD0000,
+	PMCMD_S_NETWORKINFO = PMCMD_BASE0,
 	PMCMD_G_NETWORKINFO,
 	PMCMD_S_DEVINFO,
 	PMCMD_G_DEVINFO,
@@ -137,9 +146,17 @@ typedef enum {
 	PMCMD_G_AWBPARAMS,
 	PMCMD_S_DAYNIGHTCFG,
 	PMCMD_G_DAYNIGHTCFG,
+	PMCMD_G_VERSION,
+	PMCMD_S_WORKSTATUS,
+	PMCMD_G_WORKSTATUS,
+	PMCMD_S_AVPARAMS,
+	PMCMD_G_AVPARAMS,
+	PMCMD_S_SPECCAPPARAMS,
+	PMCMD_G_SPECCAPPARAMS,
+	PMCMD_MAX0,
 
 	/* thread module cmds */
-	PMCMD_G_IMGCONVDYN = 0xBCDA0000,
+	PMCMD_G_IMGCONVDYN = PMCMD_BASE1,
 	PMCMD_G_2NDSTREAMATTRS,
 	PMCMD_G_JPGENCDYN,
 	PMCMD_S_CAPINFO,	/* This cmd should be set before any other thread cmds */
@@ -147,6 +164,7 @@ typedef enum {
 	PMCMD_G_H264ENCDYN,
 	PMCMD_G_VIDOSDDYN,
 	PMCMD_G_IMGUPLOADPARAMS,
+	PMCMD_MAX1,
 	
 }ParamsMngCtrlCmd;
 
@@ -210,6 +228,23 @@ extern Int32 params_mng_delete(ParamsMngHandle hParamsMng);
 
 *****************************************************************************/
 extern Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void *arg, Int32 size);
+
+/*****************************************************************************
+ Prototype    : params_mng_write_back
+ Description  : write back current params
+ Input        : ParamsMngHandle hParamsMng  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 params_mng_write_back(ParamsMngHandle hParamsMng);
 
 #ifdef __cplusplus
 #if __cplusplus
