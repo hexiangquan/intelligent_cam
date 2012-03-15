@@ -51,7 +51,8 @@ EXEC_INSTALL_PATH := $(TARGET_EXEC_DIR)
 # Headers depended
 APP_INC = ../include
 HEADERS = $(wildcard *.h) $(wildcard $(APP_INC)/*.h) $(wildcard $(SDK_INC_DIR)/*.h)
-INC_DIR := -I. -I$(SDK_INC_DIR) -I$(APP_INC) 
+INC_DIR := -I. -I$(SDK_INC_DIR) -I$(APP_INC) -I$(APP_INC_DIR)
+COMMON_HEADER = $(APP_INC)/cam_params.h
 
 # Complie options
 C_FLAGS += -Wall -DDM365 -O2 $(INC_DIR)
@@ -87,6 +88,7 @@ $(EXEC_OBJ): $(OBJ_DIR)/%.o: %.c $(HEADERS)
 
 install:
 	-cp -p $(EXEC) $(EXEC_INSTALL_PATH)
+	-cp -p $(COMMON_HEADER) $(APP_INC_DIR)
 
 clean:
 	@echo Removing generated files..
