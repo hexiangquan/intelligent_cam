@@ -31,6 +31,7 @@
 #include <media/davinci/vpfe_capture.h>
 #include <cmem.h>
 #include <media/hdcam.h>
+#include <pthread.h>
 
 
 /*----------------------------------------------*
@@ -56,6 +57,7 @@ typedef struct _CapBuf {
 	unsigned long 	phyAddr;
 	Uint32			byetesUsed;
 	Int16			flags;
+	Int16			refCnt;				/* reference count */
 }CapBuf;
 
 /* Object for this module */
@@ -69,6 +71,8 @@ typedef struct CapObj {
 	CapBuf				*capBufs;		/* buf pool */
 	Int32				capIndex;		/* cnt for capture */
 	CapInputInfo		inputInfo;		/* current capture info */
+	pthread_mutex_t		mutex;			/* mutex for thread safe */
+	Int16				defRefCnt;		/* default reference count when buffer alloc */
 }CapObj;
 
 /*----------------------------------------------*
@@ -646,6 +650,7 @@ static Int32 capture_init_buf(CapHandle hCap, CapAttrs *attrs)
 	}
 
 	hCap->userAlloc = attrs->userAlloc;
+	hCap->defRefCnt = attrs->defRefCnt > 0 ? attrs->defRefCnt : 1;
 	return ret;
 }
 
@@ -788,6 +793,13 @@ CapHandle capture_create(CapAttrs *attrs)
 		goto err_quit;
 	}
 
+	/* init lock */
+	ret = pthread_mutex_init(&hCap->mutex, NULL);
+	if(ret < 0) {
+		ERRSTR("init mutex failed");
+		goto err_quit;
+	}
+	
 	return hCap;
 
 err_quit:
@@ -829,9 +841,14 @@ Int32 capture_delete(CapHandle hCapture)
 
 	if(hCapture->fdCap > 0)
 		close(hCapture->fdCap);
+
+	if(pthread_mutex_destroy(&hCapture->mutex) < 0) {
+		/* try unlock and then destory */
+		pthread_mutex_unlock(&hCapture->mutex);
+		pthread_mutex_destroy(&hCapture->mutex);
+	}
 	
-	if(hCapture)
-		free(hCapture);
+	free(hCapture);
 
 	return E_NO;
 }
@@ -1012,10 +1029,120 @@ Int32 capture_get_frame(CapHandle hCap, FrameBuf *frameBuf)
 	frameBuf->private = v4l2buf.index; //Record index 
 	frameBuf->reserved = 0;
 
-	/* Set flags for this buffer */
-	hCap->capBufs[v4l2buf.index].flags |= CAP_BUF_FLAG_USED;
+	/* Set reference cnt */
+	hCap->capBufs[v4l2buf.index].refCnt = hCap->defRefCnt;
     
     return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : capture_set_def_frame_ref_cnt
+ Description  : set default reference count
+ Input        : CapHandle hCap   
+                Int32 defRefCnt  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/16
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 capture_set_def_frame_ref_cnt(CapHandle hCap, Int32 defRefCnt)
+{
+	if(!hCap)
+		return E_INVAL;
+	
+	if(hCap->capStarted) {
+		ERR("default ref cnt can only set when capture is stopped.");
+		return E_MODE;
+	}
+
+	hCap->defRefCnt = defRefCnt;
+
+	return E_NO;	
+}
+
+/*****************************************************************************
+ Prototype    : capture_find_frame
+ Description  : find frame in pool
+ Input        : CapHandle hCap            
+                const FrameBuf *frameBuf  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/16
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static inline Int32 capture_find_frame(CapHandle hCap, const FrameBuf *frameBuf)
+{
+	Uint32 index = frameBuf->private;
+
+	/* Validate the buffer */
+	if( hCap->capBufs[index].userAddr != frameBuf->dataBuf ||
+		index >= hCap->bufNum ) {
+
+		DBG("search cap buf in pool.");
+
+		/* Look through the pool */
+		for(index = 0; index < hCap->bufNum; index++){
+			if(hCap->capBufs[index].userAddr == frameBuf->dataBuf)
+				break;
+		}
+		
+		if(index >= hCap->bufNum) {
+			ERR("invalid buffer handle, not belong to capture module");
+			return E_NOTEXIST;
+		}
+	}
+
+	return index;
+}
+
+/*****************************************************************************
+ Prototype    : capture_inc_frame_ref
+ Description  : increase frame reference count
+ Input        : CapHandle hCap            
+                const FrameBuf *frameBuf  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/16
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 capture_inc_frame_ref(CapHandle hCap, const FrameBuf *frameBuf) 
+{
+	if(!hCap || !frameBuf)
+		return E_INVAL;
+	
+	/* find frame in pool */
+	Int32 index = capture_find_frame(hCap, frameBuf);
+	if(index < 0) 
+		return index;
+
+	if(hCap->capBufs[index].refCnt <= 0) {
+		WARN("this buffer has been released.");
+		return E_INVAL;
+	}
+
+	pthread_mutex_lock(&hCap->mutex);
+	hCap->capBufs[index].refCnt++;
+	pthread_mutex_unlock(&hCap->mutex);
+
+	return E_NO;
 }
 
 /*****************************************************************************
@@ -1042,28 +1169,19 @@ Int32 capture_free_frame(CapHandle hCap, FrameBuf *frameBuf)
 	if(!hCap->capStarted)
 		return E_MODE;
 
-	Int32 index = frameBuf->private;
+	/* find frame in pool */
+	Int32 index = capture_find_frame(hCap, frameBuf);
+	if(index < 0) 
+		return index;
 
-	/* Validate the buffer */
-	if( index < 0 || index >= hCap->bufNum || 
-		hCap->capBufs[index].userAddr != frameBuf->dataBuf ) {
+	/* this must be threads-safe */
+	pthread_mutex_lock(&hCap->mutex);
+	hCap->capBufs[index].refCnt--;
+	pthread_mutex_unlock(&hCap->mutex);
 
-		/* Look through the pool */
-		for(index = 0; index < hCap->bufNum; index++){
-			if(hCap->capBufs[index].userAddr == frameBuf->dataBuf)
-				break;
-		}
-		
-		if(index >= hCap->bufNum) {
-			ERR("invalid buffer handle, not belong to capture module");
-			return E_INVAL;
-		}
-	}
-
-	if(!(hCap->capBufs[index].flags & CAP_BUF_FLAG_USED)) {
-		ERR("This buffer has not been allocated before.");
-		return E_INVAL;
-	}
+	/* if reference count > 0, we should not free */
+	if(hCap->capBufs[index].refCnt > 0)
+		return E_NO;
 
 	/* Fill v4l2 buffer */
 	struct v4l2_buffer 	v4l2buf;
@@ -1080,9 +1198,6 @@ Int32 capture_free_frame(CapHandle hCap, FrameBuf *frameBuf)
         ERRSTR("que buf failed");
         return E_IO;
     }
-
-	/* Clear flag */
-    hCap->capBufs[index].flags &= ~CAP_BUF_FLAG_USED;
 
 	return E_NO;
 }

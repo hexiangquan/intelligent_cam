@@ -93,6 +93,7 @@ typedef struct _CapAttrs {
 	CaptureMode		mode;			/* input capture mode */
 	Bool			userAlloc;		/* use user ptr or mmap from driver */
 	Int32			bufNum;			/* num of buffer for capture */
+	Int32			defRefCnt;		/* default frame buf reference cnt */
 }CapAttrs;
 
 /**
@@ -298,6 +299,42 @@ extern Int32 capture_get_input_info(CapHandle hCap, CapInputInfo *info);
 
 *****************************************************************************/
 extern Int32 capture_config(CapHandle hCap, CaptureStd std, CaptureMode mode);
+
+/*****************************************************************************
+ Prototype    : capture_inc_frame_ref
+ Description  : increase frame reference count
+ Input        : CapHandle hCap            
+                const FrameBuf *frameBuf  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/16
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 capture_inc_frame_ref(CapHandle hCap, const FrameBuf *frameBuf);
+
+/*****************************************************************************
+ Prototype    : capture_set_def_frame_ref_cnt
+ Description  : set default reference count
+ Input        : CapHandle hCap   
+                Int32 defRefCnt  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/16
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 capture_set_def_frame_ref_cnt(CapHandle hCap, Int32 defRefCnt);
 
 #ifdef __cplusplus
 #if __cplusplus

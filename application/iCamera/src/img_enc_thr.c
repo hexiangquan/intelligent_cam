@@ -187,6 +187,46 @@ static Int32 img_enc_thr_init(ImgEncThrArg *arg, ImgEncThrEnv *envp)
 	return E_NO;
 }
 
+#if 0
+/*****************************************************************************
+ Prototype    : img_conv_update
+ Description  : update img conv alg
+ Input        : CapThrEnv *envp  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/7
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 img_conv_update(CapThrEnv *envp)
+{
+	Int32 				err;
+	ImgConvDynParams 	*pConvDynParams;
+	
+	pConvDynParams = &envp->convDynParams;
+	err = params_mng_control(envp->hParamsMng, PMCMD_G_IMGCONVDYN, 
+				pConvDynParams, sizeof(ImgConvDynParams));
+	if(err)
+		return err;
+
+	/* config alg */
+	err = img_conv_control( envp->hImgConv, 
+							ALG_CMD_SET_DYN_PARAMS, 
+							pConvDynParams );
+	if(err) {
+		ERR(" config for img enc err.");
+		return err;
+	}
+
+	return E_NO;
+}
+
+#endif
 /*****************************************************************************
  Prototype    : img_enc_thr_run
  Description  : add osd and do jpeg encode
@@ -221,6 +261,24 @@ static Int32 img_enc_thr_run(ImgEncThrEnv *envp, ImgMsg *msg)
 	inBuf.buf = buffer_get_user_addr(msg->hBuf);
 	inBuf.bufSize = buffer_get_size(msg->hBuf);
 	assert(inBuf.buf && inBuf.bufSize);
+
+#if 0
+	/* do image convert */
+		inBuf.buf = capFrame.dataBuf;
+		inBuf.bufSize = capFrame.bufSize;
+		outBuf.buf = buffer_get_user_addr(hBuf);
+		outBuf.bufSize = buffer_get_size(hBuf);
+		
+		err = img_conv_process(envp->hImgConv, &inBuf, NULL, &outBuf, NULL);
+		if(err) {
+			ERR("imgConv err.");
+			goto free_buf;
+		}
+		
+#ifdef CRC_EN
+		imgMsg->header.param[0] = crc16(outBuf.buf, imgMsg->dimension.size);
+#endif
+#endif
 
 #ifdef CRC_EN
 	Int32 crc = crc16(inBuf.buf, msg->dimension.size);

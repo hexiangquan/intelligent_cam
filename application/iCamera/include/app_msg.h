@@ -27,6 +27,7 @@ typedef enum _AppCmd {
 	APPCMD_EXIT = 0x1000,		//program exit
 	APPCMD_REBOOT,				//system reboot
 	APPCMD_CAP_EN,				//capture ctrl, start, stop, restart
+	APPCMD_RAW_DATA,			//new raw data
 	APPCMD_NEW_DATA,			//new image data
 	APPCMD_SET_IMG_CONV,		//set img adjust params
 	APPCMD_SET_STREAM2,			//set 2nd stream params
@@ -49,14 +50,18 @@ typedef struct _CommonMsg {
 typedef struct _ImgMsg {
 	MsgHeader		header;				/* Msg header, must be the first field */
 	BufHandle		hBuf;				/* Buffer handle */
-	FrameBuf		rawFrame;			/* raw frame if the format is not encoded */
 	Int32			index;				/* Frame index */
 	ImgDimension	dimension;			/* Format info of image */
 	CamDateTime		timeStamp;			/* Capture time */
 	Int32			frameType;			/* Frame type for video */
 }ImgMsg;
 
-
+/* Msg for raw buffer transfer */
+typedef struct _RawMsg {
+	MsgHeader		header;				/* Msg header, must be the first field */
+	FrameBuf		capBuf;				/* capture buf */
+	ImgDimension	dimension;			/* Format info of image */
+}RawMsg;
 
 #endif
 

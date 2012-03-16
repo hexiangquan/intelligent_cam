@@ -114,7 +114,7 @@ static Int32 free_frame_buf(FrameDispHandle hDispatch, ImgMsg *img, Int32 flags)
 	}
 
 	if(flags & FD_FLAG_RAW_FRAME) {
-		return capture_free_frame(hDispatch->hCap, &img->rawFrame);
+		//return capture_free_frame(hDispatch->hCap, &img->rawFrame);
 	}
 	
 	/* free buffer */

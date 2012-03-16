@@ -30,11 +30,13 @@
 #include "app_msg.h"
 #include "params_mng.h"
 #include "buffer.h"
-#include "capture_thr.h"
+#include "data_collector.h"
 #include "img_enc_thr.h"
 #include <signal.h>
 #include "vid_enc_thr.h"
 #include "img_snd_thr.h"
+#include "ctrl_thr.h"
+#include "img_convert.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -65,6 +67,9 @@
  *----------------------------------------------*/
 #define PROGRAM_NAME		"iCamera"
 #define CONFIG_FILE			"./cam.cfg"
+#define CAP_DEVICE			"/dev/video0"
+#define CAP_BUF_NUM			4
+
 	
 #define CAM_MAX_THREAD_NUM	8
 
@@ -82,41 +87,140 @@ typedef struct {
 	ParamsMngHandle hParamsMng;
 	FrameDispHandle	hDispatch;
 	CapHandle		hCap;
+	AlgHandle		hImgConv;
+	CollectorHandle	hCollector;
 }MainEnv;
 
 static Bool s_exit = FALSE;
 
 /*****************************************************************************
- Prototype    : threads_create
- Description  : create threads 
- Input        : SetupParams *params  
+ Prototype    : module_init
+ Description  : init modules
+ Input        : MainEnv *envp  
  Output       : None
  Return Value : static
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/5
+  1.Date         : 2012/3/16
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-static Int32 threads_create(MainEnv *envp)
+static Int32 app_init(MainEnv *envp)
+{
+	Int32 			ret;
+
+	/* init low level modules */
+	ret = alg_init();
+	ret |= buffer_init();
+
+	if(ret) {
+		ERR("module init failed!");
+		return ret;
+	}
+
+	/* read params */
+	envp->hParamsMng = params_mng_create(envp->cfgFileName);
+	if(!envp->hParamsMng) {
+		ERR("create params failed.");
+		return E_IO;
+	}
+	
+	/* get current work mode  & img enhance params */
+	CapAttrs		capAttrs;
+	CapInputInfo	inputInfo;
+
+	/* fill attrs for capture create */
+	capAttrs.devName = CAP_DEVICE;
+	capAttrs.inputType = CAP_INPUT_CAMERA;
+	capAttrs.std = CAP_STD_FULL_FRAME;
+	capAttrs.mode = CAM_CAP_MODE_CONTINUE;
+	capAttrs.userAlloc = TRUE;
+	capAttrs.bufNum = CAP_BUF_NUM;
+	capAttrs.defRefCnt = 1;
+
+	/* create capture object */
+	envp->hCap = capture_create(&capAttrs);
+	if(!envp->hCap) {
+		ERR("create capture handle failed...");
+		return E_IO;
+	}
+
+	capture_get_input_info(envp->hCap, &inputInfo);
+
+	/* set capture info to params manager */
+	ret = params_mng_control(envp->hParamsMng, PMCMD_S_CAPINFO, &inputInfo, sizeof(CapInputInfo));
+	assert(ret == E_NO);
+
+	/* create img conv module */
+	ImgConvInitParams convInitParams;
+	ImgConvDynParams convDynParams;
+	
+	convInitParams.prevDevName = NULL;
+	convInitParams.rszDevName = NULL;
+	convInitParams.size = sizeof(convInitParams);
+
+	/* get img convert dynamic params */
+	ret = params_mng_control(envp->hParamsMng, PMCMD_G_IMGCONVDYN, &convDynParams, sizeof(convDynParams));
+	if(ret)
+		return ret;
+
+	/* create image convert object */
+	envp->hImgConv = img_conv_create(&convInitParams, &convDynParams);
+	if(!envp->hImgConv) {
+		ERR("create img convert handle failed...");
+		return E_IO;
+	}
+
+	/* create data capture module (App module) */
+	CollectorAttrs collectorAttrs;
+
+	collectorAttrs.hParamsMng = envp->hParamsMng;
+	collectorAttrs.hCap = envp->hCap;
+	envp->hCollector = data_collector_create(&collectorAttrs);
+	if(!envp->hCollector) {
+		ERR("create data capture failed");
+		return E_INVAL;
+	}
+
+	
+	/* create frame dispatch module */
+	FrameDispInfo info;
+	info.hParamsMng = envp->hParamsMng;
+	info.savePath = envp->savePath;
+	envp->hDispatch = frame_disp_create(FT_SRV_UNCONNECTED, FRAME_ENC_ON, &info);
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : start_running
+ Description  : start running system
+ Input        : MainEnv *envp  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/16
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 app_run(MainEnv *envp)
 {
 	Int32 		err;
 
-	/* create capture thread */
-	CapThrArg 	*capArg = malloc(sizeof(CapThrArg));
-	assert(capArg);
-
-	capArg->hParamsMng = envp->hParamsMng;
-	capArg->hDispatch = envp->hDispatch;
-	err = pthread_create(&envp->pid[0], NULL, capture_thr, capArg);
-	if(err < 0) {
-		free(capArg);
-		ERRSTR("create capture thread failed...");
-		return E_NOMEM;
+	/* start data capture */
+	err = data_collector_run(envp->hCollector);
+	if(err ) {
+		ERR("data collector run failed...");
+		return err;
 	}
+
 
 	/* create image encode thread */
 	ImgEncThrArg *imgEncArg = malloc(sizeof(ImgEncThrArg));
@@ -158,6 +262,19 @@ static Int32 threads_create(MainEnv *envp)
 		return E_NOMEM;
 	}
 #endif
+
+	/* create ctrl thread */
+	CtrlThrArg *ctrlThrArg = malloc(sizeof(CtrlThrArg));
+	assert(ctrlThrArg);
+
+	ctrlThrArg->hDispatch = envp->hDispatch;
+	ctrlThrArg->hParamsMng = envp->hParamsMng;
+	err = pthread_create(&envp->pid[4], NULL, ctrl_thr, ctrlThrArg);
+	if(err < 0) {
+		free(ctrlThrArg);
+		ERRSTR("create ctrl thread failed...");
+		return E_NOMEM;
+	}
 	return E_NO;
 }
 
@@ -177,7 +294,7 @@ static Int32 threads_create(MainEnv *envp)
     Modification : Created function
 
 *****************************************************************************/
-static void threads_delete(MainEnv *envp, MsgHandle hMsg)
+static void app_exit(MainEnv *envp, MsgHandle hMsg)
 {
 	//Int32 i = 0;
 	MsgHeader msg;
@@ -193,10 +310,30 @@ static void threads_delete(MainEnv *envp, MsgHandle hMsg)
 	pthread_join(envp->pid[1], NULL);
 	msg_send(hMsg, MSG_VID_ENC, &msg, sizeof(msg));
 	pthread_join(envp->pid[2], NULL);
-	//msg_send(hMsg, MSG_IMG_TX, &msg, sizeof(msg));
-	//pthread_join(envp->pid[3], NULL);
-	msg_send(hMsg, MSG_CAP, &msg, sizeof(msg));
-	pthread_join(envp->pid[0], NULL);
+	msg_send(hMsg, MSG_IMG_TX, &msg, sizeof(msg));
+	pthread_join(envp->pid[3], NULL);
+	msg_send(hMsg, MSG_CTRL, &msg, sizeof(msg));
+	pthread_join(envp->pid[4], NULL);
+
+	if(envp->hCollector)
+		data_collector_delete(envp->hCollector, hMsg);
+
+	if(hMsg)
+		msg_delete(hMsg);
+
+	if(envp->hParamsMng)
+		params_mng_delete(envp->hParamsMng);
+
+	if(envp->hDispatch)
+		frame_disp_delete(envp->hDispatch);
+
+	if(envp->hCap)
+		capture_delete(envp->hCap);
+
+	if(envp->hImgConv)
+		img_conv_delete(envp->hImgConv);
+
+	alg_exit();
 
 }
 
@@ -279,15 +416,11 @@ static Int32 main_loop(MainEnv *envp)
 	MsgHandle 		hMsg = NULL;
 	CommonMsg		msgBuf;
 	CamDateTime		curTime;
-	
-	/* init modules */
-	status = alg_init();
-	status |= buffer_init();
 
-	if(status) {
-		ERR("module init failed!");
+	/* init and create modules for application */
+	status = app_init(envp);
+	if(status)
 		goto exit;
-	}
 
 	/* create msg */
 	hMsg = msg_create(MSG_MAIN, NULL, MSG_FLAG_NONBLK);
@@ -296,25 +429,13 @@ static Int32 main_loop(MainEnv *envp)
 		goto exit;
 	}
 
-	/* read params */
-	envp->hParamsMng = params_mng_create(envp->cfgFileName);
-	if(!envp->hParamsMng) {
-		ERR("create params failed.");
-		goto exit;
-	}
-
-	/* create frame dispatch module */
-	FrameDispInfo info;
-	info.hParamsMng = envp->hParamsMng;
-	info.savePath = envp->savePath;
-	envp->hDispatch = frame_disp_create(FT_SRV_UNCONNECTED, FRAME_ENC_ON, &info);
-
 	/* catch signals */
-	//DBG("enable signal");
 	//signal(SIGINT, sig_handler);
 
-	/* create threads */
-	status = threads_create(envp);
+	/* run our modules  */
+	status = app_run(envp);
+	if(status)
+		goto exit;
 
 	/* start main loop */
 	while(!s_exit && !envp->exit) {
@@ -336,9 +457,6 @@ static Int32 main_loop(MainEnv *envp)
 		sleep(1);
 	}
 
-	/* delete threads */
-	threads_delete(envp, hMsg);
-
 	if(envp->reboot) {
 		INFO("we are going to reboot system");
 		system("shutdown -r now");
@@ -346,19 +464,8 @@ static Int32 main_loop(MainEnv *envp)
 	
 exit:
 
-	if(hMsg)
-		msg_delete(hMsg);
-
-	if(envp->hParamsMng)
-		params_mng_delete(envp->hParamsMng);
-
-	if(envp->hDispatch)
-		frame_disp_delete(envp->hDispatch);
-
-	if(envp->hCap)
-		capture_delete(envp->hCap);
-
-	alg_exit();
+	/* exit modules */
+	app_exit(envp, hMsg);
 
 	return status;
 	

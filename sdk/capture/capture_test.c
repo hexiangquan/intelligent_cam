@@ -57,6 +57,7 @@ static Bool main_loop(TestParams *params)
 	attrs.inputType = CAP_INPUT_CAMERA;
 	attrs.std = CAP_STD_FULL_FRAME;
 	attrs.userAlloc = TRUE;
+	attrs.defRefCnt = 1;
 	
 	CapHandle hCapture = capture_create(&attrs);
 	assert(hCapture);
@@ -75,13 +76,18 @@ static Bool main_loop(TestParams *params)
 	if(!hCapture)
 		goto exit;
 
+	//capture_set_def_frame_ref_cnt(hCapture, 3);
+
 	err = capture_start(hCapture);
 	if(err)
 		goto exit;
 
+	capture_set_def_frame_ref_cnt(hCapture, 3);
+
 	Int32 i = 0;
 
 	while(1) {
+		
 		err = capture_get_frame(hCapture, &frameBuf);
 		if(err) {
 			ERR("wait capture buffer failed...");
@@ -92,14 +98,21 @@ static Bool main_loop(TestParams *params)
 			(unsigned int)frameBuf.timeStamp.tv_sec, (unsigned int)frameBuf.timeStamp.tv_usec);
 		
 
-		check_all_zero(frameBuf.dataBuf, frameBuf.bytesUsed);
+		//check_all_zero(frameBuf.dataBuf, frameBuf.bytesUsed);
 		
 		usleep(1000);
+		
+		
 		err = capture_free_frame(hCapture, &frameBuf);
 		if(err < 0) {
 			ERR("free frame failed");
 			break;
 		}
+
+		err = capture_inc_frame_ref(hCapture, &frameBuf);
+		//assert(err == E_NO);
+		
+		err = capture_free_frame(hCapture, &frameBuf);
 
 		i++;
 		if(params->loopCnt > 0 && i > params->loopCnt)
