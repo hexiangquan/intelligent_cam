@@ -218,7 +218,7 @@ extern Int32 icam_get_time(IN ICamCtrlHandle hCtrl, OUT CamDateTime *buf);
 extern Int32 icam_get_traffic_light_regions(IN ICamCtrlHandle hCtrl, OUT CamTrafficLightRegions *params);
 
 /* get image upload protocol */
-extern Int32 icam_get_upload_proto(IN ICamCtrlHandle hCtrl, OUT CamImageUploadProtocol *buf);
+extern Int32 icam_get_upload_proto(IN ICamCtrlHandle hCtrl, OUT CamImgUploadProto *buf);
 
 /* get firmware version */
 extern Int32 icam_get_version(IN ICamCtrlHandle hCtrl, OUT CamVersionInfo *buf);
@@ -302,7 +302,7 @@ extern Int32 icam_set_time(IN ICamCtrlHandle hCtrl, IN const CamDateTime *dateTi
 extern Int32 icam_set_traffic_light_regions(IN ICamCtrlHandle hCtrl, IN const CamTrafficLightRegions *params);
 
 /* set upload protocol */
-extern Int32 icam_set_upload_proto(IN ICamCtrlHandle hCtrl, IN CamImageUploadProtocol proto);
+extern Int32 icam_set_upload_proto(IN ICamCtrlHandle hCtrl, IN CamImgUploadProto proto);
 
 /* set work mode */
 extern Int32 icam_set_work_mode(IN ICamCtrlHandle hCtrl, IN const CamWorkMode *params);

@@ -162,11 +162,14 @@ Int32 buf_pool_delete(BufPoolHandle hPool)
 		return E_INVAL;
 
 	/* Free all buffers */
+	Int32 i = 0;
+	while(hPool->useNum > 0 && i++ < 10) {
+		usleep(100000); //wait other buffers free
+	}
+	
 	if(hPool->useNum > 0)
 		WARN("warning: there still buffer used in this pool...");
 	
-	Int32 i;
-
 	pthread_mutex_lock(&hPool->mutex);
 	for(i = 0; i < hPool->bufNum; i++) {
 		buffer_free(hPool->pBufs[i]);
@@ -402,29 +405,31 @@ Int32 buf_pool_free(BufHandle hBuf)
 		}
 	}
 
-	/* Checke if this buf has been locked */
-	if(hBuf->flag & BUF_FLAG_LCKED) {
-		#ifdef BUF_DBG
-		DBG("can't free buf, buf is locked.");
-		#endif
-		err = E_BUSY;
-		goto exit;
-	}
-
-	/* Set flag to free */
-	hBuf->flag &= ~(BUF_FLAG_USED);
-	if(hPool->useNum == hPool->bufNum) {
-		hPool->useNum--;
-		#ifdef BUF_DBG
-		DBG("free buf, Send signal....");
-		#endif
-		pthread_mutex_unlock(&hPool->mutex);
-		//pthread_cond_signal(&hPool->cond);
-		pthread_cond_broadcast(&hPool->cond);
-		return err;
-	} else {
-		if(hPool->useNum)
+	if(hBuf->flag & BUF_FLAG_USED) {
+		/* Checke if this buf has been locked */
+		if(hBuf->flag & BUF_FLAG_LCKED) {
+			#ifdef BUF_DBG
+			DBG("can't free buf, buf is locked.");
+			#endif
+			err = E_BUSY;
+			goto exit;
+		}
+	
+		/* Set flag to free */
+		hBuf->flag &= ~(BUF_FLAG_USED);
+		if(hPool->useNum == hPool->bufNum) {
 			hPool->useNum--;
+			#ifdef BUF_DBG
+			DBG("free buf, Send signal....");
+			#endif
+			pthread_mutex_unlock(&hPool->mutex);
+			pthread_cond_signal(&hPool->cond);
+			//pthread_cond_broadcast(&hPool->cond);
+			return err;
+		} else {
+			if(hPool->useNum)
+				hPool->useNum--;
+		}
 	}
 	
 exit:

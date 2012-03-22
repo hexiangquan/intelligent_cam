@@ -78,9 +78,9 @@ typedef struct _ImgConvDynParams {
 	ChromaFormat	inputFmt;		/* input color space format, support FMT_BAYER_RGBG, FMT_YUV420SP, FMT_YUV422ILE */
 	Uint16			inputWidth;		/* input width */
 	Uint16			inputHeight;	/* input height */
-	Uint32			ctrlFlags;		/* ctrl flags, see CONV_FLAG_XXX */
-	Uint16			digiGain;		/* digital gain for format convert */
 	ConvOutAttrs	outAttrs[CONV_MAX_OUT_CHAN_NUM]; /* out attributes */
+	Uint32			ctrlFlags;		/* ctrl flags, see CONV_FLAG_XXX */
+	Uint16			digiGain;		/* digital gain for format convert */	
 	Uint8			brigtness;		/* luma params, can only be set when init */
 	Uint8			contrast;		/* luma params, can only be set when init */
 	Int16			*eeTable;		/* edge enhance table */
@@ -90,6 +90,7 @@ typedef struct _ImgConvDynParams {
 /* Input args for process, not used */
 typedef struct _ImgConvInArgs {
 	Int32			size;			/* size of this struct */
+	ConvOutAttrs	outAttrs[CONV_MAX_OUT_CHAN_NUM]; /* out attributes */
 }ImgConvInArgs;
 
 /* Output args for process, not used */
@@ -100,8 +101,6 @@ typedef struct _ImgConvOutArgs {
 enum ImgConvCmd {
 	CONV_CMD_SET_DYN_PARAMS = ALG_CMD_SET_DYN_PARAMS,
 	CONV_CMD_GET_DYN_PARAMS = ALG_CMD_GET_DYN_PARAMS,
-	CONV_CMD_SET_OUT0_ATTRS = ALG_CMD_USER_BASE + 1,
-	CONV_CMD_SET_OUT1_ATTRS,
 };
 
 /*----------------------------------------------*

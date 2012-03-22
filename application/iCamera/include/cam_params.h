@@ -186,8 +186,9 @@ typedef enum {
 	CAM_UPLOAD_PROTO_TCP = 0,
 	CAM_UPLOAD_PROTO_FTP =1,	
 	CAM_UPLOAD_PROTO_NONE,		//don't upload, save to local file system
-	CAM_UPLOAD_PROTO_MAX
-} CamImageUploadProtocol;
+	CAM_UPLOAD_PROTO_RTP,
+	CAM_UPLOAD_PROTO_MAX,
+} CamImgUploadProto;
 
 /* 
   * TCP image recv server info 

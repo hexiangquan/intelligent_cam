@@ -51,7 +51,6 @@
 /*----------------------------------------------*
  * internal routine prototypes                  *
  *----------------------------------------------*/
-static Int32 previewer_update(int fdPrev, PreviewAttrs *attrs);
 
 /*----------------------------------------------*
  * project-wide global variables                *
@@ -160,7 +159,7 @@ Int32 previewer_ss_config(int fd, PreviewAttrs *attrs)
 		return E_IO;
 	}
 
-	return previewer_update(fd, attrs);
+	return 0;
 }
 
 /*****************************************************************************
@@ -581,7 +580,7 @@ static Int32 previewer_set_yee(struct prev_module_param *modParam, struct prev_y
     Modification : Created function
 
 *****************************************************************************/
-static Int32 previewer_update(int fdPrev, PreviewAttrs *attrs)
+Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
 {
 	int  ret = E_NO;
 	struct prev_cap cap;
@@ -631,7 +630,7 @@ static Int32 previewer_update(int fdPrev, PreviewAttrs *attrs)
 			if(attrs->ctrlFlags & CONV_FLAG_EE_EN) {
 				if(!attrs->eeTable || attrs->eeTabSize < YEE_LUT_MAX_SIZE) {
 					/* Use default table */
-					yeeTab = previewer_init_yee_table();
+					//yeeTab = previewer_init_yee_table();
 					attrs->eeTable = yeeTab;
 				}
 				previewer_set_yee(&modParam, &yee, yeeTab, attrs);
@@ -697,6 +696,7 @@ Int32 previewer_convert(int fd, AlgBuf *inBuf, AlgBuf *outBuf)
 	convert.out_buff1.size = outBuf->bufSize;
 
 	if(ioctl(fd, PREV_PREVIEW, &convert) < 0) {
+	//if(ioctl(fd, RSZ_RESIZE, &convert) < 0) {
 		ERRSTR("Error in doing preview");
 		return E_IO;
 	}

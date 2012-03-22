@@ -61,7 +61,7 @@ typedef struct {
 }ImgTcpUploadParams;
 
 /* fxns for this module */
-const UploadFxns TCP_UPLOAD_FXNS ;
+extern const UploadFxns TCP_UPLOAD_FXNS ;
 
 #endif
 

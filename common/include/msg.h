@@ -251,6 +251,24 @@ extern const char *msg_get_recv_src(MsgHandle hMsg);
 *****************************************************************************/
 extern Int32 msg_set_default_dst(MsgHandle hMsg, const char *dstName);
 
+/*****************************************************************************
+ Prototype    : msg_get_name
+ Description  : get name of this msg module
+ Input        : MsgHandle hMsg  
+ Output       : None
+ Return Value : const
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/20
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern const char *msg_get_name(MsgHandle hMsg);
+
+
 #ifdef __cplusplus
 #if __cplusplus
 }

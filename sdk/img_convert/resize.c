@@ -172,6 +172,8 @@ Int32 resize_ss_config(int fd, RszAttrs *attrs)
         ERRSTR("Error in setting configuration for single shot mode");
         goto cleanup;
     }
+
+#if 0
     rsz_chan_config.oper_mode = IMP_MODE_SINGLE_SHOT;
     rsz_chan_config.chain = attrs->isChained ? 1 : 0;
     rsz_chan_config.len = sizeof(struct rsz_single_shot_config);
@@ -181,6 +183,7 @@ Int32 resize_ss_config(int fd, RszAttrs *attrs)
         ERRSTR("Error in getting configuration from driver");
         goto cleanup;
     }
+#endif
 
     return E_NO;
     

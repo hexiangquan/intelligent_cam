@@ -155,6 +155,7 @@ static Int32 h264_enc_set_dyn_params(H264EncAlgHandle hH264Enc, H264EncDynParams
 	pH264EncDynParams->idrFrameInterval							= dynParams->idrFrameInterval;
 	pH264EncDynParams->maxBitrateCVBR							= dynParams->maxBitrateCVBR;
 	pH264EncDynParams->maxHighCmpxIntCVBR						= dynParams->maxHighCmpxIntCVBR;
+	pH264EncDynParams->resetHDVICPeveryFrame					= 2;
 	
 	Int32 status;
 

@@ -28,6 +28,8 @@
 #include "log.h"
 #include "tcp_upload.h"
 #include "ftp_upload.h"
+#include <pthread.h>
+#include "jpg_encoder.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -40,6 +42,7 @@
 /*----------------------------------------------*
  * internal routine prototypes                  *
  *----------------------------------------------*/
+static Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data);
 
 /*----------------------------------------------*
  * project-wide global variables                *
@@ -57,16 +60,121 @@
  * macros                                       *
  *----------------------------------------------*/
 
+#define RECONNECT_TIMEOUT	5 	//second
+#define MSG_RECV_TIMEOUT	25	//second
+#define HEAT_BEAT_INTERVAL	60	//second
+
+#define TEST_SEND_TIME
+
+
 /*----------------------------------------------*
  * routines' implementations                    *
  *----------------------------------------------*/
 /* structure for this module */
 struct UploadObj {
-	const UploadFxns	*fxns;
-	Bool				isConnected;
-	void				*handle;
-	Uint32				connectTimeout;
+	const UploadFxns		*fxns;
+	Bool					isConnected;
+	void					*handle;			//low level handle
+	const char				*msgName;
+	Uint32					connectTimeout;
+	Int32					flags;
+	pthread_t 				pid;
+	pthread_mutex_t			mutex;
+	Bool					exit;
+	CamImgUploadProto		protol;
+	ParamsMngHandle			hParamsMng;
+	const char				*savePath;
 };
+
+/* fxns for none upload */
+const UploadFxns NONE_UPLOAD_FXNS = {
+	.create = NULL,
+	.delete = NULL,
+	.connect = NULL,
+	.disconnect = NULL,
+	.sendFrame = NULL,
+	.sendHeartBeat = NULL,
+	.setParams = NULL,
+	.saveFrame = NULL,
+};
+
+/*****************************************************************************
+ Prototype    : upload_thread
+ Description  : running this thread
+ Input        : void *arg  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/21
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static void *upload_thread(void *arg)
+{
+	assert(arg);
+
+	UploadHandle	hUpload = (UploadHandle)arg;
+	Int32			ret;
+	ImgMsg			msgBuf;
+	time_t			lastTime = time(NULL);
+	MsgHandle		hMsg;
+
+	/* init for thread env */
+	hMsg = msg_create(hUpload->msgName, MSG_MAIN, 0);
+	if(!hMsg)
+		goto exit;
+
+	ret = msg_set_recv_timeout(hMsg, MSG_RECV_TIMEOUT);
+
+	DBG("upload thread start...");
+
+	while(!hUpload->exit) {
+		/* check if we need connect server */
+		if(!hUpload->isConnected) {
+			ret = upload_connect(hUpload, RECONNECT_TIMEOUT);
+		} else {
+			/* keep alive with server */
+			if(time(NULL) - lastTime > HEAT_BEAT_INTERVAL) {
+				upload_send_heartbeat(hUpload);
+				lastTime = time(NULL);
+			}	
+		}
+				
+		/* recv msg */
+		ret = msg_recv(hMsg, &msgBuf, sizeof(msgBuf));
+		if(ret < 0) {
+			ERR("recv msg err: %s", str_err(ret));
+			continue;
+		}
+	
+		/* process msg */
+		MsgHeader *msgHdr = &msgBuf.header;
+		switch(msgHdr->cmd) {
+		case APPCMD_NEW_DATA:
+			ret = upload_send_frame(hUpload, &msgBuf);
+			break;
+		case APPCMD_EXIT:
+			hUpload->exit = TRUE;
+			break;
+		default:
+			ERR("unkown cmd: 0x%X", (unsigned int)msgHdr->cmd);
+			ret = E_UNSUPT;
+			break;
+		}
+	}
+
+exit:
+
+	if(hMsg)
+		msg_delete(hMsg);
+
+	INFO("upload thread exit...");
+	pthread_exit(0);
+}
 
 
 /*****************************************************************************
@@ -86,9 +194,13 @@ struct UploadObj {
     Modification : Created function
 
 *****************************************************************************/
-UploadHandle upload_create(CamImageUploadProtocol protol, void *params, Uint32 reConTimeout)
+UploadHandle upload_create(UploadAttrs *attrs)
 {
 	UploadHandle hUpload;
+	Int8		 params[1024];
+
+	if(!attrs || !attrs->hParamsMng)
+		return NULL;
 
 	hUpload = calloc(1, sizeof(struct UploadObj));
 	if(!hUpload) {
@@ -97,25 +209,51 @@ UploadHandle upload_create(CamImageUploadProtocol protol, void *params, Uint32 r
 	}
 
 	hUpload->isConnected = FALSE;
-	hUpload->connectTimeout = reConTimeout;
+	hUpload->connectTimeout = attrs->reConTimeout;
+	hUpload->msgName = attrs->msgName;
+	hUpload->hParamsMng = attrs->hParamsMng;
+	hUpload->savePath = attrs->savePath;
 
-	switch(protol) {
+	switch(attrs->protol) {
 	case CAM_UPLOAD_PROTO_TCP:
 		hUpload->fxns = &TCP_UPLOAD_FXNS;
+		attrs->flags |= UPLOAD_FLAG_ANSYNC;
+		params_mng_control(hUpload->hParamsMng, PMCMD_G_IMGUPLOADPARAMS, params, sizeof(params));
 		break;
 	case CAM_UPLOAD_PROTO_FTP:
 		hUpload->fxns = &FTP_UPLOAD_FXNS;
+		attrs->flags |= UPLOAD_FLAG_ANSYNC;
+		params_mng_control(hUpload->hParamsMng, PMCMD_G_IMGUPLOADPARAMS, params, sizeof(params));
 		break;
+	case CAM_UPLOAD_PROTO_RTP:
+		//hUpload->fxns = NULL;	//not supported now
+		//break;
 	case CAM_UPLOAD_PROTO_NONE:
 	default:
-		hUpload->fxns = NULL;
+		attrs->protol = CAM_UPLOAD_PROTO_NONE;
+		hUpload->fxns = &NONE_UPLOAD_FXNS;
 		break;
 	}
 
-	if(hUpload->fxns && hUpload->fxns->create) {
+	assert(hUpload->fxns);
+
+	/* record protol */
+	hUpload->protol = attrs->protol;
+	hUpload->flags = attrs->flags;
+	pthread_mutex_init(&hUpload->mutex, NULL);
+	
+	if(hUpload->fxns->create) {
 		hUpload->handle = hUpload->fxns->create(params);
 		if(!hUpload->handle) {
 			ERR("create sub object failed.");
+			goto err_quit;
+		}
+	}
+	
+	if(hUpload->flags & UPLOAD_FLAG_ANSYNC) {
+		/* create upload thread */
+		if(pthread_create(&hUpload->pid, NULL, upload_thread, hUpload) < 0)	{
+			ERRSTR("create upload thread err");
 			goto err_quit;
 		}
 	}
@@ -144,16 +282,34 @@ err_quit:
     Modification : Created function
 
 *****************************************************************************/
-Int32 upload_delete(UploadHandle hUpload)
+Int32 upload_delete(UploadHandle hUpload, MsgHandle hCurMsg)
 {
 	if(hUpload == NULL)
 		return E_INVAL;
 
+	if(hUpload->pid) {
+		hUpload->exit = TRUE;
+		if(hCurMsg) {
+			MsgHeader msg;
+
+			/* send msg to our thread to exit */
+			msg.cmd = APPCMD_EXIT;
+			msg.index = 0;
+			msg.dataLen = 0;
+			msg.magicNum = MSG_MAGIC_SEND;
+			msg_send(hCurMsg, hUpload->msgName, &msg, sizeof(msg));
+		}
+
+		pthread_join(hUpload->pid, NULL);	
+	}
+	
 	if(hUpload->isConnected)
 		upload_disconnect(hUpload);
 
-	if(hUpload->fxns && hUpload->fxns->delete)
+	if(hUpload->fxns->delete)
 		hUpload->fxns->delete(hUpload->handle);
+
+	pthread_mutex_destroy(&hUpload->mutex);
 	
 	free(hUpload);
 
@@ -183,15 +339,18 @@ Int32 upload_connect(UploadHandle hUpload, Uint32 timeoutMs)
 	if(!hUpload)
 		return E_INVAL;
 
-	if(!hUpload->fxns || !hUpload->fxns->connect) {
-		hUpload->isConnected = FALSE;
-		return E_UNSUPT;
+	if(!hUpload->fxns->connect) {
+		hUpload->isConnected = TRUE;
+		return E_NO;
 	}
 
 	if(hUpload->isConnected)
 		upload_disconnect(hUpload);
-		
-	if((err = hUpload->fxns->connect(hUpload->handle, timeoutMs)))
+
+	pthread_mutex_lock(&hUpload->mutex);
+	err = hUpload->fxns->connect(hUpload->handle, timeoutMs);
+	pthread_mutex_unlock(&hUpload->mutex);
+	if(err)
 		return err;
 
 	hUpload->isConnected = TRUE;
@@ -221,13 +380,18 @@ Int32 upload_disconnect(UploadHandle hUpload)
 	if(!hUpload)
 		return E_INVAL;
 
-	if(!hUpload->fxns || !hUpload->fxns->disconnect)
+	if(!hUpload->fxns->disconnect) {
+		hUpload->isConnected = FALSE;
 		return E_NO;
+	}
 
-	if(hUpload->isConnected &&
-		(err = hUpload->fxns->disconnect(hUpload->handle)) != E_NO)
+	
+	if(hUpload->isConnected) {
+		pthread_mutex_lock(&hUpload->mutex);
+		err = hUpload->fxns->disconnect(hUpload->handle);
+		pthread_mutex_unlock(&hUpload->mutex);
 		return err;
-
+	}
 	hUpload->isConnected = FALSE;
 	return E_NO;
 }
@@ -255,6 +419,41 @@ Bool upload_get_connect_status(UploadHandle hUpload)
 }
 
 /*****************************************************************************
+ Prototype    : upload_save_frame
+ Description  : save frame
+ Input        : UploadHandle hUpload  
+                const ImgMsg *data    
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/21
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 upload_save_frame(UploadHandle hUpload, const ImgMsg *data)
+{
+	Int32 err = E_NO;
+
+	if(hUpload->fxns->saveFrame)
+		err = hUpload->fxns->saveFrame(hUpload->handle, data);
+	else {
+		/* try using default save function  */
+		DBG("<%d> save frame to jpeg ", data->index);
+		err = jpg_encoder_save_frame(data, hUpload->savePath);
+	}
+
+	/* free buf */
+	if(hUpload->flags & UPLOAD_FLAG_FREE_BUF)
+		err = buf_pool_free(data->hBuf);
+	
+	return err;
+}
+
+/*****************************************************************************
  Prototype    : upload_send_frame
  Description  : send one frame
  Input        : UploadHandle hUpload  
@@ -271,25 +470,60 @@ Bool upload_get_connect_status(UploadHandle hUpload)
     Modification : Created function
 
 *****************************************************************************/
-Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data)
+static Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data)
 {
-	if(!hUpload)
-		return E_INVAL;
+	Int32 err = E_NO;
+	
+	if(!hUpload->fxns->sendFrame) {
+		/* save directly */
+		err = E_TRANS;
+		goto save_frame;
+	}
 
-	if(!hUpload->fxns || !hUpload->fxns->sendFrame)
-		return E_TRANS;
-
+	/* if the server is not connect, try connect first */
 	if(!hUpload->isConnected) {
-		Int32 err = upload_connect(hUpload, hUpload->connectTimeout);
+		err = upload_connect(hUpload, hUpload->connectTimeout);
 		if(err) {
 			ERR("not connected server");
-			return err;
+			goto save_frame;
 		}
 	}
 
-	return hUpload->fxns->sendFrame(hUpload->handle, data);
-}
+#ifdef	TEST_SEND_TIME
+	struct timeval tmStart,tmEnd; 
+	float   timeUse;
 
+	gettimeofday(&tmStart,NULL);
+#endif
+
+	/* try send frame */
+	pthread_mutex_lock(&hUpload->mutex);
+	err = hUpload->fxns->sendFrame(hUpload->handle, data);
+	pthread_mutex_unlock(&hUpload->mutex);
+	if(err) {
+		/* send err */
+		ERR("<%d> send err", data->index);
+		upload_disconnect(hUpload);
+		goto save_frame;
+	}
+
+	if(hUpload->flags & UPLOAD_FLAG_FREE_BUF)
+		buf_pool_free(data->hBuf); //send success, free buf
+
+#ifdef TEST_SEND_TIME
+	gettimeofday(&tmEnd,NULL); 
+	timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+	DBG("<%d> send frame ok, size: %u KB, cost: %.2f ms", data->index, data->dimension.size>>10, timeUse/1000);
+#endif
+	
+	return E_NO;
+	
+save_frame:
+	/* send err, save to local */
+	err = upload_save_frame(hUpload, data);
+	
+	return err;
+}
 
 /*****************************************************************************
  Prototype    : upload_send_heartbeat
@@ -311,45 +545,111 @@ Int32 upload_send_heartbeat(UploadHandle hUpload)
 	if(!hUpload)
 		return E_INVAL;
 
-	if(!hUpload->fxns || !hUpload->fxns->sendHeartBeat)
+	if(!hUpload->fxns->sendHeartBeat)
 		return E_NO;
 
+	Int32 err;
+
+	/* try to connect first */
 	if(!hUpload->isConnected) {
-		ERR("server not connected ");
-		return E_CONNECT;
+		err = upload_connect(hUpload, hUpload->connectTimeout);
+		if(err)
+			return err;
+		hUpload->isConnected = TRUE;
 	}
 
-	return hUpload->fxns->sendHeartBeat(hUpload->handle);
+	/* send heartbeat  */
+	pthread_mutex_lock(&hUpload->mutex);
+	err = hUpload->fxns->sendHeartBeat(hUpload->handle);
+	pthread_mutex_unlock(&hUpload->mutex);
+	if(err) {
+		/* send err, reconnect server */
+		err = upload_connect(hUpload, hUpload->connectTimeout);
+	}
+	
+	return err;
 }
 
 /*****************************************************************************
- Prototype    : upload_set_params
+ Prototype    : upload_update_params
  Description  : update params
  Input        : UploadHandle hUpload  
-                Ptr params            
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/10
+  1.Date         : 2012/3/21
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-Int32 upload_set_params(UploadHandle hUpload, Ptr params)
+Int32 upload_update_params(UploadHandle hUpload)
 {
 	if(!hUpload)
 		return E_INVAL;
 
-	if(!hUpload->fxns || !hUpload->fxns->setParams)
+	if(!hUpload->fxns->setParams)
 		return E_NO;
 
 	if(hUpload->isConnected)
 		upload_disconnect(hUpload);
 
-	return hUpload->fxns->setParams(hUpload->handle, params);
+	Int32 	err;
+	Uint8	params[1024];
+	
+	switch(hUpload->protol) {
+	case CAM_UPLOAD_PROTO_TCP:
+	case CAM_UPLOAD_PROTO_FTP:
+		params_mng_control(hUpload->hParamsMng, PMCMD_G_IMGUPLOADPARAMS, params, sizeof(params));
+		break;
+	case CAM_UPLOAD_PROTO_RTP:
+	case CAM_UPLOAD_PROTO_NONE:
+	default:
+		return E_NO;
+	}
+
+	/* set params */
+	pthread_mutex_lock(&hUpload->mutex);
+	err = hUpload->fxns->setParams(hUpload->handle, params);
+	pthread_mutex_unlock(&hUpload->mutex);
+	
+	return err;
 }
 
+/*****************************************************************************
+ Prototype    : upload_run
+ Description  : run upload 
+ Input        : UploadHandle hUpload  
+                MsgHandle hCurMsg     
+                const ImgMsg *data    
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/21
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 upload_run(UploadHandle hUpload, MsgHandle hCurMsg, const ImgMsg *data)
+{
+	if(hUpload->pid) {
+		Int32 err = E_CONNECT;
+		/* send to upload thread */
+		if(hUpload->isConnected)
+			err = msg_send(hCurMsg, hUpload->msgName, data, sizeof(ImgMsg));
+		if(err) {
+			/* save if server is not connected or send msg err */
+			err = upload_save_frame(hUpload, data);
+		}
+		return err;
+	} else {
+		/* directly send */
+		return upload_send_frame(hUpload, data);
+	}
+}
 

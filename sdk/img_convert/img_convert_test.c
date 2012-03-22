@@ -5,6 +5,7 @@
 #include "log.h"
 #include <pthread.h>
 #include "jpg_enc.h"
+#include "msg.h"
 
 
 #define CAPTURE_DEVICE		"/dev/video0"
@@ -21,6 +22,21 @@
 #define DEF_BRIGHTNESS	0
 #define DEF_CONTRAST	16
 
+#define THR_MSG_NAME0	"/tmp/convThr0"
+#define THR_MSG_NAME1	"/tmp/convThr1"
+#define MAIN_MSG		"/tmp/convTest"
+
+#define THR_OUT_FILE0	"rsz0.jpg"
+#define THR_OUT_FILE1	"rsz1.jpg"
+
+//#define CONV_IN_CAP_THR
+
+
+typedef struct {
+	MsgHeader 	hdr;
+	FrameBuf	frame;
+}CapMsg;
+
 
 typedef struct _TestParams {
 	int loopCnt;
@@ -33,10 +49,166 @@ typedef struct _TestParams {
 	Uint8	contrast;
 }TestParams;
 
+typedef struct {
+	AlgHandle	hConv;
+	AlgHandle	hJpgEnc;
+	ImgConvDynParams convDyn;
+	pthread_mutex_t *mutex;
+	const char		*msgName;
+	Bool		*exit;
+	const char	*outFileName;
+	CapHandle	hCap;
+}ThrParams;
+
+static void *conv_thread(void *arg)
+{
+	ThrParams *params = (ThrParams *)arg;
+	assert(arg);
+
+	DBG("%s start", params->msgName);
+
+	BufHandle hConvOutBuf = NULL;
+	BufHandle hJpgOutBuf = NULL;
+	Int32	  size;
+	ConvOutAttrs	*outAttrs = &params->convDyn.outAttrs[0];
+	AlgBuf inBuf, outBuf;
+	ImgConvInArgs convInArgs;
+
+	size = outAttrs->width * outAttrs->height * 2;
+	hConvOutBuf = buffer_alloc(size, NULL);
+	assert(hConvOutBuf);
+	assert(((Uint32)buffer_get_user_addr(hConvOutBuf) % 32) == 0);
+
+	MsgHandle hMsg = msg_create(params->msgName, MAIN_MSG, 0);
+	assert(hMsg);
+	DBG("%s msg create ok", params->msgName);
+
+	struct timeval tmStart,tmEnd; 
+	float   timeUse;
+	CapMsg msg;
+
+	outBuf.buf = buffer_get_user_addr(hConvOutBuf);
+	outBuf.bufSize = buffer_get_size(hConvOutBuf);
+
+	convInArgs.outAttrs[0] = params->convDyn.outAttrs[0];
+	convInArgs.outAttrs[1] = params->convDyn.outAttrs[1];
+	convInArgs.size = sizeof(convInArgs);
+
+	while(!*(params->exit)) {
+		//DBG("%s start recv msg", params->msgName);
+		Int32 err = msg_recv(hMsg, &msg, sizeof(msg));
+
+		//DBG("%s recv msg, index: %d", params->msgName, msg.frame.index);
+		if(err < 0) {
+
+			ERR("recv msg err: %d", err);	
+			break;
+		}
+		if(err != sizeof(msg)) {
+			ERR("invalid size: %d", err);	
+			continue;
+		}
+
+		if(*(params->exit)) {
+			DBG("recv exit ...");
+			break;
+		}
+		
+		inBuf.buf = msg.frame.dataBuf;
+		inBuf.bufSize = msg.frame.bufSize;
+		//DBG("%s start conv", params->msgName);
+		gettimeofday(&tmStart,NULL);
+		err = alg_process(params->hConv, &inBuf, &convInArgs, &outBuf, NULL);
+		//err = 0;
+		//pthread_mutex_lock(params->mutex);
+		//usleep(30000);
+		//pthread_mutex_unlock(params->mutex);
+		gettimeofday(&tmEnd,NULL); 
+
+		timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+		
+		if(err) 
+			ERR("img conv failed");
+		else
+			DBG("%s  img convert cost: %.2f ms", params->msgName, timeUse/1000);
+
+		msg.hdr.cmd = 1;
+		err = msg_send(hMsg, NULL, &msg, sizeof(msg));
+		assert(err == E_NO);
+	}
+
+	
+	JpgEncInArgs inArgs;
+	JpgEncOutArgs outArgs;
+	JpgEncDynParams dynParams;
+
+	dynParams.width = convInArgs.outAttrs[0].width;
+	dynParams.height = convInArgs.outAttrs[0].height;
+	dynParams.inputFormat = convInArgs.outAttrs[0].pixFmt;
+	dynParams.quality = 90;
+	dynParams.rotation = 0;
+	dynParams.size = sizeof(dynParams);
+
+	pthread_mutex_lock(params->mutex);
+
+	Int32 err = alg_set_dynamic_params(params->hJpgEnc, &dynParams);
+
+	size = dynParams.width * dynParams.height;
+	DBG("out size: %d X %d", dynParams.width, dynParams.height);
+	hJpgOutBuf = buffer_alloc(size, NULL);
+	assert(hJpgOutBuf);
+
+	inBuf.buf = buffer_get_user_addr(hConvOutBuf);
+	inBuf.bufSize = buffer_get_size(hConvOutBuf);
+	outBuf.buf = buffer_get_user_addr(hJpgOutBuf);
+	outBuf.bufSize = buffer_get_size(hJpgOutBuf);
+	inArgs.appendData = NULL;
+	inArgs.appendSize = 0;
+	inArgs.endMark = 0;
+	inArgs.size = sizeof(inArgs);
+	outArgs.size = sizeof(outArgs);
+	outArgs.bytesGenerated = 0;
+
+	//gettimeofday(&tmStart,NULL);
+	DBG("begin encode");
+	err = alg_process(params->hJpgEnc, &inBuf, &inArgs, &outBuf, &outArgs);
+	//gettimeofday(&tmEnd,NULL); 
+	pthread_mutex_unlock(params->mutex);
+	
+	if(err) {
+		ERR("Jpg enc process failed...");
+		goto exit;
+	}
+
+	//write out file
+	FILE *fp_out= fopen(params->outFileName, "wb");
+	if(!fp_out) {
+		ERRSTR("open %s failed:", params->outFileName);
+		goto exit;
+	}
+
+
+	DBG("writing capture out data(%u bytes) to %s...", 
+		outArgs.bytesGenerated, params->outFileName);
+	fwrite(buffer_get_user_addr(hJpgOutBuf), outArgs.bytesGenerated, 1, fp_out);
+	fclose(fp_out);
+
+exit:
+
+	DBG("thread exit...");
+	msg_delete(hMsg);
+	pthread_exit(0);
+	
+}
+
 static Bool main_loop(TestParams *params)
 {
 	Bool ret = FALSE;
-	FILE *fp_out = NULL;
+	CapHandle hCapture = NULL;
+	AlgHandle hJpgEnc = NULL;
+	Bool		exit = FALSE;
+	MsgHandle	hMsg = NULL;
+	Int32		capRefCnt = 1;
 
 	int err = buffer_init();
 	err = alg_init();
@@ -46,12 +218,12 @@ static Bool main_loop(TestParams *params)
 	CapAttrs attrs;
 
 	attrs.devName = CAPTURE_DEVICE;
-	attrs.bufNum = 3;
+	attrs.bufNum = 4;
 	attrs.inputType = CAP_INPUT_CAMERA;
 	attrs.std = CAP_STD_FULL_FRAME;
 	attrs.userAlloc = TRUE;
 	
-	CapHandle hCapture = capture_create(&attrs);
+	hCapture = capture_create(&attrs);
 	CapInputInfo info;
 	assert(hCapture);
 	if(!hCapture)
@@ -62,13 +234,14 @@ static Bool main_loop(TestParams *params)
 	
 	FrameBuf frameBuf;
 	
-	Uint32 size = info.width * info.height * 2;
+	//Uint32 size = info.width * info.height * 2;
 	
 
 	AlgHandle hImgConv;
 	ImgConvInitParams convInitParams;
 	ImgConvDynParams convDynParams;
-	AlgBuf inBuf, outBuf;
+	//AlgBuf inBuf, outBuf;
+	ImgConvInArgs	convInArgs;
 
 	convInitParams.prevDevName = NULL;
 	convInitParams.rszDevName = NULL;
@@ -102,64 +275,199 @@ static Bool main_loop(TestParams *params)
 		goto exit;
 
 	}
+
+	hJpgEnc = NULL;
+	JpgEncInitParams initParams;
+	JpgEncDynParams dynParams;
 	
-	size = IMG_MAX_WIDTH * IMG_MAX_HEIGHT * 2;
-	BufHandle hBufOut = buffer_alloc(size, NULL);
-	assert(hBufOut);
-	assert(((Uint32)buffer_get_user_addr(hBufOut) % 32) == 0);
+	initParams.maxWidth = IMG_MAX_WIDTH;
+	initParams.maxHeight = IMG_MAX_HEIGHT;
+	initParams.size = sizeof(initParams);
+
+	dynParams.width = convDynParams.outAttrs[0].width;
+	dynParams.height = convDynParams.outAttrs[0].height;
+	dynParams.inputFormat = convDynParams.outAttrs[0].pixFmt;
+	dynParams.quality = 90;
+	dynParams.rotation = 0;
+	dynParams.size = sizeof(dynParams);
+
+	DBG("Create fxns.");
+	hJpgEnc = alg_create(&JPGENC_ALG_FXNS, &initParams, &dynParams);
+	assert(hJpgEnc);
+
+	convInArgs.size = sizeof(convInArgs);
+	convInArgs.outAttrs[0] = convDynParams.outAttrs[0];
+	convInArgs.outAttrs[1] = convDynParams.outAttrs[1];
+
+#ifndef CONV_IN_CAP_THR
+	ThrParams		thrParams[2];
+	pthread_mutex_t mutex;	
+	pthread_t		pid[2];
+	
+	/* init mutex */
+	pthread_mutex_init(&mutex, NULL);
+	
+	/* create threads */
+	thrParams[0].convDyn = thrParams[1].convDyn = convDynParams;
+	thrParams[0].exit = thrParams[1].exit = &exit;
+	thrParams[0].hConv = thrParams[1].hConv = hImgConv;
+	thrParams[0].hCap = thrParams[1].hCap = hCapture;
+	thrParams[0].hJpgEnc = thrParams[1].hJpgEnc = hJpgEnc;
+	thrParams[0].msgName = THR_MSG_NAME0;
+	thrParams[1].msgName = THR_MSG_NAME1;
+	thrParams[0].mutex= thrParams[1].mutex = &mutex;
+	thrParams[1].convDyn.outAttrs[0].width = SWITCH_WIDTH;
+	thrParams[1].convDyn.outAttrs[0].height = SWITCH_HEIGH;
+	thrParams[0].outFileName = THR_OUT_FILE0;
+	thrParams[1].outFileName = THR_OUT_FILE1;
+	
+	pthread_create(&pid[0], NULL, conv_thread, &thrParams[0]);
+	pthread_create(&pid[1], NULL, conv_thread, &thrParams[1]);
+
+	capRefCnt = 2;
+#else
+	
+	Uint32 size = convDynParams.outAttrs[0].width * convDynParams.outAttrs[0].height * 2;
+	BufHandle hConvOutBuf = buffer_alloc(size, NULL);
+	assert(hConvOutBuf);
+	assert(((Uint32)buffer_get_user_addr(hConvOutBuf) % 32) == 0);
+
+	AlgBuf inBuf, outBuf;
+	struct timeval tmStart,tmEnd; 
+	float   timeUse;
+
+	outBuf.buf = buffer_get_user_addr(hConvOutBuf);
+	outBuf.bufSize = buffer_get_size(hConvOutBuf);
+
+	convInArgs.outAttrs[0] = convDynParams.outAttrs[0];
+	convInArgs.outAttrs[1] = convDynParams.outAttrs[1];
+	convInArgs.size = sizeof(convInArgs);
+	
+#endif
+
+	/* create msg */
+	hMsg = msg_create(MAIN_MSG, THR_MSG_NAME0, MSG_FLAG_NONBLK);
+	assert(hMsg);
+	
+	CapMsg msg;
+	msg.hdr.cmd = 0;
+	msg.hdr.dataLen = 0;
+	msg.hdr.index = 0;
+	msg.hdr.magicNum = MSG_MAGIC_SEND;
+
+	capture_set_def_frame_ref_cnt(hCapture, capRefCnt);
+	
 	
 	err = capture_start(hCapture);
 	if(err)
 		goto exit;
 
+	//sleep(1);
+
 	Int32 i = 0;
-	Bool resSwi = TRUE;
-	Uint16 outWidth = convDynParams.outAttrs[0].width, outHeight = convDynParams.outAttrs[0].height;
-	outBuf.buf = buffer_get_user_addr(hBufOut);
-	outBuf.bufSize = buffer_get_size(hBufOut);
+	msg.frame.index = 0;
 
-	struct timeval tmStart,tmEnd; 
-	float   timeUse;
+	Int32			fdCap, fdMsg, fdMax;
+	fd_set			rdSet;
 
+	/* get fd for select */
+	fdCap = capture_get_fd(hCapture);
+	fdMsg = msg_get_fd(hMsg);
+	fdMax = MAX(fdMsg, fdCap) + 1;
+	
 	while(1) {
-		err = capture_get_frame(hCapture, &frameBuf);
-		if(err) {
-			ERR("wait capture buffer failed...");
-			break;
-		}
-
-		DBG("<%d> Get frame, index: %d, time: %u.%u", i, frameBuf.index, 
-			(unsigned int)frameBuf.timeStamp.tv_sec, (unsigned int)frameBuf.timeStamp.tv_usec);
-
-		inBuf.buf = frameBuf.dataBuf;
-		inBuf.bufSize = frameBuf.bufSize;
-		gettimeofday(&tmStart,NULL);
-		err = alg_process(hImgConv, &inBuf, NULL, &outBuf, NULL);
-		gettimeofday(&tmEnd,NULL); 
-
-		timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
-		DBG("  img convert cost: %.3f ms", timeUse/1000);
+		/* wait data ready */
+		FD_ZERO(&rdSet);
+		FD_SET(fdCap, &rdSet);
+		FD_SET(fdMsg, &rdSet);
 		
-		err = capture_free_frame(hCapture, &frameBuf);
-		if(err < 0) {
-			ERR("free frame failed");
+		ret = select(fdMax, &rdSet, NULL, NULL, NULL);
+		if(ret < 0 && errno != EINTR) {
+			ERRSTR("select err");
 			break;
 		}
 
-		i++;
-		if(params->loopCnt > 0 && i > params->loopCnt)
-			break;
+		/* no data ready */
+		if(!ret)
+			continue;
+		
+		if(FD_ISSET(fdCap, &rdSet)) {
+			err = capture_get_frame(hCapture, &frameBuf);
+			if(err) {
+				ERR("wait capture buffer failed...");
+				break;
+			}
+
+			DBG("<%d> Get frame, index: %d, time: %u.%u", i, frameBuf.index, 
+				(unsigned int)frameBuf.timeStamp.tv_sec, (unsigned int)frameBuf.timeStamp.tv_usec);
+			msg.frame = frameBuf;
+	#ifndef CONV_IN_CAP_THR
+			ret = msg_send(hMsg, NULL, &msg, sizeof(msg));
+			assert(ret == E_NO);
+			if(ret)
+				capture_free_frame(hCapture, &frameBuf);
+			
+			ret = msg_send(hMsg, THR_MSG_NAME1, &msg, sizeof(msg));
+			assert(ret == E_NO);
+			if(ret)
+				capture_free_frame(hCapture, &frameBuf);
+	#else
+
+			inBuf.buf = frameBuf.dataBuf;
+			inBuf.bufSize = frameBuf.bufSize;
+			//DBG("%s start conv", params->msgName);
+			gettimeofday(&tmStart,NULL);
+			err = alg_process(hImgConv, &inBuf, &convInArgs, &outBuf, NULL);
+			gettimeofday(&tmEnd,NULL); 
+
+			timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+		
+		if(err) 
+			ERR("img conv failed");
+		else
+			DBG("<%d> img convert cost: %.2f ms", frameBuf.index, timeUse/1000);
+		capture_free_frame(hCapture, &frameBuf);
+	#endif		
+			i++;
+			if(params->loopCnt > 0 && i > params->loopCnt) {
+				DBG("break main loop");
+				break;
+			}
+		}
+
+		if(FD_ISSET(fdMsg, &rdSet)) {
+			//DBG("%s free frame", params->msgName);
+			err = msg_recv(hMsg, &msg, sizeof(msg));
+			if(err != sizeof(msg) || msg.hdr.cmd != 1) {
+				ERR("recv msg err");
+			}else {
+				err = capture_free_frame(hCapture, &msg.frame);
+				if(err < 0) {
+					ERR("free frame failed");
+					//break;
+				}
+			}
+		}
+#if 0
 
 		if((i % 10) == 0) {
 			if(resSwi) {
 				convDynParams.outAttrs[0].width = SWITCH_WIDTH;
 				convDynParams.outAttrs[0].height = SWITCH_HEIGH;
+				convInArgs.outAttrs[0].width = SWITCH_WIDTH;
+				convInArgs.outAttrs[0].height = SWITCH_HEIGH;
+				
 				resSwi = FALSE;
 			} else {
 				convDynParams.outAttrs[0].width = outWidth;
 				convDynParams.outAttrs[0].height = outHeight;
+				convInArgs.outAttrs[0].width = outWidth;
+				convInArgs.outAttrs[0].height = outHeight;
+				
 				resSwi = TRUE;
 			}
+			DBG("res switched to %u X %u", 
+					convInArgs.outAttrs[0].width, convInArgs.outAttrs[0].height);
 
 			if(convDynParams.ctrlFlags & CONV_FLAG_NF_EN)
 				convDynParams.ctrlFlags &= ~CONV_FLAG_NF_EN;
@@ -179,8 +487,10 @@ static Bool main_loop(TestParams *params)
 
 			timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
 			DBG("  set dyn params cost: %.3f ms", timeUse/1000);
-			
+
 		}
+#endif	
+
 
 		if((i % 30) == 0) {
 			err = capture_stop(hCapture);
@@ -199,83 +509,29 @@ static Bool main_loop(TestParams *params)
 		}
 	}
 
+	exit = TRUE;
+#ifndef CONV_IN_CAP_THR
+
+	ret = msg_send(hMsg, NULL, &msg, sizeof(msg));
+	msg_send(hMsg, THR_MSG_NAME1, &msg, sizeof(msg));
+	pthread_join(pid[0], NULL);
+	pthread_join(pid[1], NULL);
+	
+	pthread_mutex_destroy(&mutex);
+#endif
+
 	err = capture_stop(hCapture);
 	if(err)
 		goto exit;
 
-	AlgHandle hJpgEnc;
-	JpgEncInitParams initParams;
-	JpgEncDynParams dynParams;
 	
-	initParams.maxWidth = IMG_MAX_WIDTH;
-	initParams.maxHeight = IMG_MAX_HEIGHT;
-	initParams.size = sizeof(initParams);
-
-	dynParams.width = convDynParams.outAttrs[0].width;
-	dynParams.height = convDynParams.outAttrs[0].height;
-	dynParams.inputFormat = convDynParams.outAttrs[0].pixFmt;
-	dynParams.quality = 90;
-	dynParams.rotation = 0;
-	dynParams.size = sizeof(dynParams);
-
-	DBG("Create fxns.");
-	hJpgEnc = alg_create(&JPGENC_ALG_FXNS, &initParams, &dynParams);
-	assert(hJpgEnc);
-
-	JpgEncInArgs inArgs;
-	JpgEncOutArgs outArgs;
-
-	BufHandle hJpgOutBuf = buffer_alloc(size/2, NULL);
-	if(!hJpgOutBuf)
-		goto exit;
-
-	inBuf.buf = buffer_get_user_addr(hBufOut);
-	inBuf.bufSize = buffer_get_size(hBufOut);
-	outBuf.buf = buffer_get_user_addr(hJpgOutBuf);
-	outBuf.bufSize = buffer_get_size(hJpgOutBuf);
-	inArgs.appendData = NULL;
-	inArgs.appendSize = 0;
-	inArgs.endMark = 0;
-	inArgs.size = sizeof(inArgs);
-	outArgs.size = sizeof(outArgs);
-	outArgs.bytesGenerated = 0;
-
-	//gettimeofday(&tmStart,NULL);
-	DBG("begin encode");
-	err = alg_process(hJpgEnc, &inBuf, &inArgs, &outBuf, &outArgs);
-	//gettimeofday(&tmEnd,NULL); 
-
-	if(err) {
-		ERR("Jpg enc process failed...");
-		goto exit;
-	}
-
-	//write out file
-	fp_out= fopen(params->outFileName, "wb");
-	if(!fp_out) {
-		ERRSTR("open %s failed:", params->outFileName);
-		goto exit;
-	}
-
-
-	DBG("writing capture out data(%u bytes) to %s...", 
-		outArgs.bytesGenerated, params->outFileName);
-	fwrite(buffer_get_user_addr(hJpgOutBuf), outArgs.bytesGenerated, 1, fp_out);
+	
 	
 	ret = TRUE;
 exit:
 
 	if(hCapture)
 		capture_delete(hCapture);
-
-	if(fp_out)
-		fclose(fp_out);
-
-	if(hBufOut)
-		buffer_free(hBufOut);
-
-	if(hJpgOutBuf)
-		buffer_free(hJpgOutBuf);
 
 	if(hJpgEnc)
 		alg_delete(hJpgEnc);

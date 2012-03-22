@@ -30,13 +30,14 @@
 #include "app_msg.h"
 #include "params_mng.h"
 #include "buffer.h"
-#include "data_collector.h"
-#include "img_enc_thr.h"
+#include "data_capture.h"
+#include "encoder.h"
 #include <signal.h>
-#include "vid_enc_thr.h"
-#include "img_snd_thr.h"
 #include "ctrl_thr.h"
 #include "img_convert.h"
+#include "jpg_encoder.h"
+#include "h264_encoder.h"
+
 
 /*----------------------------------------------*
  * external variables                           *
@@ -65,13 +66,10 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
-#define PROGRAM_NAME		"iCamera"
-#define CONFIG_FILE			"./cam.cfg"
-#define CAP_DEVICE			"/dev/video0"
-#define CAP_BUF_NUM			4
+#define PROGRAM_NAME			"iCamera"
+#define CONFIG_FILE				"./cam.cfg"
 
-	
-#define CAM_MAX_THREAD_NUM	8
+#define CAM_MAX_THREAD_NUM		8
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -79,16 +77,16 @@
 
 /* Params used in this module */
 typedef struct {
-	const char *cfgFileName;
-	const char *savePath;
-	Bool		exit;
-	Bool		reboot;
-	pthread_t	pid[CAM_MAX_THREAD_NUM];
+	const char 		*cfgFileName;
+	const char 		*savePath;
+	Bool			exit;
+	Bool			reboot;
+	pthread_t		pid[CAM_MAX_THREAD_NUM];
 	ParamsMngHandle hParamsMng;
-	FrameDispHandle	hDispatch;
-	CapHandle		hCap;
-	AlgHandle		hImgConv;
-	CollectorHandle	hCollector;
+	DataCapHandle	hDataCap;
+	EncoderHandle	hJpgEncoder;
+	EncoderHandle	hH264Encoder;
+	pthread_mutex_t	encMutex;
 }MainEnv;
 
 static Bool s_exit = FALSE;
@@ -127,70 +125,34 @@ static Int32 app_init(MainEnv *envp)
 		ERR("create params failed.");
 		return E_IO;
 	}
+
 	
-	/* get current work mode  & img enhance params */
-	CapAttrs		capAttrs;
-	CapInputInfo	inputInfo;
-
-	/* fill attrs for capture create */
-	capAttrs.devName = CAP_DEVICE;
-	capAttrs.inputType = CAP_INPUT_CAMERA;
-	capAttrs.std = CAP_STD_FULL_FRAME;
-	capAttrs.mode = CAM_CAP_MODE_CONTINUE;
-	capAttrs.userAlloc = TRUE;
-	capAttrs.bufNum = CAP_BUF_NUM;
-	capAttrs.defRefCnt = 1;
-
-	/* create capture object */
-	envp->hCap = capture_create(&capAttrs);
-	if(!envp->hCap) {
-		ERR("create capture handle failed...");
-		return E_IO;
-	}
-
-	capture_get_input_info(envp->hCap, &inputInfo);
-
-	/* set capture info to params manager */
-	ret = params_mng_control(envp->hParamsMng, PMCMD_S_CAPINFO, &inputInfo, sizeof(CapInputInfo));
-	assert(ret == E_NO);
-
-	/* create img conv module */
-	ImgConvInitParams convInitParams;
-	ImgConvDynParams convDynParams;
-	
-	convInitParams.prevDevName = NULL;
-	convInitParams.rszDevName = NULL;
-	convInitParams.size = sizeof(convInitParams);
-
-	/* get img convert dynamic params */
-	ret = params_mng_control(envp->hParamsMng, PMCMD_G_IMGCONVDYN, &convDynParams, sizeof(convDynParams));
-	if(ret)
-		return ret;
-
-	/* create image convert object */
-	envp->hImgConv = img_conv_create(&convInitParams, &convDynParams);
-	if(!envp->hImgConv) {
-		ERR("create img convert handle failed...");
-		return E_IO;
-	}
-
 	/* create data capture module (App module) */
-	CollectorAttrs collectorAttrs;
+	DataCapAttrs dataCapAttrs;
 
-	collectorAttrs.hParamsMng = envp->hParamsMng;
-	collectorAttrs.hCap = envp->hCap;
-	envp->hCollector = data_collector_create(&collectorAttrs);
-	if(!envp->hCollector) {
+	dataCapAttrs.hParamsMng = envp->hParamsMng;
+	dataCapAttrs.maxOutWidth = IMG_MAX_WIDTH;
+	dataCapAttrs.maxOutHeight = IMG_MAX_HEIGHT;
+	
+	envp->hDataCap = data_capture_create(&dataCapAttrs);
+	if(!envp->hDataCap) {
 		ERR("create data capture failed");
 		return E_INVAL;
 	}
 
 	
-	/* create frame dispatch module */
-	FrameDispInfo info;
-	info.hParamsMng = envp->hParamsMng;
-	info.savePath = envp->savePath;
-	envp->hDispatch = frame_disp_create(FT_SRV_UNCONNECTED, FRAME_ENC_ON, &info);
+	/* create jpg encoder */
+	pthread_mutex_init(&envp->encMutex, NULL);
+	envp->hJpgEncoder = jpg_encoder_create(envp->hParamsMng, &envp->encMutex);
+	if(!envp->hJpgEncoder) {
+		return E_IO;
+	}
+
+	/* create video encoder */
+	envp->hH264Encoder = h264_encoder_create(envp->hParamsMng, &envp->encMutex);
+	if(!envp->hH264Encoder) {
+		return E_IO;
+	}
 
 	return E_NO;
 }
@@ -215,40 +177,30 @@ static Int32 app_run(MainEnv *envp)
 	Int32 		err;
 
 	/* start data capture */
-	err = data_collector_run(envp->hCollector);
+	err = data_capture_run(envp->hDataCap);
 	if(err ) {
-		ERR("data collector run failed...");
+		ERR("data capture run failed...");
 		return err;
 	}
 
-
-	/* create image encode thread */
-	ImgEncThrArg *imgEncArg = malloc(sizeof(ImgEncThrArg));
-	assert(imgEncArg);
-
-	imgEncArg->hDispatch = envp->hDispatch;
-	imgEncArg->hParamsMng = envp->hParamsMng;
-	err = pthread_create(&envp->pid[1], NULL, img_enc_thr, imgEncArg);
-	if(err < 0) {
-		free(imgEncArg);
-		ERRSTR("create img enc thread failed...");
-		return E_NOMEM;
-	}
-
-	/* create video encode thread */
-	VidEncThrArg *vidEncArg = malloc(sizeof(VidEncThrArg));
-	assert(vidEncArg);
-
-	vidEncArg->hDispatch = envp->hDispatch;
-	vidEncArg->hParamsMng = envp->hParamsMng;
-	err = pthread_create(&envp->pid[2], NULL, vid_enc_thr, vidEncArg);
-	if(err < 0) {
-		free(vidEncArg);
-		ERRSTR("create vid enc thread failed...");
-		return E_NOMEM;
-	}
-
 #if 1
+	/* run encode thread */
+	DBG("start running encoders");
+
+	err = encoder_run(envp->hJpgEncoder);
+	if(err) {
+		ERR("jpg encoder run failed...");
+		return err;
+	}
+
+	err = encoder_run(envp->hH264Encoder);
+	if(err) {
+		ERR("h264 encoder run failed...");
+		return err;
+	}
+#endif
+
+#if 0
 	/* create image send thread */
 	ImgSndThrArg *imgSndArg = malloc(sizeof(ImgSndThrArg));
 	assert(imgSndArg);
@@ -267,7 +219,7 @@ static Int32 app_run(MainEnv *envp)
 	CtrlThrArg *ctrlThrArg = malloc(sizeof(CtrlThrArg));
 	assert(ctrlThrArg);
 
-	ctrlThrArg->hDispatch = envp->hDispatch;
+	ctrlThrArg->hDispatch = NULL;
 	ctrlThrArg->hParamsMng = envp->hParamsMng;
 	err = pthread_create(&envp->pid[4], NULL, ctrl_thr, ctrlThrArg);
 	if(err < 0) {
@@ -306,17 +258,22 @@ static void app_exit(MainEnv *envp, MsgHandle hMsg)
 	msg.index = 0;
 	msg.dataLen = 0;
 	msg.magicNum = MSG_MAGIC_SEND;
-	msg_send(hMsg, MSG_IMG_ENC, &msg, sizeof(msg));
-	pthread_join(envp->pid[1], NULL);
-	msg_send(hMsg, MSG_VID_ENC, &msg, sizeof(msg));
-	pthread_join(envp->pid[2], NULL);
+	
 	msg_send(hMsg, MSG_IMG_TX, &msg, sizeof(msg));
 	pthread_join(envp->pid[3], NULL);
 	msg_send(hMsg, MSG_CTRL, &msg, sizeof(msg));
 	pthread_join(envp->pid[4], NULL);
 
-	if(envp->hCollector)
-		data_collector_delete(envp->hCollector, hMsg);
+	/* call encoders exit */
+	if(envp->hJpgEncoder)
+		encoder_delete(envp->hJpgEncoder, hMsg);
+
+	if(envp->hH264Encoder)
+		encoder_delete(envp->hH264Encoder, hMsg);
+
+	/* exit data capture */
+	if(envp->hDataCap)
+		data_capture_delete(envp->hDataCap, hMsg);
 
 	if(hMsg)
 		msg_delete(hMsg);
@@ -324,14 +281,7 @@ static void app_exit(MainEnv *envp, MsgHandle hMsg)
 	if(envp->hParamsMng)
 		params_mng_delete(envp->hParamsMng);
 
-	if(envp->hDispatch)
-		frame_disp_delete(envp->hDispatch);
-
-	if(envp->hCap)
-		capture_delete(envp->hCap);
-
-	if(envp->hImgConv)
-		img_conv_delete(envp->hImgConv);
+	pthread_mutex_destroy(&envp->encMutex);
 
 	alg_exit();
 
@@ -430,7 +380,10 @@ static Int32 main_loop(MainEnv *envp)
 	}
 
 	/* catch signals */
-	//signal(SIGINT, sig_handler);
+	signal(SIGINT, sig_handler);
+
+	/* ignore signal when socket is closed by server */
+	signal(SIGPIPE, SIG_IGN); 
 
 	/* run our modules  */
 	status = app_run(envp);

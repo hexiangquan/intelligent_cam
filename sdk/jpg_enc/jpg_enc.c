@@ -344,7 +344,7 @@ static Int32 jpg_encode_process(Ptr algHandle, AlgBuf *inBuf, Ptr inArgsPtr, Alg
 	}
 
 	hJpgEnc->outBufDesc.descs[0].buf = (XDAS_Int8 *)(outBuf->buf);
-	
+
 	Int32 status;
 	status = IMGENC1_process(hJpgEnc->algHandle, 
 							&hJpgEnc->inBufDesc, 

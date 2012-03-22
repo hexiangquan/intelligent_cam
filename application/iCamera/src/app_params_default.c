@@ -103,7 +103,7 @@ const AppParams c_appParamsDef = {
 		.sharpness = 16,
 		.brightness = 0,
 		.saturation = 0,
-		.digiGain = 512,
+		.digiGain = 256,
 		.reserved = {0},
 	},
 	.h264EncParams = {
@@ -131,7 +131,7 @@ const AppParams c_appParamsDef = {
 	.imgEncParams = {
 		.width = 0,
 		.height = 0,
-		.encQuality = 90,
+		.encQuality = 80,
 		.rotation = 0,
 	},
 	.ioCfg = {

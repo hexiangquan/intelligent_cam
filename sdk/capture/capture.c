@@ -1018,7 +1018,6 @@ Int32 capture_get_frame(CapHandle hCap, FrameBuf *frameBuf)
 		ioctl(hCap->fdCap, VIDIOC_QBUF, &v4l2buf);
 		return E_IO;
 	}
-	
 	 
 	/* Fill frameBuf info */
 	frameBuf->index = ++(hCap->capIndex);
@@ -1175,14 +1174,15 @@ Int32 capture_free_frame(CapHandle hCap, FrameBuf *frameBuf)
 		return index;
 
 	/* this must be threads-safe */
-	pthread_mutex_lock(&hCap->mutex);
 	hCap->capBufs[index].refCnt--;
-	pthread_mutex_unlock(&hCap->mutex);
+	
 
 	/* if reference count > 0, we should not free */
-	if(hCap->capBufs[index].refCnt > 0)
+	if(hCap->capBufs[index].refCnt > 0) {
 		return E_NO;
+	}
 
+	//DBG("cap free frame: %d", index);
 	/* Fill v4l2 buffer */
 	struct v4l2_buffer 	v4l2buf;
 	memset(&v4l2buf, 0, sizeof(v4l2buf));
@@ -1194,11 +1194,12 @@ Int32 capture_free_frame(CapHandle hCap, FrameBuf *frameBuf)
 	v4l2buf.m.userptr = (unsigned long)hCap->capBufs[index].userAddr;
 
     /* Issue captured frame buffer back to device driver */
+	//DBG("que buf");
     if(ioctl(hCap->fdCap, VIDIOC_QBUF, &v4l2buf) < 0) {
         ERRSTR("que buf failed");
         return E_IO;
     }
-
+	//DBG("que buf done");
 	return E_NO;
 }
 

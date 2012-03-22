@@ -668,7 +668,7 @@ Int32 icam_set_rtp_params(ICamCtrlHandle hCtrl, const CamRtpParams *params)
  Prototype    : icam_get_upload_protol
  Description  : get image upload protol
  Input        : ICamCtrlHandle hCtrl         
-                CamImageUploadProtocol *buf  
+                CamImgUploadProto *buf  
  Output       : None
  Return Value : 
  Calls        : 
@@ -680,11 +680,11 @@ Int32 icam_set_rtp_params(ICamCtrlHandle hCtrl, const CamRtpParams *params)
     Modification : Created function
 
 *****************************************************************************/
-Int32 icam_get_upload_proto(ICamCtrlHandle hCtrl, CamImageUploadProtocol *buf)
+Int32 icam_get_upload_proto(ICamCtrlHandle hCtrl, CamImgUploadProto *buf)
 {
 	struct {
 		MsgHeader 		hdr;
-		CamImageUploadProtocol	protol;
+		CamImgUploadProto	protol;
 	}msgBuf;
 
 	Int32 ret;
@@ -706,7 +706,7 @@ Int32 icam_get_upload_proto(ICamCtrlHandle hCtrl, CamImageUploadProtocol *buf)
  Prototype    : icam_set_upload_proto
  Description  : set image upload proto
  Input        : ICamCtrlHandle hCtrl          
-                CamImageUploadProtocol proto  
+                CamImgUploadProto proto  
  Output       : None
  Return Value : 
  Calls        : 
@@ -718,11 +718,11 @@ Int32 icam_get_upload_proto(ICamCtrlHandle hCtrl, CamImageUploadProtocol *buf)
     Modification : Created function
 
 *****************************************************************************/
-Int32 icam_set_upload_proto(ICamCtrlHandle hCtrl, CamImageUploadProtocol proto)
+Int32 icam_set_upload_proto(ICamCtrlHandle hCtrl, CamImgUploadProto proto)
 {
 	struct {
-		MsgHeader 		hdr;
-		CamImageUploadProtocol	proto;
+		MsgHeader 			hdr;
+		CamImgUploadProto	proto;
 	}msgBuf;
 
 	Int32 ret;

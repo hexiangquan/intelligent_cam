@@ -12,6 +12,7 @@
 #define MSG_ROOT		"/tmp"
 #define MSG_MAIN		MSG_ROOT"/msgMain"
 #define MSG_CAP			MSG_ROOT"/msgCap"
+#define MSG_CONV		MSG_ROOT"/msgConv"
 #define MSG_IMG_ENC		MSG_ROOT"/msgImgEnc"
 #define MSG_VID_ENC		MSG_ROOT"/msgVidEnc"
 #define MSG_IMG_TX		MSG_ROOT"/msgImgTx"
@@ -21,6 +22,18 @@
 /* enable crc check sum of data between threads */
 //#define CRC_EN
 
+/* some common macros */
+#define IMG_MAX_WIDTH			2560
+#define IMG_MAX_HEIGHT			2048
+
+#define IMG_ENC_NAME			"imgEncoder"
+#define VID_ENC_NAME			"vidEncoder"
+
+#define IMG_ENC_POOL_BUF_NUM	2
+#define VID_ENC_POOL_BUF_NUM	0
+
+#define SD_MNT_PATH				"/media/mmc"
+
 
 /* Cmd of this application */
 typedef enum _AppCmd {
@@ -28,6 +41,7 @@ typedef enum _AppCmd {
 	APPCMD_REBOOT,				//system reboot
 	APPCMD_CAP_EN,				//capture ctrl, start, stop, restart
 	APPCMD_RAW_DATA,			//new raw data
+	APPCMD_FREE_RAW,			//free raw data
 	APPCMD_NEW_DATA,			//new image data
 	APPCMD_SET_IMG_CONV,		//set img adjust params
 	APPCMD_SET_STREAM2,			//set 2nd stream params
@@ -55,13 +69,6 @@ typedef struct _ImgMsg {
 	CamDateTime		timeStamp;			/* Capture time */
 	Int32			frameType;			/* Frame type for video */
 }ImgMsg;
-
-/* Msg for raw buffer transfer */
-typedef struct _RawMsg {
-	MsgHeader		header;				/* Msg header, must be the first field */
-	FrameBuf		capBuf;				/* capture buf */
-	ImgDimension	dimension;			/* Format info of image */
-}RawMsg;
 
 #endif
 

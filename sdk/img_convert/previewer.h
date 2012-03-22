@@ -129,6 +129,25 @@ extern Int32 previewer_ss_config(int fdPrev, PreviewAttrs *params);
 *****************************************************************************/
 extern Int32 previewer_convert(int fd, AlgBuf *inBuf, AlgBuf *outBuf);
 
+/*****************************************************************************
+ Prototype    : ipipe_update
+ Description  : Update ipipe params
+ Input        : CapHandle hCap   
+                CapAttrs *attrs  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/2/24
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs);
+
+
 #ifdef __cplusplus
 #if __cplusplus
 }

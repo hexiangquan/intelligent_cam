@@ -266,7 +266,7 @@ Int32 msg_send(MsgHandle hMsg, const char *dstName, const void *data, Int32 data
 			dataLen, header->dataLen);
 	//DBG("send len: %d", dataLen);
 	if(sendto(hMsg->fd, data, dataLen, 0, 
-			(struct sockaddr *)dstAddr, sizeof(struct sockaddr)) < 0) {
+			(struct sockaddr *)dstAddr, sizeof(struct sockaddr)) != dataLen) {
 		ERRSTR("sendto data err");
 		return E_IO;
 	}
@@ -449,5 +449,28 @@ Int32 msg_set_default_dst(MsgHandle hMsg, const char *dstName)
 		strncpy(hMsg->dstAddr.sun_path, dstName, sizeof(hMsg->dstAddr.sun_path));
 
 	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : msg_get_name
+ Description  : get name of this msg module
+ Input        : MsgHandle hMsg  
+ Output       : None
+ Return Value : const
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/20
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+const char *msg_get_name(MsgHandle hMsg)
+{	
+	if(!hMsg)
+		return NULL;
+
+	return hMsg->name;
 }
 

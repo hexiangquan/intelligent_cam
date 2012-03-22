@@ -91,7 +91,7 @@ static Int32 ctrl_thr_init(CtrlThrArg *arg, CtrlThrEnv *envp)
 {
 	//Int32 err;
 	
-	assert(arg && arg->hParamsMng && arg->hDispatch);
+	assert(arg && arg->hParamsMng);
 
 	/* clear */
 	memset(envp, 0, sizeof(CtrlThrEnv));
@@ -244,7 +244,7 @@ void *ctrl_thr(void *arg)
 			break;
 		case ICAMCMD_G_UPLOADPROTO:
 			ret = params_mng_control(env.hParamsMng, PMCMD_G_IMGTRANSPROTO, data, CTRL_MSG_BUF_LEN);
-			respLen = sizeof(CamImageUploadProtocol);
+			respLen = sizeof(CamImgUploadProto);
 			break;
 		case ICAMCMD_S_IMGSRVINFO:
 			ret = params_mng_control(env.hParamsMng, PMCMD_S_TCPSRVINFO, data, msgHdr->dataLen);

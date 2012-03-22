@@ -790,7 +790,7 @@ static Int32 get_img_conv_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 		appCfg->workMode.format == CAM_FMT_JPEG_H264) {
 		/* 1st stream is h.264 */
 		get_video_out_attrs(hParamsMng, &params->outAttrs[0], sizeof(params->outAttrs[0]));
-	}else {
+	}else if(appCfg->workMode.format == CAM_FMT_JPEG){
 		/* Out0 is jpeg */
 		params->outAttrs[0].width = appCfg->imgEncParams.width;
 		params->outAttrs[0].height = appCfg->imgEncParams.height;
@@ -800,6 +800,9 @@ static Int32 get_img_conv_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 			params->outAttrs[0].width = params->inputWidth;
 			params->outAttrs[0].height = params->inputHeight;
 		}
+	} else {
+		/* raw output, disable convert */
+		params->outAttrs[0].enbale = FALSE;
 	}
 	
 	return E_NO;
@@ -2133,10 +2136,10 @@ static Int32 get_detector_params(ParamsMngHandle hParamsMng, void *data, Int32 s
 *****************************************************************************/
 static Int32 set_upload_proto(ParamsMngHandle hParamsMng, void *data, Int32 size)
 {
-	if(!data || size != sizeof(CamImageUploadProtocol)) 
+	if(!data || size != sizeof(CamImgUploadProto)) 
 		return E_INVAL;
 
-	CamImageUploadProtocol protol = *(CamImageUploadProtocol *)data;
+	CamImgUploadProto protol = *(CamImgUploadProto *)data;
 	AppParams *appCfg = &hParamsMng->appParams;
 
 	/* validate data */
@@ -2170,13 +2173,13 @@ static Int32 set_upload_proto(ParamsMngHandle hParamsMng, void *data, Int32 size
 *****************************************************************************/
 static Int32 get_upload_proto(ParamsMngHandle hParamsMng, void *data, Int32 size)
 {
-	if(!data || size < sizeof(CamImageUploadProtocol)) 
+	if(!data || size < sizeof(CamImgUploadProto)) 
 		return E_INVAL;
 
 	AppParams *appCfg = &hParamsMng->appParams;
 	
 	/* Copy data */
-	*(CamImageUploadProtocol *)data = appCfg->imgTransType;
+	*(CamImgUploadProto *)data = appCfg->imgTransType;
 
 	return E_NO;
 }
@@ -2532,6 +2535,97 @@ static Int32 get_spec_cap_params(ParamsMngHandle hParamsMng, void *data, Int32 s
 	return E_NO;
 }
 
+/*****************************************************************************
+ Prototype    : get_img_osd_info
+ Description  : get osd info for image
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/20
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_img_osd_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamOsdInfo)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamOsdInfo *)data = appCfg->osdParams.imgOsd;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_vid_osd_info
+ Description  : get osd info for video
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/20
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_vid_osd_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamOsdInfo)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamOsdInfo *)data = appCfg->osdParams.vidOsd;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_vid_upload_proto
+ Description  : get video upload protocol
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/21
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_vid_upload_proto(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamImgUploadProto)) 
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Copy data */
+	*(CamImgUploadProto *)data = CAM_UPLOAD_PROTO_RTP;
+
+	return E_NO;
+}
+
+
 /* tables for control fxns */
 static const PmCtrlInfo g_paramsConfig[] = {
 	{.cmd = PMCMD_S_NETWORKINFO, .fxn = set_network_info,},
@@ -2600,6 +2694,9 @@ static const PmCtrlInfo g_paramsConvert[] = {
 	{.cmd = PMCMD_G_H264ENCDYN, .fxn = get_h264_enc_dyn, },
 	{.cmd = PMCMD_G_VIDOSDDYN, .fxn = get_vid_osd_dyn, },
 	{.cmd = PMCMD_G_IMGUPLOADPARAMS, .fxn = get_img_upload_params, },
+	{.cmd = PMCMD_G_IMGOSDINFO, .fxn = get_img_osd_info, },
+	{.cmd = PMCMD_G_VIDOSDINFO, .fxn = get_vid_osd_info, },
+	{.cmd = PMCMD_G_VIDUPLOADPROTO, .fxn = get_vid_upload_proto,},
 	{.cmd = PMCMD_MAX1, .fxn = NULL,},
 };
 
@@ -2654,157 +2751,6 @@ Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void 
 	pthread_mutex_lock(&hParamsMng->mutex);
 	ret = ctrlFxn(hParamsMng, arg, size);
 	pthread_mutex_unlock(&hParamsMng->mutex);
-
-#if 0
-	switch(cmd) {
-	case PMCMD_S_NETWORKINFO:
-		ret = set_network_info(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_NETWORKINFO:
-		ret = get_network_info(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_DEVINFO:
-		ret = set_dev_info(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_DEVINFO:
-		ret = get_dev_info(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_ROADINFO:
-		ret = set_road_info(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_ROADINFO:
-		ret = get_road_info(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_RTPPARAMS:
-		ret = set_rtp_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_RTPPARAMS:
-		ret = get_rtp_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_IMGTRANSPROTO:
-		ret = set_upload_proto(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_IMGTRANSPROTO:
-		ret = get_upload_proto(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_TCPSRVINFO:
-		ret = set_tcp_srv_info(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_TCPSRVINFO:
-		ret = get_tcp_srv_info(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_FTPSRVINFO:
-		ret = set_ftp_srv_info(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_FTPSRVINFO:
-		ret = get_ftp_srv_info(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_NTPSRVINFO:
-		ret = set_ntp_srv_info(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_NTPSRVINFO:
-		ret = get_ntp_srv_info(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_EXPPARAMS:
-		ret = set_exposure_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_EXPPARAMS:
-		ret = get_exposure_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_RGBGAINS:
-		ret = set_rgb_gains(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_RGBGAINS:
-		ret = get_rgb_gains(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_DRCPARAMS:
-		ret = set_drc_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_DRCPARAMS:
-		ret = get_drc_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_LIGHTCORRECT:
-		ret = set_light_regions(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_LIGHTCORRECT:
-		ret = get_light_regions(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_IMGADJPARAMS:
-		ret = set_img_adj_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_IMGADJPARAMS:
-		ret = get_img_adj_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_H264ENCPARAMS:
-		ret = set_h264_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_H264ENCPARAMS:
-		ret = get_h264_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_AEPARAMS:
-		break;
-	case PMCMD_G_AEPARAMS:
-		break;
-	case PMCMD_S_OSDPARAMS:
-		ret = set_osd_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_OSDPARAMS:
-		ret = get_osd_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_WORKMODE:
-		ret = set_work_mode(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_WORKMODE:
-		ret = get_work_mode(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_CAPINFO:
-		ret = set_cap_input_info(hParamsMng, arg, size);
-		break;
-	
-	case PMCMD_G_IMGCONVDYN:
-		ret = get_img_conv_dyn(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_2NDSTREAMATTRS:
-		ret = get_stream2_out_attrs(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_JPGENCDYN:
-		ret = get_jpg_enc_dyn(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_H264ENCDYN:
-		ret = get_h264_enc_dyn(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_IMGOSDDYN:
-		ret = get_img_osd_dyn(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_VIDOSDDYN:
-		ret = get_vid_osd_dyn(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_IMGTRANSPROTO:
-		ret = set_img_trans_protol(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_IMGTRANSPROTO:
-		ret = get_img_trans_protol(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_IMGUPLOADPARAMS:
-		ret = get_img_upload_params(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_VERSION:
-		ret = get_version_info(hParamsMng, arg, size);
-		break;
-	case PMCMD_S_WORKSTATUS:
-		ret = set_work_status(hParamsMng, arg, size);
-		break;
-	case PMCMD_G_WORKSTATUS:
-		ret = get_work_status(hParamsMng, arg, size);
-		break;
-	default:
-		ret = E_UNSUPT;
-		ERR("unkown cmd: 0x%X", (unsigned int)cmd);
-		break;
-	}
-
-	pthread_mutex_unlock(&hParamsMng->mutex);
-#endif
 
 	return ret;
 }

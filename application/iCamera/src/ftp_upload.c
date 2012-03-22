@@ -67,6 +67,21 @@ typedef struct _FtpUploadHandle
 	PathNameHandle	hPathName;
 }FtpUploadObj, *FtpUploadHandle;
 
+/*****************************************************************************
+ Prototype    : ftp_upload_create
+ Description  : create ftp upload module
+ Input        : void *params  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/21
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
 static void *ftp_upload_create(void *params)
 {
 	FtpUploadParams *uploadParams = (FtpUploadParams *)params;
@@ -388,5 +403,6 @@ const UploadFxns FTP_UPLOAD_FXNS = {
 	.sendFrame = ftp_upload_send,
 	.sendHeartBeat = ftp_upload_send_heartbeat,
 	.setParams = ftp_upload_set_params,
+	.saveFrame = NULL,
 };
 

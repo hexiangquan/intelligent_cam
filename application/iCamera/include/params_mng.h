@@ -70,7 +70,7 @@ typedef struct _AppParams {
 	CamOsdParams			osdParams;			//osd params
 	CamRoadInfo				roadInfo;			//road info
 	CamRtpParams			rtpParams;			//rtp params for h.264 sending
-	CamImageUploadProtocol	imgTransType;		//image upload type
+	CamImgUploadProto		imgTransType;		//image upload type
 	CamTcpImageServerInfo	tcpImgSrvInfo;		//Tcp Image server info
 	CamFtpImageServerInfo	ftpSrvInfo;			//Ftp server info
 	CamNtpServerInfo		ntpSrvInfo;			//Ntp server info
@@ -164,6 +164,9 @@ typedef enum {
 	PMCMD_G_H264ENCDYN,
 	PMCMD_G_VIDOSDDYN,
 	PMCMD_G_IMGUPLOADPARAMS,
+	PMCMD_G_IMGOSDINFO,
+	PMCMD_G_VIDOSDINFO,
+	PMCMD_G_VIDUPLOADPROTO,
 	PMCMD_MAX1,
 	
 }ParamsMngCtrlCmd;

@@ -78,7 +78,7 @@ endif
 #override VERBOSE = @
 
 # Link libs and flags
-LD_LIBS += -l$(LIB_NAME) -lpthread -lasound -lalg -lcapture -ljpgenc -lbuf -lm
+LD_LIBS += -l$(LIB_NAME) -lpthread -lasound -lalg -lcapture -ljpgenc -lbuf -lm -lmsg
 LD_FLAGS += -L$(LINUXLIBS_INSTALL_DIR)/lib -L$(LIB_PATH) -L$(SDK_LIB_DIR)
 
 # Complier, archive and link commands

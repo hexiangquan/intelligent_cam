@@ -25,6 +25,7 @@
 #include "previewer.h"
 #include "resize.h"
 #include "log.h"
+#include <pthread.h>
 
 /*----------------------------------------------*
  * external variables                           *
@@ -42,6 +43,8 @@ typedef struct _ImgConvObj {
 	int 				fdRsz;
 	int 				outChanNum;
 	ImgConvDynParams	dynParams;
+	pthread_mutex_t		mutex;
+	RszAttrs 			rszAttrs;
 }ImgConvObj, *ImgConvHandle;
 
 /*----------------------------------------------*
@@ -154,12 +157,70 @@ static Int32 img_convert_set_dyn_params(ImgConvHandle hConv, ImgConvDynParams *d
 	PreviewAttrs prevAttrs;
 	convert_previewer_attrs(dynParams, &prevAttrs);
 	ret = previewer_ss_config(hConv->fdPrev, &prevAttrs);
+	ret |= previewer_cap_update(hConv->fdPrev, &prevAttrs);
+	
+	if(ret)
+		return ret;
+	
+	hConv->dynParams = *dynParams;
+	hConv->rszAttrs = rszAttrs;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : img_convert_set_rsz_out_attrs
+ Description  : set resize output attrs
+ Input        : ImgConvHandle hConv  
+                ImgConvInArgs *args  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/17
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 img_convert_set_out_attrs(ImgConvHandle hConv, ImgConvInArgs *args)
+{
+	RszAttrs 	*rszAttrs = &hConv->rszAttrs;
+	Int32		ret;
+
+	if(memcmp(rszAttrs->outAttrs, args->outAttrs, sizeof(rszAttrs->outAttrs)) == 0) 
+		return E_NO; //same params, need not config
+
+	if(!ALIGNED(args->outAttrs[0].width, 16) ) {
+		ERR("Out0 width must be multiply of 16");
+		return E_INVAL;
+	}
+
+	if(args->outAttrs[1].enbale && 
+		(!ALIGNED(args->outAttrs[1].width, 16))) {
+		ERR("Out1 width must be multiply of 16");
+		return E_INVAL;
+	}
+
+	rszAttrs->outAttrs[0] = args->outAttrs[0];
+	rszAttrs->outAttrs[1] = args->outAttrs[1];
+	
+	ret = resize_ss_config(hConv->fdRsz, rszAttrs);
 	if(ret)
 		return ret;
 
-	hConv->dynParams = *dynParams;
+	
+	/* record params */
+	hConv->dynParams.outAttrs[0] = args->outAttrs[0];
+	hConv->dynParams.outAttrs[1] = args->outAttrs[1];
 
-	return E_NO;
+	PreviewAttrs prevAttrs;
+	convert_previewer_attrs(&hConv->dynParams, &prevAttrs);
+	ret = previewer_ss_config(hConv->fdPrev, &prevAttrs);
+	
+	return ret;
+
 }
 
 /*****************************************************************************
@@ -227,6 +288,11 @@ static Ptr img_convert_init(const Ptr init, const Ptr dyn)
 	if(ret < 0)
 		goto err_quit;
 
+	if(pthread_mutex_init(&hConv->mutex, NULL) < 0) {
+		ERRSTR("init mutex failed");
+		goto err_quit;
+	}
+
 	return hConv;
 
 err_quit:
@@ -271,6 +337,8 @@ static Int32 img_convert_exit(Ptr handle)
 	if(hConv->fdPrev)
 		close(hConv->fdPrev);
 
+	pthread_mutex_destroy(&hConv->mutex);
+
 	free(hConv);
 
 	return E_NO;
@@ -298,53 +366,32 @@ static Int32 img_convert_exit(Ptr handle)
 static Int32 img_convert_process(Ptr algHandle, AlgBuf *inBuf, Ptr inArgsPtr, AlgBuf *outBuf, Ptr outArgsPtr)
 {
 	ImgConvHandle 	hConv = (ImgConvHandle)algHandle; 
+	ImgConvInArgs	*inArgs = (ImgConvInArgs *)inArgsPtr;
 
-	if(!hConv || !inBuf || !outBuf)
+	if(!hConv || !inBuf || !outBuf || !inArgs || inArgs->size != sizeof(ImgConvInArgs))
 		return E_INVAL;
-
+/*
 	if(!ALIGNED(inBuf->buf, 32) || !ALIGNED(outBuf->buf, 32)) {
 		ERR("buf not aligned");
 		return E_INVAL;
 	}
+*/
+	Int32 ret;
+
+	pthread_mutex_lock(&hConv->mutex);
+	ret = img_convert_set_out_attrs(hConv, inArgs);
+	if(ret) {
+		goto exit;
+	}
+
+	ret = previewer_convert(hConv->fdPrev, inBuf, outBuf);
+
+exit:
 	
-	return previewer_convert(hConv->fdPrev, inBuf, outBuf);
+	pthread_mutex_unlock(&hConv->mutex);
+	return ret;
 }
 
-/*****************************************************************************
- Prototype    : img_convert_set_out_attrs
- Description  : set output attrs
- Input        : ImgConvHandle hConv     
-                ConvOutAttrs *outAttrs  
-                Int32 chanNum           
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/3/7
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static Int32 img_convert_set_out_attrs(ImgConvHandle hConv, ConvOutAttrs *outAttrs, Int32 chanNum)
-{
-	if(!outAttrs || chanNum >= CONV_MAX_OUT_CHAN_NUM)
-		return E_INVAL;
-
-	if(chanNum == 0 && !outAttrs->enbale) {
-		ERR("out chan0 must enable");
-		return E_INVAL;
-	}
-
-	if(outAttrs->enbale && !ALIGNED(outAttrs->width, 16)) {
-		ERR("width must align to 16");
-		return E_INVAL;
-	}
-
-	hConv->dynParams.outAttrs[chanNum] = *outAttrs;
-	return img_convert_set_dyn_params(hConv, &hConv->dynParams);
-}
 
 /*****************************************************************************
  Prototype    : img_convert_control
@@ -381,12 +428,6 @@ static Int32 img_convert_control(Ptr algHandle, Int32 cmd, Ptr args)
 			ret = E_NO;
 		} else 
 			ret = E_INVAL;
-		break;
-	case CONV_CMD_SET_OUT0_ATTRS:
-		ret = img_convert_set_out_attrs(hConv, (ConvOutAttrs *)args, 0);
-		break;
-	case CONV_CMD_SET_OUT1_ATTRS:
-		ret = img_convert_set_out_attrs(hConv, (ConvOutAttrs *)args, 1);
 		break;
 	default:
 		ret = E_UNSUPT;

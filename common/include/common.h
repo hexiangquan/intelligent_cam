@@ -82,6 +82,10 @@ typedef unsigned char	Uint8;
 #define OUT
 #endif
 
+#ifndef INOUT
+#define INOUT
+#endif
+
 #define SYS_FOREVER				(Uint32)(-1)
 
 /* Macro for array size calc */

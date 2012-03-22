@@ -21,6 +21,7 @@
 
 #include "common.h"
 #include "app_msg.h"
+#include "params_mng.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -49,6 +50,8 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
+#define UPLOAD_FLAG_ANSYNC		(1 << 0)	//using ansync upload 
+#define UPLOAD_FLAG_FREE_BUF	(1 << 1)	//free buffer after send
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -69,6 +72,9 @@ typedef struct _UploadFxns {
 	/* Send a frame,, 1st: sub object handle, 2nd: frame data, 3rd: data len */
 	Int32  (*sendFrame)(void *handle, const ImgMsg *frame);
 
+	/* Save a frame,, 1st: sub object handle, 2nd: frame data, 3rd: data len, when send fails */
+	Int32  (*saveFrame)(void *handle, const ImgMsg *frame);
+
 	/* Send heart beat, , 1st: sub object handle, can be NULL */
 	Int32  (*sendHeartBeat)(void *handle);
 	
@@ -78,6 +84,15 @@ typedef struct _UploadFxns {
 	/* Delete param, 1st: sub object handle*/
 	Int32  (*delete)(void *handle);
 }UploadFxns;
+
+typedef struct {
+	CamImgUploadProto 		protol;			//protocol to send
+	ParamsMngHandle			hParamsMng;		//handle for params manage
+	Uint32					reConTimeout;	//reconnect timeout in second	
+	Int32					flags;			//ctrl flags
+	const char				*msgName;		//msg name for ansyn thread
+	const char				*savePath;		//path for save frame when err happens
+}UploadAttrs;
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -102,7 +117,7 @@ extern "C"{
     Modification : Created function
 
 *****************************************************************************/
-extern UploadHandle upload_create(CamImageUploadProtocol protol, void *params, Uint32 reConTimeout);
+extern UploadHandle upload_create(UploadAttrs *attrs);
 
 /*****************************************************************************
  Prototype    : upload_delete
@@ -119,7 +134,7 @@ extern UploadHandle upload_create(CamImageUploadProtocol protol, void *params, U
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 upload_delete(UploadHandle hUpload);
+extern Int32 upload_delete(UploadHandle hUpload, MsgHandle hCurMsg);
 
 /*****************************************************************************
  Prototype    : upload_connect
@@ -191,22 +206,21 @@ extern Bool upload_get_connect_status(UploadHandle hUpload);
 extern Int32 upload_send_heartbeat(UploadHandle hUpload);
 
 /*****************************************************************************
- Prototype    : upload_set_params
+ Prototype    : upload_update_params
  Description  : update params
  Input        : UploadHandle hUpload  
-                Ptr params            
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/10
+  1.Date         : 2012/3/21
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 upload_set_params(UploadHandle hUpload, Ptr params);
+Int32 upload_update_params(UploadHandle hUpload);
 
 /*****************************************************************************
  Prototype    : upload_send_frame
@@ -224,7 +238,7 @@ extern Int32 upload_set_params(UploadHandle hUpload, Ptr params);
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data);
+extern Int32 upload_run(UploadHandle hUpload, MsgHandle hCurMsg, const ImgMsg *data);
 
 #ifdef __cplusplus
 #if __cplusplus

@@ -238,5 +238,6 @@ const UploadFxns TCP_UPLOAD_FXNS = {
 	.sendFrame = tcp_upload_send,
 	.sendHeartBeat = NULL,
 	.setParams = tcp_upload_set_params,
+	.saveFrame = NULL,
 };
 
