@@ -25,6 +25,7 @@
 #include "crc16.h"
 #include <pthread.h>
 #include "converter.h"
+#include "cam_time.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -385,7 +386,7 @@ static void *data_capture_thread(void *arg)
 	fdMax = MAX(fdMsg, fdCap) + 1;
 	
 	/* start capture */
-	ret = capture_start(hDataCap->hCap);
+	ret = 0;//capture_start(hDataCap->hCap);
 	if(ret) {
 		ERR("Start capture failed.");
 		goto exit;
@@ -499,6 +500,45 @@ exit:
 }
 
 /*****************************************************************************
+ Prototype    : data_capture_send_cmd
+ Description  : send cmd to our pthread
+ Input        : DataCapHandle hDataCap  
+                Uint16 cmd              
+                MsgHandle hCurMsg       
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/21
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 data_capture_send_cmd(DataCapHandle hDataCap, Uint16 cmd, MsgHandle hCurMsg)
+{
+	if(!hDataCap || !hCurMsg)
+		return E_INVAL;
+
+	/* make sure we have start running */
+	if(!hDataCap->pid)
+		return E_MODE;
+
+	/* send cmd to our thread */
+	Int32 		err;
+	MsgHeader 	msg;
+
+	msg.cmd = cmd;
+	msg.dataLen = 0;
+	msg.index = 0;
+	msg.magicNum = MSG_MAGIC_SEND;
+
+	err = msg_send(hCurMsg, msg_get_name(hDataCap->hMsg), &msg, sizeof(msg));
+	return err;
+}
+
+/*****************************************************************************
  Prototype    : data_capture_delete
  Description  : delete data capture handle
  Input        : DataCapHandle hDataCap  
@@ -515,18 +555,13 @@ exit:
 *****************************************************************************/
 Int32 data_capture_delete(DataCapHandle hDataCap, MsgHandle hCurMsg)
 {
+	if(!hDataCap)
+		return E_INVAL;
+	
 	if(hDataCap->pid > 0) {
-		if(hCurMsg) {
-			MsgHeader msg;
-
-			/* send msg to our thread to exit */
-			msg.cmd = APPCMD_EXIT;
-			msg.index = 0;
-			msg.dataLen = 0;
-			msg.magicNum = MSG_MAGIC_SEND;
-			msg_send(hCurMsg, MSG_CAP, &msg, sizeof(msg));
-		}
-
+		/* send exit cmd */
+		data_capture_send_cmd(hDataCap, APPCMD_EXIT, hCurMsg);
+		
 		/* set flag to exit */
 		hDataCap->exit = TRUE;
 		
@@ -579,45 +614,6 @@ Int32 data_capture_run(DataCapHandle hDataCap)
 	}
 
 	return E_NO;
-}
-
-/*****************************************************************************
- Prototype    : data_capture_send_cmd
- Description  : send cmd to our pthread
- Input        : DataCapHandle hDataCap  
-                Uint16 cmd              
-                MsgHandle hCurMsg       
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/3/21
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static Int32 data_capture_send_cmd(DataCapHandle hDataCap, Uint16 cmd, MsgHandle hCurMsg)
-{
-	if(!hDataCap || !hCurMsg)
-		return E_INVAL;
-
-	/* make sure we have start running */
-	if(!hDataCap->pid)
-		return E_MODE;
-
-	/* send cmd to our thread */
-	Int32 		err;
-	MsgHeader 	msg;
-
-	msg.cmd = cmd;
-	msg.dataLen = 0;
-	msg.index = 0;
-	msg.magicNum = MSG_MAGIC_SEND;
-
-	err = msg_send(hCurMsg, msg_get_name(hDataCap->hMsg), &msg, sizeof(msg));
-	return err;
 }
 
 /*****************************************************************************

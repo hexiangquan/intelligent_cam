@@ -33,11 +33,11 @@
 #include "data_capture.h"
 #include "encoder.h"
 #include <signal.h>
-#include "ctrl_thr.h"
+#include "ctrl_server.h"
 #include "img_convert.h"
 #include "jpg_encoder.h"
 #include "h264_encoder.h"
-
+#include "icam_ctrl.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -86,6 +86,7 @@ typedef struct {
 	DataCapHandle	hDataCap;
 	EncoderHandle	hJpgEncoder;
 	EncoderHandle	hH264Encoder;
+	CtrlSrvHandle	hCtrlSrv;
 	pthread_mutex_t	encMutex;
 }MainEnv;
 
@@ -154,6 +155,17 @@ static Int32 app_init(MainEnv *envp)
 		return E_IO;
 	}
 
+	/* create ctrl server */
+	CtrlSrvAttrs ctrlSrvAttrs;
+
+	ctrlSrvAttrs.hParamsMng = envp->hParamsMng;
+	ctrlSrvAttrs.msgName = ICAM_MSG_NAME;
+	
+	envp->hCtrlSrv = ctrl_server_create(&ctrlSrvAttrs);
+	if(!envp->hCtrlSrv) {
+		return E_IO;
+	}
+
 	return E_NO;
 }
 
@@ -200,33 +212,13 @@ static Int32 app_run(MainEnv *envp)
 	}
 #endif
 
-#if 0
-	/* create image send thread */
-	ImgSndThrArg *imgSndArg = malloc(sizeof(ImgSndThrArg));
-	assert(imgSndArg);
-
-	imgSndArg->hDispatch = envp->hDispatch;
-	imgSndArg->hParamsMng = envp->hParamsMng;
-	err = pthread_create(&envp->pid[3], NULL, img_snd_thr, imgSndArg);
-	if(err < 0) {
-		free(imgSndArg);
-		ERRSTR("create img snd thread failed...");
-		return E_NOMEM;
+	/* run ctrl server */
+	err = ctrl_server_run(envp->hCtrlSrv);
+	if(err) {
+		ERR("ctrl server run failed...");
+		return err;
 	}
-#endif
 
-	/* create ctrl thread */
-	CtrlThrArg *ctrlThrArg = malloc(sizeof(CtrlThrArg));
-	assert(ctrlThrArg);
-
-	ctrlThrArg->hDispatch = NULL;
-	ctrlThrArg->hParamsMng = envp->hParamsMng;
-	err = pthread_create(&envp->pid[4], NULL, ctrl_thr, ctrlThrArg);
-	if(err < 0) {
-		free(ctrlThrArg);
-		ERRSTR("create ctrl thread failed...");
-		return E_NOMEM;
-	}
 	return E_NO;
 }
 
@@ -248,28 +240,16 @@ static Int32 app_run(MainEnv *envp)
 *****************************************************************************/
 static void app_exit(MainEnv *envp, MsgHandle hMsg)
 {
-	//Int32 i = 0;
-	MsgHeader msg;
-
-	DBG("delete threads...");
-
-	/* send msg to all tasks to exit */
-	msg.cmd = APPCMD_EXIT;
-	msg.index = 0;
-	msg.dataLen = 0;
-	msg.magicNum = MSG_MAGIC_SEND;
-	
-	msg_send(hMsg, MSG_IMG_TX, &msg, sizeof(msg));
-	pthread_join(envp->pid[3], NULL);
-	msg_send(hMsg, MSG_CTRL, &msg, sizeof(msg));
-	pthread_join(envp->pid[4], NULL);
-
 	/* call encoders exit */
 	if(envp->hJpgEncoder)
 		encoder_delete(envp->hJpgEncoder, hMsg);
 
 	if(envp->hH264Encoder)
 		encoder_delete(envp->hH264Encoder, hMsg);
+
+	/* call ctrl server exit */
+	if(envp->hCtrlSrv)
+		ctrl_server_delete(envp->hCtrlSrv, hMsg);
 
 	/* exit data capture */
 	if(envp->hDataCap)
@@ -284,6 +264,8 @@ static void app_exit(MainEnv *envp, MsgHandle hMsg)
 	pthread_mutex_destroy(&envp->encMutex);
 
 	alg_exit();
+
+	DBG("app exit...");
 
 }
 
@@ -396,7 +378,7 @@ static Int32 main_loop(MainEnv *envp)
 
 		/* recv msg */
 		status = msg_recv(hMsg, &msgBuf, sizeof(msgBuf));
-		if(!status) {
+		if(status > 0) {
 			msg_process(&msgBuf, envp);
 		}
 			
@@ -503,5 +485,38 @@ Int32 main(Int32 argc, char **argv)
 	INFO("%s exit, status: %d...\n", PROGRAM_NAME, ret);
 
 	exit(0);
+}
+
+/*****************************************************************************
+ Prototype    : app_hdr_msg_send
+ Description  : api for send only msg header
+ Input        : MsgHandle hMsg       
+                const char *dstName  
+                Uint16 cmd           
+                Int32 param0         
+                Int32 param1         
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/22
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 app_hdr_msg_send(MsgHandle hMsg, const char *dstName, Uint16 cmd, Int32 param0, Int32 param1)
+{
+	MsgHeader msg;
+
+	msg.cmd = cmd;
+	msg.dataLen = 0;
+	msg.param[0] = param0;
+	msg.param[1] = param1;
+	msg.magicNum = MSG_MAGIC_SEND;
+	msg.index = 0;
+
+	return msg_send(hMsg, dstName, &msg, sizeof(msg));
 }
 

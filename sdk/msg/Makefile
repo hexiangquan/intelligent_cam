@@ -17,6 +17,8 @@ LIB_INSTALL_DIR := $(SDK_LIB_DIR)
 
 EXEC = $(LIB_NAME)Test
 SRC = $(LIB_NAME)_test.o
+EXEC1 = $(LIB_NAME)TestClient
+SRC1 = $(LIB_NAME)_test_client.o
 
 ifeq ($(PLATFORM), dm368)
 CROSS_COMPILE ?= $(CSTOOL_PREFIX)
@@ -42,11 +44,11 @@ LDFLAGS += -lpthread -l$(LIB_NAME) -lnetutils
 
 CFLAGS += -I$(INC_DIR)
 
-all: $(LIB) $(EXEC) install
+all: $(LIB) test install
 	
 lib: $(LIB)
 
-test: $(EXEC)
+test: $(EXEC) $(EXEC1)
 
 $(LIB_PATH)/%.o: %.c
 	-mkdir -p $(LIB_PATH)
@@ -63,6 +65,9 @@ endif
 $(EXEC): $(SRC) 
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) 
 	
+$(EXEC1): $(SRC1) 
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) 
+
 clean:
 	@rm -vf $(LIB) $(EXEC) *.o *~ $(LIB_PATH)/*.o
 
@@ -70,5 +75,5 @@ install:
 	cp -p $(LIB) $(LIB_INSTALL_DIR)
 	cp -p $(LIB) $(SDK_LIB_DIR)
 	cp -p $(LIB_HEADER) $(SDK_INC_DIR)
-	cp -p $(EXEC) $(EXEC_INSTALL_PATH)
+	cp -p $(EXEC) $(EXEC1) $(EXEC_INSTALL_PATH)
 

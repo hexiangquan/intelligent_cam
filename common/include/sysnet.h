@@ -26,7 +26,7 @@
 #include <sys/select.h>
 #include <sys/sysctl.h>
 #include <sys/ioctl.h>
-#include <sys/un.h>
+#include <linux/un.h>
 
 #include <pthread.h>
 

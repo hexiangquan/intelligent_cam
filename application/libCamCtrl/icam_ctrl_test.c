@@ -1,40 +1,67 @@
 #include "icam_ctrl.h"
 #include "log.h"
 #include <linux/types.h>
+#include "msg.h"
 
-#define DEF_LOOP_CNT 10
-#define DEF_PATH_NAME "/tmp/icamTestMsg"
+#define DEF_LOOP_CNT 	10
+#define DEF_PATH_NAME 	"/tmp/msgCtrlTest"
+#define PARENT_MSG		"/tmp/msgParent"
+//#define CHILD_MSG		"/tmp/msgChild"
+#define CHILD_MSG		DEF_PATH_NAME
 
 typedef struct {
 	const char *pathName;
 	Int32 loopCnt;
 }TestParams;
 
+typedef struct _MsgData {
+	MsgHeader	header;
+	char		buf[512];
+}MsgData;
+
+
+extern Int32 icamCtrl_cmd_test(ICamCtrlHandle hCtrl,const char * str);
+
 static void main_loop(TestParams *params)
 {
 	ICamCtrlHandle hCtrl = NULL;
 
-	hCtrl = icam_ctrl_create(params->pathName, 0);
+	hCtrl = icam_ctrl_create(params->pathName, 0, 5);
+	DBG("create msg: %s", params->pathName);
 	assert(hCtrl);
 	
-	Int32 err;
+	Int32 err, cnt = 0;
 	CamVersionInfo version;
 
-	err = icam_get_version(hCtrl, &version);
-	if(err)
-		goto exit;
+	while(1) {
 
-	DBG("cam version:");
-	DBG(" arm: 0x%X", (__u32)version.armVer);
-	DBG(" dsp: 0x%X", (__u32)version.dspVer);
-	DBG(" fpga: 0x%X", (__u32)version.fpgaVer);
-	
-exit:
+#if 1
+		err = icam_get_version(hCtrl, &version);
+		//if(err)
+			//break;
+		if(!err) {
+			DBG("cam version:");
+			DBG(" arm: 0x%X", (__u32)version.armVer);
+			DBG(" dsp: 0x%X", (__u32)version.dspVer);
+			DBG(" fpga: 0x%X", (__u32)version.fpgaVer);
+		} else {
+			DBG("get ver err");
+		}
+#endif
+
+		//err = icamCtrl_cmd_test(hCtrl, "test");
+
+		if(cnt++ > params->loopCnt) {
+			break;
+		}
+	}
+
 
 	if(hCtrl)
 		icam_ctrl_delete(hCtrl);
-	
-	DBG("ftp test complete.");
+
+exit:
+	DBG("icam ctrl test complete.");
 	
 }
 
@@ -56,7 +83,7 @@ static void usage(void)
 int main(int argc, char **argv)
 {
 	int c;
-    char *options = "n:h";
+    char *options = "n:p:h";
 	TestParams params;
 
 	params.loopCnt = DEF_LOOP_CNT;

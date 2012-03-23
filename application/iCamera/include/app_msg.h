@@ -70,5 +70,20 @@ typedef struct _ImgMsg {
 	Int32			frameType;			/* Frame type for video */
 }ImgMsg;
 
+#ifdef __cplusplus
+#if __cplusplus
+extern "C"{
 #endif
+#endif /* __cplusplus */
+
+/* api for send only header msg */
+extern Int32 app_hdr_msg_send(MsgHandle hMsg, const char *dstName, Uint16 cmd, Int32 param0, Int32 param1);
+
+#ifdef __cplusplus
+#if __cplusplus
+}
+#endif
+#endif /* __cplusplus */
+
+#endif /*___APP_MSG__ */
 

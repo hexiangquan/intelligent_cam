@@ -6,6 +6,14 @@
 #define DEF_MSG_SIZE	1024
 #define DEF_LOOP_CNT	100
 #define DEF_THR_NUM		10
+#define PARENT_MSG		"/tmp/msgParent"
+#define CHILD_MSG		"/tmp/msgChild"
+#define ICAM_MSG_NAME	"/tmp/iCamCtrl"
+
+
+
+//#define DEF_USE_THR		1
+#define PARENT_ONLY
 
 typedef struct _TestParams {
 	char *baseName;
@@ -26,6 +34,7 @@ typedef struct _MsgData {
 	char		buf[512];
 }MsgData;
 
+#ifdef DEF_USE_THR
 static void *thr_msg(void *arg)
 {
 	assert(arg);
@@ -160,6 +169,112 @@ static Bool main_loop(TestParams *params)
 	return ret;
 	
 }
+#else
+/* test between process */
+static Bool main_loop(TestParams *params)
+{
+	Bool ret = FALSE;
+
+#ifndef PARENT_ONLY
+	pid_t	pid;
+
+	if((pid = fork()) < 0) {
+		ERRSTR("fork err");
+		goto exit;
+	} else if(pid == 0) {
+		/* child */
+		MsgHandle hMsg0 = msg_create(CHILD_MSG, PARENT_MSG, 0);
+		if(!hMsg0) {
+			ERR("create child msg failed");
+			goto exit;
+		}
+		sleep(1);
+
+		/* we just send msg */
+		Int32 cnt0;
+		MsgData	msgData0;
+		Int32 err0, dataLen0;
+
+		DBG("msg test client start...");
+		
+		for(cnt0 = 0; cnt0 < params->loopCnt; cnt0++) {
+			memset(&msgData0.buf, 0, sizeof(msgData0.buf));
+			msgData0.header.cmd = cnt0;
+			msgData0.header.index = cnt0;
+			msgData0.header.magicNum = MSG_MAGIC_SEND;
+			msgData0.header.dataLen = sprintf(msgData0.buf, "child msg [%d]", cnt0);
+			dataLen0 = msgData0.header.dataLen + sizeof(msgData0.header);	
+
+			err0 = msg_send(hMsg0, NULL, &msgData0, dataLen0);
+			if(err0)
+				ERR("<%d> send msg err", cnt0);
+			else
+				DBG("<%d> send msg ok...", cnt0);
+
+			err0 = msg_recv(hMsg0, &msgData0, sizeof(msgData0));
+			if(err0 < 0) {
+				ERR("child wait reply err");
+			} else 
+				DBG("<%d> child recv reply: %s", cnt0, msgData0.buf);
+
+			usleep(100000);
+		}
+		
+		DBG("child exit");
+	} 
+	else 
+#endif
+	{
+		/* parent */
+		MsgHandle hMsg1 = msg_create(PARENT_MSG, CHILD_MSG, 0);
+		if(!hMsg1) {
+			ERR("create parent msg failed");
+			goto exit;
+		}
+		sleep(1);
+
+		/* we just send msg */
+		Int32 cnt1;
+		MsgData	msgData1;
+		Int32 err1, dataLen1;
+
+		DBG("msg test server start...");
+		
+		for(cnt1 = 0; cnt1 < params->loopCnt; cnt1++) {
+			memset(&msgData1.buf, 0, sizeof(msgData1.buf));
+
+			err1 = msg_recv(hMsg1, &msgData1, sizeof(msgData1));
+			if(err1 < 0) {
+				ERR("<%d> recv msg err", cnt1);
+				continue;
+			}
+			else
+				DBG("<%d> parent recv msg: %s...", cnt1, msgData1.buf);
+
+			usleep(100000);
+
+			/* reply msg */
+			msgData1.header.magicNum = MSG_MAGIC_RESP;
+			err1 = msg_send(hMsg1, NULL, &msgData1, sizeof(msgData1));
+			if(err1 < 0)
+				ERR("<%d> send reply msg err", cnt1);
+		}
+
+		DBG("parent exit");
+
+	}
+
+	ret = TRUE;
+
+exit:
+	
+
+	return ret;
+	
+}
+
+
+#endif
 
 static void usage(void)
 {

@@ -28,6 +28,7 @@
 #include "log.h"
 #include "msg.h"
 #include "net_utils.h"
+//#include <linux/un.h>
 
 /*----------------------------------------------*
  * external variables                           *
@@ -68,6 +69,8 @@ typedef struct _MsgObj {
 //#define SUN_LEN(path)		(offsetof(struct sockaddr_un, sun_path) + strlen(path))
 #endif
 
+#define MSG_MAX_NAME_LEN	(UNIX_PATH_MAX - 1)
+
 /*----------------------------------------------*
  * routines' implementations                    *
  *----------------------------------------------*/
@@ -95,6 +98,12 @@ MsgHandle msg_create(const Int8 *srcName, const Int8 *dstName, Int32 flag)
 		return NULL;
 	}
 
+	if( strlen(srcName) > MSG_MAX_NAME_LEN || 
+		(dstName && strlen(dstName) > MSG_MAX_NAME_LEN) ) {
+		ERR("msg name too long, max: %d", MSG_MAX_NAME_LEN);
+		return NULL;
+	}
+
 	MsgHandle hMsg = calloc(1, sizeof(MsgObj));
 	if(!hMsg) {
 		ERR("Alloc mem failed.");
@@ -106,13 +115,13 @@ MsgHandle msg_create(const Int8 *srcName, const Int8 *dstName, Int32 flag)
 
 	memset(&un, 0, sizeof(un));
 	un.sun_family = AF_UNIX;
-	strncpy(un.sun_path, srcName, sizeof(un.sun_path));
+	strcpy(un.sun_path, srcName);
 	
 	if ((fd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) {
 		ERRSTR("socket error");
 		goto err_quit;
 	}
-	size = SUN_LEN(&un);
+	size = offsetof(struct sockaddr_un, sun_path) + strlen(un.sun_path);
 	unlink(srcName);
 	if (bind(fd, (struct sockaddr *)&un, size) < 0) {
 		ERRSTR("bind error");
@@ -124,6 +133,7 @@ MsgHandle msg_create(const Int8 *srcName, const Int8 *dstName, Int32 flag)
 	hMsg->flag = flag;
 	hMsg->name = srcName;
 	hMsg->dstAddr.sun_family = AF_UNIX;
+	hMsg->recvAddr.sun_family = AF_UNIX;
 	if(dstName)
 		strncpy(hMsg->dstAddr.sun_path, dstName, sizeof(un.sun_path));
 
@@ -266,7 +276,7 @@ Int32 msg_send(MsgHandle hMsg, const char *dstName, const void *data, Int32 data
 			dataLen, header->dataLen);
 	//DBG("send len: %d", dataLen);
 	if(sendto(hMsg->fd, data, dataLen, 0, 
-			(struct sockaddr *)dstAddr, sizeof(struct sockaddr)) != dataLen) {
+			(struct sockaddr *)dstAddr, sizeof(struct sockaddr_un)) != dataLen) {
 		ERRSTR("sendto data err");
 		return E_IO;
 	}
@@ -302,6 +312,7 @@ Int32 msg_recv(MsgHandle hMsg, void *buf, Int32 bufLen)
 	int rcvLen;
 	MsgHeader *header = (MsgHeader *)buf;
 
+	bzero(&hMsg->recvAddr.sun_path, sizeof(hMsg->recvAddr.sun_path));
 	rcvLen = recvfrom(hMsg->fd, buf, bufLen, 0, (struct sockaddr *)&hMsg->recvAddr, &len);
 	if(rcvLen < 0) {
 		//ERRSTR("recv header err");
@@ -445,8 +456,12 @@ Int32 msg_set_default_dst(MsgHandle hMsg, const char *dstName)
 	if(!hMsg || !dstName)
 		return E_INVAL;
 	
-	if(dstName)
-		strncpy(hMsg->dstAddr.sun_path, dstName, sizeof(hMsg->dstAddr.sun_path));
+	if( strlen(dstName) > MSG_MAX_NAME_LEN ) {
+		ERR("msg name too long, max: %d", MSG_MAX_NAME_LEN);
+		return E_NOSPC;
+	}
+
+	strcpy(hMsg->dstAddr.sun_path, dstName);
 
 	return E_NO;
 }

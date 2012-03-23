@@ -147,7 +147,7 @@ static void *upload_thread(void *arg)
 		/* recv msg */
 		ret = msg_recv(hMsg, &msgBuf, sizeof(msgBuf));
 		if(ret < 0) {
-			ERR("recv msg err: %s", str_err(ret));
+			//ERR("recv msg err: %s", str_err(ret));
 			continue;
 		}
 	

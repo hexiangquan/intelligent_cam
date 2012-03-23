@@ -10,6 +10,7 @@ struct ICamCtrlObj {
 	pthread_mutex_t mutex;
 };
 
+
 /*****************************************************************************
  Prototype    : icam_ctrl_create
  Description  : create cam ctrl handle
@@ -26,7 +27,7 @@ struct ICamCtrlObj {
     Modification : Created function
 
 *****************************************************************************/
-ICamCtrlHandle icam_ctrl_create(const char *pathName, Int32 flags)
+ICamCtrlHandle icam_ctrl_create(const char *pathName, Int32 flags, Int32 transTimeout)
 {
 	ICamCtrlHandle 	hCtrl;
 	Int32			msgFlags = 0;
@@ -40,6 +41,7 @@ ICamCtrlHandle icam_ctrl_create(const char *pathName, Int32 flags)
 	if(flags & ICAM_FLAG_NONBLOCK) {
 		msgFlags |= MSG_FLAG_NONBLK;
 	}
+
 	hCtrl->hMsg = msg_create(pathName, ICAM_MSG_NAME, msgFlags);
 
 	if(!hCtrl->hMsg) {
@@ -48,6 +50,11 @@ ICamCtrlHandle icam_ctrl_create(const char *pathName, Int32 flags)
 		return NULL;
 	}
 
+	if(transTimeout > 0) {
+		msg_set_send_timeout(hCtrl->hMsg, transTimeout);
+		msg_set_recv_timeout(hCtrl->hMsg, transTimeout);
+	}
+	
 	pthread_mutex_init(&hCtrl->mutex, NULL);
 
 	return hCtrl;
@@ -120,7 +127,8 @@ static Int32 icam_send_cmd(ICamCtrlHandle hCtrl, Uint16 cmd, void *data, Int32 s
 
 	/* wait response */
 	err = msg_recv(hCtrl->hMsg, data, rcvLen);
-	if(err)
+
+	if(err < 0)
 		return err;
 
 	/* validate data */
@@ -2325,5 +2333,24 @@ Int32 icam_get_sd_dir_info(ICamCtrlHandle hCtrl, const char *dirPath, void *buf,
 	return E_NO;
 }
 
+Int32 icamCtrl_cmd_test(ICamCtrlHandle hCtrl, const char *str)
+{
+	if(!hCtrl || !str)
+		return E_INVAL;
+
+	struct {
+		MsgHeader	hdr;
+		char		buf[512];
+	}msgBuf;
+
+	Int32 ret;
+	Int32 len = strlen(str) + 1;
+
+	strcpy(msgBuf.buf, str);
+	
+	ret = icam_send_cmd(hCtrl, 0, &msgBuf, sizeof(MsgHeader) + len, sizeof(msgBuf));
+
+	return ret;
+}
 
 

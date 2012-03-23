@@ -49,6 +49,7 @@
  * macros                                       *
  *----------------------------------------------*/
 #define ICAM_MSG_NAME		"/tmp/iCamCtrl"
+#define ICAM_CLIENT_NAME	"/tmp/iCamClient"
 #define ICAM_FLAG_NONBLOCK	(1 << 0)
 #define ICAM_CMD_BASE		0x8000
 
@@ -131,7 +132,7 @@ extern "C"{
  */
 
 /* create icam control handle */
-extern ICamCtrlHandle icam_ctrl_create(IN const char *pathName, IN Int32 flags);
+extern ICamCtrlHandle icam_ctrl_create(IN const char *pathName, IN Int32 flags, IN Int32 transTimeout);
 
 /* delete icam control handle */
 extern Int32 icam_ctrl_delete(IN ICamCtrlHandle hCtrl);
