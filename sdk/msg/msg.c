@@ -181,52 +181,14 @@ Int32 msg_delete(MsgHandle hMsg)
 	return E_NO;
 }
 
-#if 0
-/*****************************************************************************
- Prototype    : send_msg
- Description  : Send msg data and header
- Input        : MsgHandle hMsg            
-                struct sockaddr *srvAddr  
-                const MsgHeader *header   
-                const void *data          
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/2/14
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static inline Int32 send_msg(MsgHandle hMsg, struct sockaddr *srvAddr, const MsgHeader *header, const void *data)
-{
-	if(sendto(hMsg->fd, header, sizeof(header), 0, 
-		srvAddr, sizeof(struct sockaddr)) < 0) {
-		ERRSTR("sendto header err");
-		return E_IO;
-	}
-
-	if(header->dataLen > 0 && data) {
-		if(sendto(hMsg->fd, data, header->dataLen, 0, 
-			srvAddr, sizeof(struct sockaddr)) < 0) {
-			ERRSTR("sendto data err");
-			return E_IO;
-		}
-	}
-
-	return E_NO;
-}
-#endif
-
 /*****************************************************************************
  Prototype    : msg_send
  Description  : Send request msg
  Input        : MsgHandle hMsg           
                 const char *dstName, if this is NULL, send to default dst      
                 const MsgHeader *header  
-                const void *data         
+                const void *data 
+                Int32 flags
  Output       : None
  Return Value : 
  Calls        : 
@@ -238,18 +200,10 @@ static inline Int32 send_msg(MsgHandle hMsg, struct sockaddr *srvAddr, const Msg
     Modification : Created function
 
 *****************************************************************************/
-Int32 msg_send(MsgHandle hMsg, const char *dstName, const void *data, Int32 dataLen)
+Int32 msg_send(MsgHandle hMsg, const char *dstName, const MsgHeader *header, Int32 flags)
 {
-	if(!hMsg || hMsg->fd < 0 || !data || dataLen < sizeof(MsgHeader))
+	if(!hMsg || !header || (header->type & MSG_SYNC_MARSK) != MSG_SYNC_HEAD)
 		return E_INVAL;
-
-	MsgHeader *header = (MsgHeader *)data;
-
-	if(header->magicNum != MSG_MAGIC_SEND && 
-		header->magicNum != MSG_MAGIC_RESP) {
-		ERR("invalid magic");
-		return E_CHECKSUM;
-	}
 
 	struct sockaddr_un *dstAddr;
 	struct sockaddr_un serverAddr;
@@ -260,7 +214,7 @@ Int32 msg_send(MsgHandle hMsg, const char *dstName, const void *data, Int32 data
 		serverAddr.sun_family = AF_UNIX;
 		strncpy(serverAddr.sun_path, dstName, sizeof(serverAddr.sun_path));
 		dstAddr = &serverAddr;
-	} else if(header->magicNum == MSG_MAGIC_SEND) {
+	} else if(header->type == MSG_TYPE_REQU) {
 		/* Use default dest name */
 		dstAddr = &hMsg->dstAddr;
 	} else {
@@ -269,15 +223,12 @@ Int32 msg_send(MsgHandle hMsg, const char *dstName, const void *data, Int32 data
 	}
 
 	/* Align send len */
-	dataLen = ROUND_UP(dataLen, MSG_LEN_ALIGN);
-	header->dataLen = ROUND_UP(header->dataLen, MSG_LEN_ALIGN);
-	if(dataLen < header->dataLen + sizeof(MsgHeader))
-		WARN("send msg, warning: dataLen: %d is smaller than msgHeader.dataLen: %d...",
-			dataLen, header->dataLen);
-	//DBG("send len: %d", dataLen);
-	if(sendto(hMsg->fd, data, dataLen, 0, 
-			(struct sockaddr *)dstAddr, sizeof(struct sockaddr_un)) != dataLen) {
-		ERRSTR("sendto data err");
+	Int32 transLen = sizeof(MsgHeader) + header->dataLen;
+
+	/* send data */
+	if(sendto(hMsg->fd, header, transLen, 0, 
+			(struct sockaddr *)dstAddr, sizeof(struct sockaddr_un)) != transLen) {
+		ERRSTR("<0> sendto data err");
 		return E_IO;
 	}
 	
@@ -302,51 +253,35 @@ Int32 msg_send(MsgHandle hMsg, const char *dstName, const void *data, Int32 data
     Modification : Created function
 
 *****************************************************************************/
-Int32 msg_recv(MsgHandle hMsg, void *buf, Int32 bufLen)
+Int32 msg_recv(MsgHandle hMsg, MsgHeader *header, Int32 bufLen, Int32 flags)
 {
-	if(!hMsg || !buf || bufLen < sizeof(MsgHeader))
+	if(!hMsg || !header || bufLen < sizeof(MsgHeader)) {
+		ERR("invalid value");	
 		return E_INVAL;
-
-    socklen_t len;  
-    len = sizeof(hMsg->recvAddr);
-	int rcvLen;
-	MsgHeader *header = (MsgHeader *)buf;
+	}
+	
+    socklen_t addrLen;  
+    addrLen = sizeof(hMsg->recvAddr);
+	int ret;
 
 	bzero(&hMsg->recvAddr.sun_path, sizeof(hMsg->recvAddr.sun_path));
-	rcvLen = recvfrom(hMsg->fd, buf, bufLen, 0, (struct sockaddr *)&hMsg->recvAddr, &len);
-	if(rcvLen < 0) {
-		//ERRSTR("recv header err");
-		return E_IO;
-	}
 
-	Int32 offset;
-	for(offset = 0; offset < rcvLen; offset += sizeof(Uint32)) {
-		/* Check header magic */
-		if( *(Uint32 *)(buf + offset) == MSG_MAGIC_SEND || 
-			*(Uint32 *)(buf + offset) == MSG_MAGIC_RESP ) {
-				break;
+	/* recv data */
+	do {
+		ret = recvfrom(hMsg->fd, header, bufLen, 0, (struct sockaddr *)&hMsg->recvAddr, &addrLen);
+		if(ret <= 0) {
+			ERRSTR("recv header err: %d", ret);
+			return E_TIMEOUT;
 		}
+	}while((header->type & MSG_SYNC_MARSK) != MSG_SYNC_HEAD);
+
+	/* we have recv in continous buffer */
+	if(ret < header->dataLen + sizeof(MsgHeader)) {
+		WARN("rcvlen %d is not equal to data len in header %d", ret, header->dataLen);
+		return E_TRANS;
 	}
-
-	if(offset >= rcvLen || rcvLen - offset < sizeof(MsgHeader)) {
-		ERR("can't sync header");
-		return E_CHECKSUM;
-	}
-
-	/* Skip invalid data */
-	if(offset) {
-		DBG("offset is %d", offset);
-		memmove(buf, buf + offset, offset);
-		rcvLen -= offset; //rcvLen = effective data len
-	}	
-
-	if(header->dataLen > rcvLen - sizeof(MsgHeader)) {
-		WARN("msg recv, warning: msgHeader.dataLen: %d is bigger than rcv len: %d!",
-			header->dataLen, rcvLen - sizeof(MsgHeader));
-		//return E_NOSPC;
-	}
-
-	return rcvLen;
+	
+	return E_NO;
 }
 
 

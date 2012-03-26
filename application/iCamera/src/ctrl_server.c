@@ -52,7 +52,7 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
-#define CTRL_MSG_BUF_LEN		(1 * 1024)
+#define CTRL_MSG_BUF_LEN		(2 * 1024 * 1024)
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -109,7 +109,7 @@ static void *ctrl_server_thread(void *arg)
 	/* start main loop */
 	while(!hCtrlSrv->exit) {		
 		/* recv msg */
-		ret = msg_recv(hCtrlSrv->hMsg, &hCtrlSrv->msgBuf, sizeof(CtrlMsg));
+		ret = msg_recv(hCtrlSrv->hMsg, (MsgHeader *)&hCtrlSrv->msgBuf, sizeof(CtrlMsg), 0);
 		if(ret < 0) {
 			ERR("ctrl thr recv msg err: %s", str_err(ret));
 			continue;
@@ -385,6 +385,10 @@ static void *ctrl_server_thread(void *arg)
 			/* TBD */
 			ret = E_NO;
 			break;
+		case ICAMCMD_S_UPDATE:
+			/* TBD */
+			ret = E_NO;
+			break;
 		default:
 			ERR("unkown cmd: 0x%X", (unsigned int)msgHdr->cmd);
 			ret = E_UNSUPT;
@@ -402,10 +406,10 @@ static void *ctrl_server_thread(void *arg)
 			else
 				msgHdr->dataLen = respLen;
 
-			DBG("reply msg to %s, len: %d, ret: %d", msg_get_recv_src(hCtrlSrv->hMsg), msgHdr->dataLen, msgHdr->param[0]);
-			msgHdr->magicNum = MSG_MAGIC_RESP;
+			DBG("reply msg to %s, len: %d, ret: %d", msg_get_recv_src(hCtrlSrv->hMsg), msgHdr->dataLen, (int)msgHdr->param[0]);
+			msgHdr->type = MSG_TYPE_RESP;
 			/* send back response */
-			ret = msg_send(hCtrlSrv->hMsg, NULL, &hCtrlSrv->msgBuf, msgHdr->dataLen + sizeof(MsgHeader));
+			ret = msg_send(hCtrlSrv->hMsg, NULL, (MsgHeader *)&hCtrlSrv->msgBuf, 0);
 			DBG("reply ret %d...", ret);
 		}
 	}

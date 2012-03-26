@@ -235,6 +235,36 @@ static Int32 data_capture_config(DataCapHandle hDataCap)
 	return E_NO;
 }
 
+static Int32 data_cap_ctrl(DataCapHandle hDataCap, CamCapCtrl ctrl)
+{
+	Int32 ret = E_NO;
+
+	/* stop capture */
+	if(ctrl == CAM_CAP_STOP || ctrl == CAM_CAP_RESTART) {
+		if(hDataCap->status & CAPTHR_STAT_CAP_STARTED) {
+			ret = capture_stop(hDataCap->hCap);
+			if(!ret)
+				hDataCap->status &= ~CAPTHR_STAT_CAP_STARTED;
+		}
+	}
+
+	/* start capture */
+	if(ctrl == CAM_CAP_START || ctrl == CAM_CAP_RESTART) {
+		if(!(hDataCap->status & CAPTHR_STAT_CAP_STARTED))
+			ret = capture_start(hDataCap->hCap);
+		if(!ret)
+			hDataCap->status |= CAPTHR_STAT_CAP_STARTED;
+	}
+
+	/* trigger capture */
+	if((ctrl == CAM_CAP_TRIG || ctrl == CAM_CAP_SPEC_TRIG) && 
+		(hDataCap->status & CAPTHR_STAT_CAP_STARTED)) {
+		hDataCap->encImg = TRUE; // capture next frame
+	}
+
+	return ret;
+}
+
 
 /*****************************************************************************
  Prototype    : capture_new_img
@@ -291,7 +321,7 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 	}
 	
 	/* send msg */
-	err = msg_send(hDataCap->hMsg, dstName, &imgMsg, sizeof(imgMsg));
+	err = msg_send(hDataCap->hMsg, dstName, (MsgHeader *)&imgMsg, 0);
 	//err = 1;
 	if(err) {
 		DBG("msg send err");
@@ -328,7 +358,7 @@ static Int32 msg_process(DataCapHandle hDataCap, CommonMsg *msgBuf)
 	Int32 		err;
 	MsgHeader 	*msgHdr = &msgBuf->header;
 	
-	err = msg_recv(hDataCap->hMsg, msgBuf, sizeof(CommonMsg));
+	err = msg_recv(hDataCap->hMsg, msgHdr, sizeof(CommonMsg), 0);
 	if(err < 0)
 		return err;
 
@@ -342,6 +372,9 @@ static Int32 msg_process(DataCapHandle hDataCap, CommonMsg *msgBuf)
 		break;
 	case APPCMD_SET_IMG_CONV:
 		err = converter_params_update(hDataCap->hConverter);
+		break;
+	case APPCMD_CAP_EN:
+		err = data_cap_ctrl(hDataCap, msgHdr->param[0]);
 		break;
 	case APPCMD_EXIT:
 		hDataCap->exit = TRUE;
@@ -532,9 +565,9 @@ static Int32 data_capture_send_cmd(DataCapHandle hDataCap, Uint16 cmd, MsgHandle
 	msg.cmd = cmd;
 	msg.dataLen = 0;
 	msg.index = 0;
-	msg.magicNum = MSG_MAGIC_SEND;
+	msg.type = MSG_TYPE_REQU;
 
-	err = msg_send(hCurMsg, msg_get_name(hDataCap->hMsg), &msg, sizeof(msg));
+	err = msg_send(hCurMsg, msg_get_name(hDataCap->hMsg), &msg, 0);
 	return err;
 }
 

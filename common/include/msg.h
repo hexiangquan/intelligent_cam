@@ -22,6 +22,18 @@
 #include "common.h"
 
 /*----------------------------------------------*
+ * macros                                       *
+ *----------------------------------------------*/
+
+#define MSG_MAX_DATA_LEN		(128 * 1024)	/* Maximum of data size to send */
+
+#define MSG_FLAG_NONBLK			(1 << 0)		/* create flag for non-blocking Send and Recv Msg */
+#define MSG_LEN_ALIGN			4				/* All msg len should be for bytes aligned */
+
+#define MSG_SYNC_HEAD			0xA55ABC00
+#define MSG_SYNC_MARSK			0xFFFFFF00
+
+/*----------------------------------------------*
  * external variables                           *
  *----------------------------------------------*/
 
@@ -34,13 +46,19 @@
  *----------------------------------------------*/
 typedef struct _MsgObj *MsgHandle;
 
+/* type of msg */
+enum MsgType{
+	MSG_TYPE_REQU = (MSG_SYNC_HEAD + 0x10),		/* request */
+	MSG_TYPE_RESP,								/* response */
+};
+
 /* Header of message */
 typedef struct _MsgHeader {
-	Uint32	magicNum;		/* Magic Number for sync */
+	Uint32	type;			/* type of msg */
 	Uint16	cmd;			/* Command Id */
 	Uint16	index;			/* Unique index of this command */
 	long	param[2];		/* General params */
-	Int32	dataLen;		/* Len of append data */
+	Uint32	dataLen;		/* Len of append data */
 	/* Int8 dataBuf[...] */		/* Append data should be add here */
 }MsgHeader;
 
@@ -55,17 +73,6 @@ typedef struct _MsgHeader {
 /*----------------------------------------------*
  * constants                                    *
  *----------------------------------------------*/
-
-/*----------------------------------------------*
- * macros                                       *
- *----------------------------------------------*/
-#define MSG_MAGIC_SEND			0x20120FED		/* Magic num for request msg */
-#define MSG_MAGIC_RESP			0x20120BAC		/* Magic num for response msg */
-
-#define MSG_MAX_DATA_LEN		(128 * 1024)	/* Maximum of data size to send */
-
-#define MSG_FLAG_NONBLK			(1 << 0)		/* Flag for non-blocking Send and Recv Msg */
-#define MSG_LEN_ALIGN			4				/* All msg len should be for bytes aligned */
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -94,7 +101,7 @@ extern "C"{
     Modification : Created function
 
 *****************************************************************************/
-extern MsgHandle msg_create(const Int8 *srcName, const Int8 *dstName, Int32 flag);
+extern MsgHandle msg_create(const Int8 *srcName, const Int8 *dstName, Int32 flags);
 
 /*****************************************************************************
  Prototype    : msg_delete
@@ -117,9 +124,10 @@ extern Int32 msg_delete(MsgHandle hMsg);
  Prototype    : msg_recv
  Description  : Recv a msg
  Input        : 	MsgHandle hMsg, handle created by msg_create     
-                	Int32 bufLen, len of dataBuf, must no less than sizeof(MsgHeader)      
- Output       :  void *dataBuf, buffer for header and append data, if any
- 			the first field of this buffer will be filled with MsgHeader
+                	Int32 bufLen, len of whole msg buffer, including the msg header, must no less than sizeof(MsgHeader) ,      
+			Int32 flags, reserved, should be set to zero
+ Output       :  MsgHeader *header, buffer for header,  if there is append data, this data will put after header
+ 			
  Return Value : common error code
  Calls        : 
  Called By    : 
@@ -130,7 +138,7 @@ extern Int32 msg_delete(MsgHandle hMsg);
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 msg_recv(MsgHandle hMsg, void *buf, Int32 bufLen);
+extern Int32 msg_recv(MsgHandle hMsg, MsgHeader *header, Int32 bufLen, Int32 flags);
 
 /*****************************************************************************
  Prototype    : msg_send
@@ -140,16 +148,11 @@ extern Int32 msg_recv(MsgHandle hMsg, void *buf, Int32 bufLen);
                 	const char *dstName,  name of dest, must have been created by msg_create     
 					if this is set to NULL, the module use default dest name when send request, 
 					or use last msg recv name when send reply
- 
-                	const void *data, data to send, include header and append data, must contain header as the 
-                			first field, i.e., define this structure 
-                			struct MsgData {
-						MsgHeader 	header;
-						Int8			buf[128];
-                			}
-                	Int32 dataLen, length of data to send, Unit bytes, including the header
-                			normally, it is equal to sizeof(MsgHeader) + header.dataLen, 
-                			should be 4 bytes aligned 
+
+ 			const MsgHeader *header, header to send, if header->dataLen > 0 the fxn will
+ 					put the append data after header, so header and append data must be continous
+               
+                	Int32 flags, reserved , should be set to zero
  Output       : None
  Return Value : fails: common error code, success: num of bytes received 
  Calls        : 
@@ -161,7 +164,7 @@ extern Int32 msg_recv(MsgHandle hMsg, void *buf, Int32 bufLen);
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 msg_send(MsgHandle hMsg, const char *dstName, const void *data, Int32 dataLen);
+extern Int32 msg_send(MsgHandle hMsg,const char *dstName, const MsgHeader *header, Int32 flags);
 
 /*****************************************************************************
  Prototype    : msg_set_recv_timeout

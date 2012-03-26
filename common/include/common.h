@@ -51,6 +51,7 @@
 #define E_INVPASSWD		(-16)	// Invalid password
 #define E_AGAIN			(-17)	// Unkwon error, May retry
 #define E_UNSUPT		(-18)	// Unsupported operation
+#define E_REBOOT		(-19)	//system need reboot
 
 /* Some common defines */
 #if 0

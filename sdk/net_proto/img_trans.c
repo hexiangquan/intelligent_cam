@@ -1,13 +1,72 @@
+/******************************************************************************
+
+  Copyright (C), 2001-2011, DCN Co., Ltd.
+
+ ******************************************************************************
+  File Name     : img_trans.c
+  Version       : Initial Draft
+  Author        : Sun
+  Created       : 2012/3/23
+  Last Modified :
+  Description   : protocol stack for image upload using own TCP protocol
+  Function List :
+              img_trans_connect
+              img_trans_create
+              img_trans_delete
+              img_trans_disconnect
+              img_trans_send
+              img_trans_set_src_desp
+              img_trans_set_srv_info
+  History       :
+  1.Date        : 2012/3/23
+    Author      : Sun
+    Modification: Created file
+
+******************************************************************************/
 #include "img_trans.h"
 #include "net_utils.h"
 #include "log.h"
 
+/*----------------------------------------------*
+ * external variables                           *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * external routine prototypes                  *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * internal routine prototypes                  *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * project-wide global variables                *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * module-wide global variables                 *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * constants                                    *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * macros                                       *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * routines' implementations                    *
+ *----------------------------------------------*/
+
+/* header for sync */
 typedef struct {
 	Int8		syncStart[4];		// sync start, "<I> " (0x3C, 0x49, 0x3E, 0x20)
 	Int8		imageSource[16];	// src of image 
 	ImgHdrInfo	info;
 }ImgTransHeader;
 
+/* object of this module */
 struct ImgTransObj {
 	Int32				sock;
 	struct sockaddr_in	srvAddr;
@@ -19,6 +78,23 @@ struct ImgTransObj {
 
 
 
+/*****************************************************************************
+ Prototype    : img_trans_set_srv_info
+ Description  : set server IP, port
+ Input        : ImgTransHandle hTrans  
+                const char *ipString   
+                Uint16 port            
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/23
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
 Int32 img_trans_set_srv_info(ImgTransHandle hTrans, const char *ipString, Uint16 port)
 {
 	struct sockaddr_in *addr = &hTrans->srvAddr;
@@ -42,6 +118,25 @@ Int32 img_trans_set_srv_info(ImgTransHandle hTrans, const char *ipString, Uint16
 	return E_NO;
 }
 
+/*****************************************************************************
+ Prototype    : img_trans_create
+ Description  : create module
+ Input        : const char *ipString  
+                Uint16 port           
+                const char *srcDesp   
+                Uint32 timeout        
+                Int32 flags           
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/23
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
 ImgTransHandle img_trans_create(const char *ipString, Uint16 port, const char *srcDesp, Uint32 timeout, Int32 flags)
 {
 	ImgTransHandle	hTrans;
@@ -70,6 +165,21 @@ ImgTransHandle img_trans_create(const char *ipString, Uint16 port, const char *s
 	return hTrans;
 }
 
+/*****************************************************************************
+ Prototype    : img_trans_delete
+ Description  : delete module
+ Input        : ImgTransHandle hTrans  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/23
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
 Int32 img_trans_delete(ImgTransHandle hTrans)
 {
 	if(hTrans->connected)
@@ -82,6 +192,22 @@ Int32 img_trans_delete(ImgTransHandle hTrans)
 	return E_NO;
 }
 
+/*****************************************************************************
+ Prototype    : img_trans_connect
+ Description  : connect server
+ Input        : ImgTransHandle hTrans  
+                Uint32 timeoutSec      
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/23
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
 Int32 img_trans_connect(ImgTransHandle hTrans, Uint32 timeoutSec)
 {
 	Int32 sock, ret;
@@ -120,6 +246,21 @@ Int32 img_trans_connect(ImgTransHandle hTrans, Uint32 timeoutSec)
 	return E_NO;
 }
 
+/*****************************************************************************
+ Prototype    : img_trans_disconnect
+ Description  : disconnect server
+ Input        : ImgTransHandle hTrans  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/23
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
 Int32 img_trans_disconnect(ImgTransHandle hTrans)
 {
 	if(!hTrans)
@@ -135,6 +276,23 @@ Int32 img_trans_disconnect(ImgTransHandle hTrans)
 	
 	return E_NO;
 }
+/*****************************************************************************
+ Prototype    : img_trans_send
+ Description  : send image
+ Input        : ImgTransHandle hTrans   
+                const ImgHdrInfo *info  
+                const void *data        
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/23
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
 Int32 img_trans_send(ImgTransHandle hTrans, const ImgHdrInfo *info, const void *data)
 {
 	const Int8 	syncEnd[] = {0x3C, 0x2F, 0x49, 0x3E};
@@ -161,6 +319,22 @@ Int32 img_trans_send(ImgTransHandle hTrans, const ImgHdrInfo *info, const void *
 	return E_TRANS;
 }
 
+/*****************************************************************************
+ Prototype    : img_trans_set_src_desp
+ Description  : set our description
+ Input        : ImgTransHandle hTrans  
+                const char *srcDesp    
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/23
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
 Int32 img_trans_set_src_desp(ImgTransHandle hTrans, const char *srcDesp)
 {
 	if(!hTrans || !srcDesp)

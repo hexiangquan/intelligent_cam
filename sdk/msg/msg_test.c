@@ -1,6 +1,7 @@
 #include "msg.h"
 #include "log.h"
 #include <pthread.h>
+#include "sysnet.h"
 
 #define BASE_NAME		"/tmp/msgtest"
 #define DEF_MSG_SIZE	1024
@@ -13,7 +14,7 @@
 
 
 //#define DEF_USE_THR		1
-#define PARENT_ONLY
+//#define PARENT_ONLY
 
 typedef struct _TestParams {
 	char *baseName;
@@ -31,7 +32,7 @@ typedef struct _TaskEnv {
 
 typedef struct _MsgData {
 	MsgHeader	header;
-	char		buf[512];
+	char		buf[1024];
 }MsgData;
 
 #ifdef DEF_USE_THR
@@ -57,14 +58,14 @@ static void *thr_msg(void *arg)
 	memset(&msgData, 0, sizeof(msgData));
 	msgData.header.cmd = cnt;
 	msgData.header.index = cnt;
-	msgData.header.magicNum = MSG_MAGIC_SEND;
+	msgData.header.type = MSG_TYPE_REQU;
 	msgData.header.dataLen = sprintf(msgData.buf, "%s start", env->name);
 	dataLen = msgData.header.dataLen + sizeof(msgData.header);	
 	//msgData.header.dataLen += 16;
 
 	if(env->id) {
 		DBG("send msg to %s", env->dest);
-		err = msg_send(hMsg, env->dest, &msgData, dataLen);
+		err = msg_send(hMsg, env->dest, &msgData.header, 0);
 		if(err < 0)
 			DBG("send msg returns %d", err);
 	}
@@ -79,7 +80,7 @@ static void *thr_msg(void *arg)
 	while(1) {
 		/* Do echo loop */
 		gettimeofday(&tmStart,NULL);
-		err = msg_recv(hMsg, &msgData, sizeof(msgData));
+		err = msg_recv(hMsg, &msgData.header, sizeof(MsgData), 0);
 		gettimeofday(&tmEnd,NULL); 
 		
 		if(err > 0) {
@@ -95,12 +96,12 @@ static void *thr_msg(void *arg)
 		/* Send back data */
 		sprintf(msgData.buf, "<%d> %s send msg", cnt, env->name);
 		msgData.header.dataLen = sizeof(msgData.buf);
-		msgData.header.magicNum = MSG_MAGIC_RESP;
+		msgData.header.type  = MSG_TYPE_RESP;
 		msgData.header.index = cnt;
 		dataLen = msgData.header.dataLen + sizeof(msgData.header);
 
 		gettimeofday(&tmStart,NULL);
-		err = msg_send(hMsg, NULL, &msgData, dataLen);
+		err = msg_send(hMsg, NULL, &msgData.header, 0);
 		gettimeofday(&tmEnd,NULL); 
 		if(err)
 			ERR("Send msg failed");
@@ -125,12 +126,78 @@ exit:
 }
 
 
+static Int32 raw_trans_test()
+{
+	Int8 bufTx[1024], bufRx[1024];
+	
+	MsgHandle hMsgTx = msg_create("/tmp/RawSend", "/tmp/RawRecv", 0);
+	MsgHandle hMsgRx = msg_create("/tmp/RawRecv", "/tmp/RawSend", 0);
+	assert(hMsgTx && hMsgRx);
+	int fdTx, fdRx;
+
+	fdTx = msg_get_fd(hMsgTx);
+	fdRx = msg_get_fd(hMsgRx);
+
+	Int32 i;
+
+	for(i = 0; i < sizeof(bufTx); i++) {
+		bufTx[i] = i;
+	}
+
+	struct sockaddr_un serverAddr;
+	memset(&serverAddr, 0, sizeof(serverAddr));
+	serverAddr.sun_family = AF_UNIX;
+	strncpy(serverAddr.sun_path, "/tmp/RawRecv", sizeof(serverAddr.sun_path));
+	
+	if(sendto( fdTx, bufTx, 64, 0, 
+			(struct sockaddr *)&serverAddr, sizeof(serverAddr)) != 64) {
+			ERRSTR("<0> sendto data err");
+			return E_IO;
+	}
+
+	
+	if(sendto( fdTx, bufTx, 128, 0, 
+				(struct sockaddr *)&serverAddr, sizeof(serverAddr)) != 128) {
+		ERRSTR("<1> sendto data err");
+		return E_IO;
+	}
+
+	
+	if(sendto( fdTx, bufTx, 256, 0, 
+				(struct sockaddr *)&serverAddr, sizeof(serverAddr)) != 256) {
+		ERRSTR("<2> sendto data err");
+		return E_IO;
+	}
+
+	Int32 rcv;
+	socklen_t len;  
+    len = sizeof(serverAddr);
+
+	rcv = recvfrom(fdRx, bufRx, 512, 0, (struct sockaddr *)&serverAddr, &len);
+	DBG("recv len %d", rcv);
+	rcv = recvfrom(fdRx, bufRx, 512, 0, (struct sockaddr *)&serverAddr, &len);
+	DBG("recv len %d", rcv);
+	rcv = recvfrom(fdRx, bufRx, 512, 0, (struct sockaddr *)&serverAddr, &len);
+	DBG("recv len %d", rcv);
+
+
+	msg_delete(hMsgTx);
+
+	msg_delete(hMsgRx);
+
+	return E_NO;
+	
+}
+
 static Bool main_loop(TestParams *params)
 {
 	Bool ret = FALSE;
 	pthread_t *pid = calloc(params->thrNum, sizeof(pthread_t));
 
 	int i;
+
+	raw_trans_test();
+	
 	for(i = 0; i < params->thrNum; i++) {
 		TaskEnv *env = malloc(sizeof(TaskEnv));
 		if(!env) {
@@ -201,17 +268,18 @@ static Bool main_loop(TestParams *params)
 			memset(&msgData0.buf, 0, sizeof(msgData0.buf));
 			msgData0.header.cmd = cnt0;
 			msgData0.header.index = cnt0;
-			msgData0.header.magicNum = MSG_MAGIC_SEND;
-			msgData0.header.dataLen = sprintf(msgData0.buf, "child msg [%d]", cnt0);
+			msgData0.header.type = MSG_TYPE_REQU;
+			msgData0.header.dataLen = sprintf(msgData0.buf, "child msg [%d]", cnt0) + 1;
+			//msgData0.header.dataLen= ROUND_UP(msgData0.header.dataLen,4);
 			dataLen0 = msgData0.header.dataLen + sizeof(msgData0.header);	
 
-			err0 = msg_send(hMsg0, NULL, &msgData0, dataLen0);
+			err0 = msg_send(hMsg0, NULL, &msgData0.header, 0);
 			if(err0)
-				ERR("<%d> send msg err", cnt0);
+				ERR("<%d> child send msg err", cnt0);
 			else
-				DBG("<%d> send msg ok...", cnt0);
+				DBG("<%d> child send msg ok...", cnt0);
 
-			err0 = msg_recv(hMsg0, &msgData0, sizeof(msgData0));
+			err0 = msg_recv(hMsg0, &msgData0.header, sizeof(msgData0), 0);
 			if(err0 < 0) {
 				ERR("child wait reply err");
 			} else 
@@ -236,16 +304,16 @@ static Bool main_loop(TestParams *params)
 		/* we just send msg */
 		Int32 cnt1;
 		MsgData	msgData1;
-		Int32 err1, dataLen1;
+		Int32 err1;
 
 		DBG("msg test server start...");
 		
 		for(cnt1 = 0; cnt1 < params->loopCnt; cnt1++) {
 			memset(&msgData1.buf, 0, sizeof(msgData1.buf));
 
-			err1 = msg_recv(hMsg1, &msgData1, sizeof(msgData1));
+			err1 = msg_recv(hMsg1, &msgData1.header, sizeof(msgData1), 0);
 			if(err1 < 0) {
-				ERR("<%d> recv msg err", cnt1);
+				ERR("<%d> parent recv msg err", cnt1);
 				continue;
 			}
 			else
@@ -254,10 +322,12 @@ static Bool main_loop(TestParams *params)
 			usleep(100000);
 
 			/* reply msg */
-			msgData1.header.magicNum = MSG_MAGIC_RESP;
-			err1 = msg_send(hMsg1, NULL, &msgData1, sizeof(msgData1));
+			msgData1.header.type = MSG_TYPE_RESP;
+			err1 = msg_send(hMsg1, NULL, &msgData1.header, 0);
 			if(err1 < 0)
 				ERR("<%d> send reply msg err", cnt1);
+			else
+				DBG("<%d> parent reply msg ok");
 		}
 
 		DBG("parent exit");

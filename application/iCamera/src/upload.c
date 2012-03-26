@@ -145,7 +145,7 @@ static void *upload_thread(void *arg)
 		}
 				
 		/* recv msg */
-		ret = msg_recv(hMsg, &msgBuf, sizeof(msgBuf));
+		ret = msg_recv(hMsg, (MsgHeader *)&msgBuf, sizeof(msgBuf), 0);
 		if(ret < 0) {
 			//ERR("recv msg err: %s", str_err(ret));
 			continue;
@@ -290,14 +290,8 @@ Int32 upload_delete(UploadHandle hUpload, MsgHandle hCurMsg)
 	if(hUpload->pid) {
 		hUpload->exit = TRUE;
 		if(hCurMsg) {
-			MsgHeader msg;
-
 			/* send msg to our thread to exit */
-			msg.cmd = APPCMD_EXIT;
-			msg.index = 0;
-			msg.dataLen = 0;
-			msg.magicNum = MSG_MAGIC_SEND;
-			msg_send(hCurMsg, hUpload->msgName, &msg, sizeof(msg));
+			app_hdr_msg_send(hCurMsg, hUpload->msgName, APPCMD_EXIT, 0, 0);
 		}
 
 		pthread_join(hUpload->pid, NULL);	
@@ -641,7 +635,7 @@ Int32 upload_run(UploadHandle hUpload, MsgHandle hCurMsg, const ImgMsg *data)
 		Int32 err = E_CONNECT;
 		/* send to upload thread */
 		if(hUpload->isConnected)
-			err = msg_send(hCurMsg, hUpload->msgName, data, sizeof(ImgMsg));
+			err = msg_send(hCurMsg, hUpload->msgName, (MsgHeader *)data, 0);
 		if(err) {
 			/* save if server is not connected or send msg err */
 			err = upload_save_frame(hUpload, data);

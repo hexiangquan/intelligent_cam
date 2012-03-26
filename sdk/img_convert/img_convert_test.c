@@ -96,7 +96,7 @@ static void *conv_thread(void *arg)
 
 	while(!*(params->exit)) {
 		//DBG("%s start recv msg", params->msgName);
-		Int32 err = msg_recv(hMsg, &msg, sizeof(msg));
+		Int32 err = msg_recv(hMsg, (MsgHeader *)&msg, sizeof(msg), 0);
 
 		//DBG("%s recv msg, index: %d", params->msgName, msg.frame.index);
 		if(err < 0) {
@@ -133,7 +133,7 @@ static void *conv_thread(void *arg)
 			DBG("%s  img convert cost: %.2f ms", params->msgName, timeUse/1000);
 
 		msg.hdr.cmd = 1;
-		err = msg_send(hMsg, NULL, &msg, sizeof(msg));
+		err = msg_send(hMsg, NULL, (MsgHeader *)&msg, 0);
 		assert(err == E_NO);
 	}
 
@@ -402,12 +402,12 @@ static Bool main_loop(TestParams *params)
 				(unsigned int)frameBuf.timeStamp.tv_sec, (unsigned int)frameBuf.timeStamp.tv_usec);
 			msg.frame = frameBuf;
 	#ifndef CONV_IN_CAP_THR
-			ret = msg_send(hMsg, NULL, &msg, sizeof(msg));
+			ret = msg_send(hMsg, NULL, (MsgHeader *)&msg, 0);
 			assert(ret == E_NO);
 			if(ret)
 				capture_free_frame(hCapture, &frameBuf);
 			
-			ret = msg_send(hMsg, THR_MSG_NAME1, &msg, sizeof(msg));
+			ret = msg_send(hMsg, THR_MSG_NAME1, (MsgHeader *)&msg, 0);
 			assert(ret == E_NO);
 			if(ret)
 				capture_free_frame(hCapture, &frameBuf);
@@ -437,7 +437,7 @@ static Bool main_loop(TestParams *params)
 
 		if(FD_ISSET(fdMsg, &rdSet)) {
 			//DBG("%s free frame", params->msgName);
-			err = msg_recv(hMsg, &msg, sizeof(msg));
+			err = msg_recv(hMsg, (MsgHeader *)&msg, sizeof(msg), 0);
 			if(err != sizeof(msg) || msg.hdr.cmd != 1) {
 				ERR("recv msg err");
 			}else {
@@ -512,8 +512,8 @@ static Bool main_loop(TestParams *params)
 	exit = TRUE;
 #ifndef CONV_IN_CAP_THR
 
-	ret = msg_send(hMsg, NULL, &msg, sizeof(msg));
-	msg_send(hMsg, THR_MSG_NAME1, &msg, sizeof(msg));
+	ret = msg_send(hMsg, NULL, (MsgHeader *)&msg, 0);
+	msg_send(hMsg, THR_MSG_NAME1, (MsgHeader *)&msg, 0);
 	pthread_join(pid[0], NULL);
 	pthread_join(pid[1], NULL);
 	

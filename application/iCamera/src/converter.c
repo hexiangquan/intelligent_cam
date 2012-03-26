@@ -226,7 +226,7 @@ Int32 converter_run(ConverterHandle hConverter, FrameBuf *rawBuf, Int32 streamId
 	imgMsg->hBuf = hBufOut;
 	imgMsg->index = rawBuf->index;
 	imgMsg->header.cmd = APPCMD_NEW_DATA;
-	imgMsg->header.magicNum = MSG_MAGIC_SEND;
+	imgMsg->header.type = MSG_TYPE_REQU;
 	imgMsg->header.index = 0;
 	imgMsg->header.dataLen = sizeof(ImgMsg) - sizeof(MsgHeader);
 

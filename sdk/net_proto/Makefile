@@ -8,8 +8,8 @@ STATIC=0
 
 LIB_PATH = lib
 LIB_NAME = netproto
-LIB_SRC = img_trans.c
-LIB_HEADER = img_trans.h
+LIB_SRC = img_trans.c tcp_cmd_trans.c
+LIB_HEADER = img_trans.h tcp_cmd_trans.h
 LIB_OBJ=$(addprefix $(LIB_PATH)/, $(addsuffix .o, $(basename $(LIB_SRC))))
 
 INC_DIR := $(SDK_INC_DIR)

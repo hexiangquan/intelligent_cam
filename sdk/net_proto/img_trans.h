@@ -32,21 +32,26 @@ extern "C"{
 #endif
 #endif /* __cplusplus */
 
+/* create module */
 extern ImgTransHandle img_trans_create(const char *ipString, Uint16 port, const char *srcDesp, Uint32 timeout, Int32 flags);
 
+/* delete module */
 extern Int32 img_trans_delete(ImgTransHandle hTrans);
 
+/* set server IP, port */
 extern Int32 img_trans_set_srv_info(ImgTransHandle hTrans, const char *ipString, Uint16 port);
 
+/* connect server */
 extern Int32 img_trans_connect(ImgTransHandle hTrans, Uint32 timeoutSec);
 
+/* disconnect server */
 extern Int32 img_trans_disconnect(ImgTransHandle hTrans);
 
+/* send image */
 extern Int32 img_trans_send(ImgTransHandle hTrans, const ImgHdrInfo *info, const void *data);
 
+/* set our description */
 extern Int32 img_trans_set_src_desp(ImgTransHandle hTrans, const char *srcDesp);
-
-extern Int32 img_trans_set_srv_info(ImgTransHandle hTrans, const char *ipString, Uint16 port);
 
 #ifdef __cplusplus
 #if __cplusplus

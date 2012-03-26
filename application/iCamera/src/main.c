@@ -377,7 +377,7 @@ static Int32 main_loop(MainEnv *envp)
 		/* feed dog */
 
 		/* recv msg */
-		status = msg_recv(hMsg, &msgBuf, sizeof(msgBuf));
+		status = msg_recv(hMsg, (MsgHeader *)&msgBuf, sizeof(msgBuf), 0);
 		if(status > 0) {
 			msg_process(&msgBuf, envp);
 		}
@@ -514,9 +514,9 @@ Int32 app_hdr_msg_send(MsgHandle hMsg, const char *dstName, Uint16 cmd, Int32 pa
 	msg.dataLen = 0;
 	msg.param[0] = param0;
 	msg.param[1] = param1;
-	msg.magicNum = MSG_MAGIC_SEND;
+	msg.type = MSG_TYPE_REQU;
 	msg.index = 0;
 
-	return msg_send(hMsg, dstName, &msg, sizeof(msg));
+	return msg_send(hMsg, dstName, &msg, 0);
 }
 

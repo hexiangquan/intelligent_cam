@@ -428,7 +428,7 @@ static Int32 msg_process(EncoderHandle hEnc, CommonMsg *msgBuf)
 	Int32 ret;
 
 	/* recv msg */
-	ret = msg_recv(hEnc->hMsg, msgBuf, sizeof(CommonMsg));
+	ret = msg_recv(hEnc->hMsg, (MsgHeader *)msgBuf, sizeof(CommonMsg), 0);
 	if(ret < 0) {
 		ERR("img enc thr recv msg err: %s", str_err(ret));
 		return ret;
@@ -578,8 +578,8 @@ Int32 encoder_delete(EncoderHandle hEnc, MsgHandle hCurMsg)
 			msg.cmd = APPCMD_EXIT;
 			msg.index = 0;
 			msg.dataLen = 0;
-			msg.magicNum = MSG_MAGIC_SEND;
-			msg_send(hCurMsg, msg_get_name(hEnc->hMsg), &msg, sizeof(msg));
+			msg.type = MSG_TYPE_REQU;
+			msg_send(hCurMsg, msg_get_name(hEnc->hMsg), &msg, 0);
 		}
 
 		/* set flag to exit */
@@ -668,8 +668,8 @@ Int32 encoder_set_enc_params(EncoderHandle hEnc, MsgHandle hCurMsg)
 		msg.cmd = APPCMD_SET_ENC_PARAMS;
 		msg.index = 0;
 		msg.dataLen = 0;
-		msg.magicNum = MSG_MAGIC_SEND;
-		ret = msg_send(hCurMsg, msg_get_name(hEnc->hMsg), &msg, sizeof(msg));
+		msg.type = MSG_TYPE_REQU;
+		ret = msg_send(hCurMsg, msg_get_name(hEnc->hMsg), &msg, 0);
 	}
 
 	return ret;

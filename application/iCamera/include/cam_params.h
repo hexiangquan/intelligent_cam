@@ -574,8 +574,19 @@ typedef enum {
 	CAM_CAP_STOP = 0,
 	CAM_CAP_START = 1,
 	CAM_CAP_RESTART = 2,
+	CAM_CAP_TRIG = 3,
+	CAM_CAP_SPEC_TRIG = 4,
 	CAM_CAP_MAX,
 }CamCapCtrl;
+
+/*
+ * firmware type
+ */
+typedef enum {
+	CAM_UPDATE_ARM = 0,
+	CAM_UPDATE_DSP,
+	CAM_UPDATE_FPGA,
+}CamUpdateType;
 
 /*
  * Cam local file params 
