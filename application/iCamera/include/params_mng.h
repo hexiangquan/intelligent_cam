@@ -153,6 +153,7 @@ typedef enum {
 	PMCMD_G_AVPARAMS,
 	PMCMD_S_SPECCAPPARAMS,
 	PMCMD_G_SPECCAPPARAMS,
+	PMCMD_S_RESTOREDEFAULT,
 	PMCMD_MAX0,
 
 	/* thread module cmds */
@@ -160,6 +161,7 @@ typedef enum {
 	PMCMD_G_2NDSTREAMATTRS,
 	PMCMD_G_JPGENCDYN,
 	PMCMD_S_CAPINFO,	/* This cmd should be set before any other thread cmds */
+	PMCMD_G_CAPINFO,
 	PMCMD_G_IMGOSDDYN,
 	PMCMD_G_H264ENCDYN,
 	PMCMD_G_VIDOSDDYN,

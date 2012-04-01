@@ -5,6 +5,7 @@
 #include "buffer.h"
 #include "cam_params.h"
 #include "capture.h"
+#include "cap_info.h"
 
 #define MSG_MAX_LEN		1024
 
@@ -68,6 +69,7 @@ typedef struct _ImgMsg {
 	ImgDimension	dimension;			/* Format info of image */
 	CamDateTime		timeStamp;			/* Capture time */
 	Int32			frameType;			/* Frame type for video */
+	CaptureInfo		capInfo;			/* capture info of this frame */
 }ImgMsg;
 
 #ifdef __cplusplus

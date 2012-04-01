@@ -5,7 +5,7 @@
 #include "log.h"
 #include "app_msg.h"
 
-#define TEST_SAVE_TIME	
+//#define TEST_SAVE_TIME	
 
 /*****************************************************************************
  Prototype    : jpg_encoder_process
@@ -82,7 +82,7 @@ Int32 jpg_encoder_save_frame(IN const ImgMsg *msg, IN const char *path)
 
 	/* only save jpeg */
 	if(msg->dimension.colorSpace != FMT_JPG) {
-		ERR("not a jpeg file");
+		//ERR("not a jpeg file");
 		return E_UNSUPT;
 	}
 

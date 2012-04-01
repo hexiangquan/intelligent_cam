@@ -270,7 +270,7 @@ Int32 msg_recv(MsgHandle hMsg, MsgHeader *header, Int32 bufLen, Int32 flags)
 	do {
 		ret = recvfrom(hMsg->fd, header, bufLen, 0, (struct sockaddr *)&hMsg->recvAddr, &addrLen);
 		if(ret <= 0) {
-			ERRSTR("recv header err: %d", ret);
+			//ERRSTR("recv header err: %d", ret);
 			return E_TIMEOUT;
 		}
 	}while((header->type & MSG_SYNC_MARSK) != MSG_SYNC_HEAD);

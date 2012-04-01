@@ -75,6 +75,7 @@ struct EncoderObj {
 	UploadHandle		hUpload;
 	AlgHandle			hEncode;
 	MsgHandle			hMsg;
+	BufPoolHandle		hPoolIn;
 	OsdHandle			hOsd;
 	CamOsdInfo			osdInfo;
 	BufHandle			hBufEnc;		//buffer for encode out
@@ -239,6 +240,7 @@ static Int32 encode_frame(EncoderHandle hEnc, ImgMsg *msg)
 	hBufIn = msg->hBuf;
 	inBuf.buf = buffer_get_user_addr(hBufIn);
 	inBuf.bufSize = buffer_get_bytes_used(hBufIn);
+	hEnc->hPoolIn = buffer_get_pool(hBufIn);
 	
 	if(hEnc->hPoolEnc) {
 		/* Alloc buffer for encoded data */
@@ -290,7 +292,7 @@ static Int32 encode_frame(EncoderHandle hEnc, ImgMsg *msg)
 		goto err_quit;
 	}
 
-	DBG("<%d> %s encode ok", msg->index, hEnc->name);
+	//DBG("<%d> %s encode ok", msg->index, hEnc->name);
 
 	return E_NO;
 
@@ -603,6 +605,9 @@ Int32 encoder_delete(EncoderHandle hEnc, MsgHandle hCurMsg)
 
 	if(hEnc->hMsg)
 		msg_delete(hEnc->hMsg);
+
+	if(hEnc->hPoolIn)
+		buf_pool_free_all(hEnc->hPoolIn);
 
 	free(hEnc);
 

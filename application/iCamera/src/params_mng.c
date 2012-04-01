@@ -418,10 +418,11 @@ static Int32 set_img_enc_params(ParamsMngHandle hParamsMng, void *data, Int32 si
 	/* Validate data */
 	CamImgEncParams *params = (CamImgEncParams *)data;
 
-	if( params->encQuality > 100 || 
-		(params->rotation != 0 && params->rotation != 90 && params->rotation != 270) ||
+	if( params->encQuality > 97 || params->encQuality < 10 || 
+		(params->rotation != 0 && params->rotation != 90 && 
+		params->rotation != 180 && params->rotation != 270) ||
 		!ALIGNED(params->width, 16) || !ALIGNED(params->height, 8)) {
-		ERR("invalid img enc params, rotation must be 0, 90 or 270, qaulity must less than 100, width must multi of 16");
+		ERR("invalid img enc params, rotation must be 0, 90 or 270, qaulity must between 10 and 98, width must multi of 16");
 		return E_INVAL;
 	}
 
@@ -603,6 +604,11 @@ static Int32 set_h264_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 		params->QPMin > 51 || params->QPMax > 51) {
 		ERR("invalid h264 params");
 		return E_INVAL;
+	}
+
+	if(params->bitRate > CAM_H264_MAX_BIT_RATE) {
+		WARN("bit rate too big, set to max value: %d", CAM_H264_MAX_BIT_RATE);
+		params->bitRate= CAM_H264_MAX_BIT_RATE;
 	}
 
 	hParamsMng->appParams.h264EncParams = *params;
@@ -945,6 +951,10 @@ static Int32 get_h264_enc_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 	if(appCfg->h264EncParams.forceIFrame)
 		dynParams->forceFrame = VID_I_FRAME;
 	dynParams->maxBitrateCVBR = appCfg->h264EncParams.bitRate * 2000;
+	if(dynParams->maxBitrateCVBR > CAM_H264_MAX_BIT_RATE * 1000) 
+		dynParams->maxBitrateCVBR = CAM_H264_MAX_BIT_RATE * 1000;
+
+	DBG("bit rate: %d, max %d", dynParams->targetBitRate, dynParams->maxBitrateCVBR);
 	
 	return E_NO;
 }
@@ -1077,6 +1087,38 @@ static Int32 set_cap_input_info(ParamsMngHandle hParamsMng, void *data, Int32 si
 	
 	return E_NO;
 }
+
+/*****************************************************************************
+ Prototype    : get_cap_input_info
+ Description  : get capture input info
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/28
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_cap_input_info(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(CamInputInfo)) 
+		return E_INVAL;
+
+	/* if capture info is not set, tell app to call later */
+	if(!(hParamsMng->flags & PM_FLAG_CAPINFO_SET))
+		return E_AGAIN;
+	
+	*(CapInputInfo *)data = hParamsMng->capInputInfo;
+	
+	return E_NO;
+}
+
 
 /*****************************************************************************
  Prototype    : get_version_info
@@ -2625,6 +2667,34 @@ static Int32 get_vid_upload_proto(ParamsMngHandle hParamsMng, void *data, Int32 
 	return E_NO;
 }
 
+/*****************************************************************************
+ Prototype    : restore_default
+ Description  : restore to default params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/28
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 restore_default(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	AppParams *appCfg = &hParamsMng->appParams;
+	
+	/* Restore to default params */
+	INFO("restore to default params!!!");
+	*appCfg = c_appParamsDef;
+
+	return E_NO;
+}
+
 
 /* tables for control fxns */
 static const PmCtrlInfo g_paramsConfig[] = {
@@ -2681,6 +2751,7 @@ static const PmCtrlInfo g_paramsConfig[] = {
 	{.cmd = PMCMD_G_AVPARAMS, .fxn = get_av_params,},
 	{.cmd = PMCMD_S_SPECCAPPARAMS, .fxn = set_spec_cap_params,},
 	{.cmd = PMCMD_G_SPECCAPPARAMS, .fxn = get_spec_cap_params,},
+	{.cmd = PMCMD_S_RESTOREDEFAULT, .fxn = restore_default,},
 	{.cmd = PMCMD_MAX0, .fxn = NULL,},
 };
 
@@ -2690,6 +2761,7 @@ static const PmCtrlInfo g_paramsConvert[] = {
 	{.cmd = PMCMD_G_2NDSTREAMATTRS, .fxn = get_stream2_out_attrs, },
 	{.cmd = PMCMD_G_JPGENCDYN, .fxn = get_jpg_enc_dyn, },
 	{.cmd = PMCMD_S_CAPINFO, .fxn = set_cap_input_info, },
+	{.cmd = PMCMD_G_CAPINFO, .fxn = get_cap_input_info, },
 	{.cmd = PMCMD_G_IMGOSDDYN, .fxn = get_img_osd_dyn, },
 	{.cmd = PMCMD_G_H264ENCDYN, .fxn = get_h264_enc_dyn, },
 	{.cmd = PMCMD_G_VIDOSDDYN, .fxn = get_vid_osd_dyn, },

@@ -78,6 +78,11 @@ typedef struct {
 } CamDateTime;
 
 /* 
+  * Front end input info 
+  */
+typedef ImgDimension CamInputInfo;
+
+/* 
   * Network info 
   */
 typedef struct {
@@ -283,7 +288,8 @@ typedef struct {
 	Uint16	brightness;		//value of brightness, unused at current ver.
 	Uint16	saturation;		//value of saturation, unused at current ver.
 	Uint16	digiGain;		//digital gain
-	Uint16	reserved[2];	//reserved
+	Uint16	drcStrength;	//strength of DRC
+	Uint16	reserved;		//reserved
 } CamImgEnhanceParams;
 
 /* Flags for image enhance */
@@ -293,6 +299,7 @@ typedef struct {
 #define CAM_IMG_SAT_EN			(1 << 3)	//enable saturation adjust
 #define CAM_IMG_MED_FILTER_EN	(1 << 4)	//enable median filter
 #define CAM_IMG_NF_EN			(1 << 5)	//enable noise filter
+#define CAM_IMG_DRC_EN			(1 << 6)	//enable dynamic range compression
 
 /* 
   * H.264 encode params  
@@ -322,6 +329,8 @@ enum eCamH264Resolution
 	H264_RES_720X480 = 3,		//D1
 	H264_RES_MAX,
 };
+
+#define CAM_H264_MAX_BIT_RATE	6000	//max bit rate
 
 typedef struct {
 	Uint8	resolution;			//H.264 video resolution, see eH264 Resolution
@@ -411,7 +420,7 @@ typedef struct {
 	Uint16	width;	
 	Uint16	height;
 	Uint16	encQuality;	//0~97
-	Uint16	rotation;	//only support 0, 90, 270, anti-clockwise
+	Uint16	rotation;	//only support 0, 90, 180, 270, anti-clockwise
 }CamImgEncParams;
 
 /*
@@ -445,8 +454,8 @@ typedef struct {
 
 #define CAM_STROBE_FLAG_EN0		(1 << 0)	//enable strobe0
 #define CAM_STROBE_FLAG_EN1		(1 << 1)	//enable strobe1
-#define CAM_STROBE_FLAG_STROBE1	(1 << 8)	//enable strobe0 in strobe mode
-#define CAM_STROBE_FLAG_STROBE2	(1 << 9)	//enable strobe1 in strobe mode
+#define CAM_STROBE_FLAG_AUTO0	(1 << 8)	//enable strobe0 auto switch
+#define CAM_STROBE_FLAG_AUTO1	(1 << 9)	//enable strobe1 auto switch
 
 typedef enum {
 	CAM_STROBE_SWITCH_AUTO = 0, //switch automatically
@@ -459,6 +468,7 @@ typedef struct {
 	Uint16	switchMode;		//switch mode, see CamStrobeSwitchMode
 	Uint16	ctrlFlags;		//bit[0:1]--strobe[0:1] enable
 	Uint16	threshold;		//threshold for auto switch
+	Int32	offset;			//offset for pre-enable strobe, Uinit: us
 	Uint8	enStartHour;	//start hour, 0~23
 	Uint8	enStartMin;		//start minute, 0~59
 	Uint8	enEndHour;		//end hour
@@ -489,7 +499,7 @@ typedef struct {
 
 enum VehicleDetectorId
 {
-	DETECTOR_IO = 0,			//IO trigger
+	DETECTOR_IO = 1,			//IO trigger
 	DETECTOR_TORY_EP,			//Tory epolice detector
 	DETECTOR_TORY_CP,			//Tory checkpost detector
 	DETECTOR_TORY_EP_NEW,		//Tory new epolice detector

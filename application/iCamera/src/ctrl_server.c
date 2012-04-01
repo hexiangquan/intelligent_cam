@@ -126,13 +126,16 @@ static void *ctrl_server_thread(void *arg)
 			needResp = FALSE;
 			break;
 		case ICAMCMD_G_VERSION:
-			DBG("get version");
 			ret = params_mng_control(hParamsMng, PMCMD_G_VERSION, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamVersionInfo);
 			break;
 		case ICAMCMD_G_WORKSTATUS:
 			ret = params_mng_control(hParamsMng, PMCMD_G_WORKSTATUS, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamWorkStatus); 
+			break;
+		case ICAMCMD_G_INPUTINFO:
+			ret = params_mng_control(hParamsMng, PMCMD_G_CAPINFO, data, CTRL_MSG_BUF_LEN);
+			respLen = sizeof(CamInputInfo); 
 			break;
 		case ICAMCMD_S_DATETIME:
 			if(msgHdr->dataLen != sizeof(CamDateTime))
@@ -155,7 +158,7 @@ static void *ctrl_server_thread(void *arg)
 			ret = params_mng_control(hParamsMng, PMCMD_S_DEVINFO, data, msgHdr->dataLen);
 			break;
 		case ICAMCMD_G_DEVINFO:
-			ret = params_mng_control(hParamsMng, PMCMD_S_DEVINFO, data, CTRL_MSG_BUF_LEN);
+			ret = params_mng_control(hParamsMng, PMCMD_G_DEVINFO, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamDeviceInfo);
 			break;
 		case ICAMCMD_S_OSDPARAMS:
@@ -170,10 +173,10 @@ static void *ctrl_server_thread(void *arg)
 			ret = params_mng_control(hParamsMng, PMCMD_G_OSDPARAMS, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamOsdParams);
 			break;
-		case ICAMCMD_S_RODAINFO:
+		case ICAMCMD_S_ROADINFO:
 			ret = params_mng_control(hParamsMng, PMCMD_S_ROADINFO, data, msgHdr->dataLen);
 			break;
-		case ICAMCMD_G_RODAINFO:
+		case ICAMCMD_G_ROADINFO:
 			ret = params_mng_control(hParamsMng, PMCMD_G_ROADINFO, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamRoadInfo);
 			break;
@@ -271,6 +274,9 @@ static void *ctrl_server_thread(void *arg)
 			if(!ret) {
 				/* tell other tasks to update params */
 				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_VID_ENC, APPCMD_SET_ENC_PARAMS, 0, 0);
+				/* tell capture to update convert params */
+				if(!ret)
+					ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_CAP, APPCMD_SET_IMG_CONV, 0, 0);
 			}
 			break;
 		case ICAMCMD_G_H264PARAMS:
@@ -303,6 +309,9 @@ static void *ctrl_server_thread(void *arg)
 			if(!ret) {
 				/* tell other tasks to update params */
 				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_IMG_ENC, APPCMD_SET_ENC_PARAMS, 0, 0);
+				/* tell capture to update convert params */
+				if(!ret)
+					ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_CAP, APPCMD_SET_IMG_CONV, 0, 0);
 			}
 			break;
 		case ICAMCMD_G_IMGENCPARAMS:
@@ -320,7 +329,7 @@ static void *ctrl_server_thread(void *arg)
 			ret = params_mng_control(hParamsMng, PMCMD_S_IOCFG, data, msgHdr->dataLen);
 			break;
 		case ICAMCMD_G_IOCFG:
-			ret = params_mng_control(hParamsMng, PMCMD_G_IOCFG, data,CTRL_MSG_BUF_LEN);
+			ret = params_mng_control(hParamsMng, PMCMD_G_IOCFG, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamIoCfg);
 			break;
 		case ICAMCMD_S_STROBEPARAMS:
@@ -368,7 +377,7 @@ static void *ctrl_server_thread(void *arg)
 			ret = params_mng_control(hParamsMng, PMCMD_G_DAYNIGHTCFG, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamDayNightModeCfg);
 			break;
-		case ICAMCMD_S_CAPEN:
+		case ICAMCMD_S_CAPCTRL:
 			/* tell other tasks to update params */
 			ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_CAP, APPCMD_CAP_EN, *(Int32 *)data, 0);
 			break;
@@ -385,9 +394,11 @@ static void *ctrl_server_thread(void *arg)
 			/* TBD */
 			ret = E_NO;
 			break;
-		case ICAMCMD_S_UPDATE:
-			/* TBD */
-			ret = E_NO;
+		case ICAMCMD_S_RESTORECFG:
+			ret = params_mng_control(hParamsMng, PMCMD_S_RESTOREDEFAULT, data, msgHdr->dataLen);
+			/* we should reboot after restore params */
+			if(!ret)
+				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_MAIN, APPCMD_REBOOT, 0, 0);	
 			break;
 		default:
 			ERR("unkown cmd: 0x%X", (unsigned int)msgHdr->cmd);
@@ -406,11 +417,10 @@ static void *ctrl_server_thread(void *arg)
 			else
 				msgHdr->dataLen = respLen;
 
-			DBG("reply msg to %s, len: %d, ret: %d", msg_get_recv_src(hCtrlSrv->hMsg), msgHdr->dataLen, (int)msgHdr->param[0]);
+			DBG("reply cmd len: %d, ret: %d", msgHdr->dataLen, (int)msgHdr->param[0]);
 			msgHdr->type = MSG_TYPE_RESP;
 			/* send back response */
 			ret = msg_send(hCtrlSrv->hMsg, NULL, (MsgHeader *)&hCtrlSrv->msgBuf, 0);
-			DBG("reply ret %d...", ret);
 		}
 	}
 

@@ -6,7 +6,7 @@
 #define DOMAIN_NAME		"WORKGROUP"
 #define HOST_NAME		"hdcam"
 #define DNS_SERVER		"192.168.0.1"
-#define SERVER_IP		"192.168.0.25"
+#define SERVER_IP		"192.168.0.15"
 #define TCP_SRV_PORT	9300
 #define OSD_STRING		"HDCAM"
 #define ROAD_NAME		OSD_STRING
@@ -104,7 +104,8 @@ const AppParams c_appParamsDef = {
 		.brightness = 0,
 		.saturation = 0,
 		.digiGain = 256,
-		.reserved = {0},
+		.drcStrength = 16,
+		.reserved = 0,
 	},
 	.h264EncParams = {
 		.resolution = H264_RES_1280X720,
@@ -122,7 +123,7 @@ const AppParams c_appParamsDef = {
 		.flags = 0,
 	},
 	.workMode = {
-		.format = CAM_FMT_JPEG_H264,
+		.format = CAM_FMT_JPEG,
 		.resType = CAM_RES_FULL_FRAME,
 		.capMode = CAM_CAP_MODE_CONTINUE,
 		.flags = 0,

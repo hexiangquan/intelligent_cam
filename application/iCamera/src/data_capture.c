@@ -26,6 +26,7 @@
 #include <pthread.h>
 #include "converter.h"
 #include "cam_time.h"
+#include "detector.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -54,14 +55,18 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
-#define CAPTHR_STAT_CONV_EN			(1 << 0)
-#define CAPTHR_STAT_CAP_STARTED		(1 << 1)
+#define CAPTHR_STAT_CONV_EN			(1 << 0)	//enable convert
+#define CAPTHR_STAT_CAP_STARTED		(1 << 1)	//capture started
+#define CAPTHR_STAT_TRIG			(1 << 2)	//tirgger mode
 
 #define CAP_DEVICE					"/dev/video0"
 #define CAP_BUF_NUM					3
 #define CONV_BUF_NUM				2
 
 #define CAP_TRIG_TEST
+
+/* index for trigger capture */
+#define CAP_INDEX_NEXT_FRAME		(-1)
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -73,9 +78,13 @@ struct DataCapObj{
 	CapHandle			hCap;
 	CapInputInfo		inputInfo;
 	ConverterHandle		hConverter;
+	DetectorHandle		hDetector;
+	CaptureInfo			capInfo, defCapInfo;
+	Int32				capIndex;
 	Bool				encImg;
 	Bool				exit;
 	Int32				status;
+	Int32				fdMsg, fdCap, fdDetect, fdMax;
 	MsgHandle			hMsg;
 	ImgDimension		capDim;
 	pthread_t			pid;
@@ -139,6 +148,37 @@ static CapHandle cap_module_init(ParamsMngHandle hParamsMng)
 }
 
 /*****************************************************************************
+ Prototype    : data_capture_get_fds
+ Description  : get fds for select
+ Input        : DataCapHandle hDataCap  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/1
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 data_capture_get_fds(DataCapHandle hDataCap)
+{
+	Int32 ret;
+	
+	/* get fd for select */
+	hDataCap->fdCap = capture_get_fd(hDataCap->hCap);
+	hDataCap->fdMsg = msg_get_fd(hDataCap->hMsg);
+	hDataCap->fdMax = MAX(hDataCap->fdMsg, hDataCap->fdCap);
+	/* get detector fd */
+	ret = detector_control(hDataCap->hDetector, DETECTOR_CMD_GET_FD, &hDataCap->fdDetect, sizeof(Int32));
+	assert(ret == E_NO);
+	hDataCap->fdMax = MAX(hDataCap->fdMax, hDataCap->fdDetect) + 1;
+
+	return ret;
+}
+
+/*****************************************************************************
  Prototype    : data_collector_init
  Description  : init module env
  Input        : DataCapHandle hDataCap  
@@ -159,13 +199,18 @@ static Int32 data_capture_config(DataCapHandle hDataCap)
 	CamWorkMode			workMode;
 	Int32				ret;
 	Int32				bufRefCnt = 1;
-	
+
+	DBG("set work mode");
 	ret = params_mng_control(hDataCap->hParamsMng, PMCMD_G_WORKMODE, &workMode, sizeof(workMode));
 	assert(ret == E_NO);
 
 	/* alloc encode for continously stream, test */
-	if(workMode.capMode == CAM_CAP_MODE_CONTINUE)
+	if(workMode.capMode == CAM_CAP_MODE_CONTINUE) {
 		hDataCap->encImg = FALSE;
+		hDataCap->status &= ~CAPTHR_STAT_TRIG;
+	} else {
+		hDataCap->status |= CAPTHR_STAT_TRIG;
+	}
 	
 	hDataCap->dstName[1] = NULL;
 	hDataCap->status |= CAPTHR_STAT_CONV_EN;
@@ -235,16 +280,91 @@ static Int32 data_capture_config(DataCapHandle hDataCap)
 	return E_NO;
 }
 
+/*****************************************************************************
+ Prototype    : detector_config
+ Description  : config detector
+ Input        : DataCapHandle hDataCap  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/1
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 detector_config(DataCapHandle hDataCap)
+{
+	CamDetectorParam 	detectorParams;
+	Int32				ret;
+
+	/* get current params */
+	ret = params_mng_control(hDataCap->hParamsMng, PMCMD_G_DETECTORPARAMS, 
+			&detectorParams, sizeof(detectorParams));
+	assert(ret == E_NO);
+
+	if(!hDataCap->hDetector) {
+		/* create */
+		hDataCap->hDetector = detector_create(&detectorParams);
+		if(!hDataCap->hDetector) {
+			ERR("create new detector failed");
+			return E_IO;
+		}
+		/* init default capture info */
+		CaptureInfo *capInfo = &hDataCap->defCapInfo;
+
+		memset(capInfo, 0, sizeof(CaptureInfo));
+		capInfo->capCnt = 1;
+		capInfo->triggerInfo[0].frameId = FRAME_CONTINUE;
+		
+	} else {
+		/* cfg detector */
+		ret = detector_control(hDataCap->hDetector, DETECTOR_CMD_SET_PARAMS, 
+				&detectorParams, sizeof(detectorParams));
+		if(!ret) {
+			ERR("set detector params failed");
+			return ret;
+		}
+	}
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : data_cap_ctrl
+ Description  : control capture
+ Input        : DataCapHandle hDataCap  
+                CamCapCtrl ctrl         
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/1
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
 static Int32 data_cap_ctrl(DataCapHandle hDataCap, CamCapCtrl ctrl)
 {
 	Int32 ret = E_NO;
+
+	DBG("capture ctrl: %d", ctrl);
 
 	/* stop capture */
 	if(ctrl == CAM_CAP_STOP || ctrl == CAM_CAP_RESTART) {
 		if(hDataCap->status & CAPTHR_STAT_CAP_STARTED) {
 			ret = capture_stop(hDataCap->hCap);
-			if(!ret)
+			if(!ret) {
 				hDataCap->status &= ~CAPTHR_STAT_CAP_STARTED;
+				/* stop detector */
+				ret = detector_control( hDataCap->hDetector, 
+										DETECTOR_CMD_STOP, 
+										NULL, 0 );
+			}
 		}
 	}
 
@@ -252,14 +372,24 @@ static Int32 data_cap_ctrl(DataCapHandle hDataCap, CamCapCtrl ctrl)
 	if(ctrl == CAM_CAP_START || ctrl == CAM_CAP_RESTART) {
 		if(!(hDataCap->status & CAPTHR_STAT_CAP_STARTED))
 			ret = capture_start(hDataCap->hCap);
-		if(!ret)
+		if(!ret) {
 			hDataCap->status |= CAPTHR_STAT_CAP_STARTED;
+			/* start detector */
+			ret = detector_control( hDataCap->hDetector, 
+									DETECTOR_CMD_START, 
+									NULL, 0 );
+			ret |= data_capture_get_fds(hDataCap);
+		}
 	}
 
 	/* trigger capture */
 	if((ctrl == CAM_CAP_TRIG || ctrl == CAM_CAP_SPEC_TRIG) && 
 		(hDataCap->status & CAPTHR_STAT_CAP_STARTED)) {
 		hDataCap->encImg = TRUE; // capture next frame
+		/* set capture info for mannual trigger */
+		hDataCap->capInfo.capCnt = 1;
+		hDataCap->capInfo.flags = 0;
+		hDataCap->capInfo.triggerInfo[0].frameId = FRAME_MANUALTRIG;
 	}
 
 	return ret;
@@ -296,14 +426,17 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 	}
 
 	/* choose strem channel Id */
-	Int32 	streamId;
+	Int32 		streamId;
+	CaptureInfo	*capInfo;
+	
 	if(hDataCap->dstName[1] && hDataCap->encImg) {
 		streamId = 1;
 		dstName = hDataCap->dstName[1];
 		hDataCap->encImg = FALSE;
-		/* add capture info here */
+		capInfo = &hDataCap->capInfo;
 	} else {
 		streamId = 0;
+		capInfo = &hDataCap->defCapInfo;
 	}
 
 	/* do convert */
@@ -321,14 +454,15 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 	}
 	
 	/* send msg */
+	imgMsg.capInfo = *capInfo;
 	err = msg_send(hDataCap->hMsg, dstName, (MsgHeader *)&imgMsg, 0);
 	//err = 1;
 	if(err) {
 		DBG("msg send err");
 		/* err happens, free buf after convert */
 		buf_pool_free(imgMsg.hBuf);
-	} else
-		DBG("<%d> cap run ok...", capFrame.index);
+	} //else
+		//DBG("<%d> cap run ok...", capFrame.index);
 
 #ifdef CAP_TRIG_TEST
 	if((capFrame.index % 4) == 0)
@@ -363,6 +497,9 @@ static Int32 msg_process(DataCapHandle hDataCap, CommonMsg *msgBuf)
 		return err;
 
 	switch(msgHdr->cmd) {
+	case APPCMD_CAP_EN:
+		err = data_cap_ctrl(hDataCap, msgHdr->param[0]);
+		break;
 	case APPCMD_FREE_RAW:
 		//err = free_raw_buf(hDataCap, (RawMsg *)msgBuf);
 		err = E_NO;
@@ -373,8 +510,8 @@ static Int32 msg_process(DataCapHandle hDataCap, CommonMsg *msgBuf)
 	case APPCMD_SET_IMG_CONV:
 		err = converter_params_update(hDataCap->hConverter);
 		break;
-	case APPCMD_CAP_EN:
-		err = data_cap_ctrl(hDataCap, msgHdr->param[0]);
+	case APPCMD_SET_TRIG_PARAMS:
+		err = detector_config(hDataCap);
 		break;
 	case APPCMD_EXIT:
 		hDataCap->exit = TRUE;
@@ -387,6 +524,44 @@ static Int32 msg_process(DataCapHandle hDataCap, CommonMsg *msgBuf)
 
 	return err;
 }
+
+/*****************************************************************************
+ Prototype    : detector_trigger
+ Description  : trigger capture
+ Input        : DataCapHandle hDataCap  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/1
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 detector_trigger(DataCapHandle hDataCap)
+{
+	Int32 		ret;
+	CaptureInfo	*capInfo = &hDataCap->capInfo;
+
+	/* run detector to get trigger info */
+	ret = detector_run(hDataCap->hDetector, capInfo);
+	if(!ret && capInfo->capCnt && (hDataCap->status & CAPTHR_STAT_CAP_STARTED)) {
+		/* need trigger */
+		hDataCap->encImg = TRUE;
+		if(CAPTHR_STAT_TRIG & hDataCap->status) {
+			/* set trigger cmd */
+			hDataCap->capIndex = CAP_INDEX_NEXT_FRAME;
+		} else {
+			/* we may set special trigger and use index of that frame */
+			hDataCap->capIndex = CAP_INDEX_NEXT_FRAME;
+		}
+	}
+
+	return ret;
+}
+
 
 /*****************************************************************************
  Prototype    : data_capture_thread
@@ -407,19 +582,16 @@ static void *data_capture_thread(void *arg)
 {
 	DataCapHandle	hDataCap = (DataCapHandle)arg;
 	Int32			ret;
-	Int32			fdCap, fdMsg, fdMax;
 	fd_set			rdSet;
 	CommonMsg 		msgBuf;
 
 	assert(hDataCap);
 
-	/* get fd for select */
-	fdCap = capture_get_fd(hDataCap->hCap);
-	fdMsg = msg_get_fd(hDataCap->hMsg);
-	fdMax = MAX(fdMsg, fdCap) + 1;
+	/* get fds for detect */
+	data_capture_get_fds(hDataCap);
 	
 	/* start capture */
-	ret = 0;//capture_start(hDataCap->hCap);
+	ret = capture_start(hDataCap->hCap);
 	if(ret) {
 		ERR("Start capture failed.");
 		goto exit;
@@ -429,10 +601,11 @@ static void *data_capture_thread(void *arg)
 	while(!hDataCap->exit) {
 		/* wait data ready */
 		FD_ZERO(&rdSet);
-		FD_SET(fdCap, &rdSet);
-		FD_SET(fdMsg, &rdSet);
+		FD_SET(hDataCap->fdCap, &rdSet);
+		FD_SET(hDataCap->fdMsg, &rdSet);
+		FD_SET(hDataCap->fdDetect, &rdSet);
 		
-		ret = select(fdMax, &rdSet, NULL, NULL, NULL);
+		ret = select(hDataCap->fdMax, &rdSet, NULL, NULL, NULL);
 		if(ret < 0 && errno != EINTR) {
 			ERRSTR("select err");
 			break;
@@ -443,12 +616,17 @@ static void *data_capture_thread(void *arg)
 			continue;
 
 		/* check which is ready */
-		if(FD_ISSET(fdCap, &rdSet)) {
+		if(FD_ISSET(hDataCap->fdDetect, &rdSet)){
+			/* trigger capture */
+			detector_trigger(hDataCap);
+		}
+		
+		if(FD_ISSET(hDataCap->fdCap, &rdSet)) {
 			/* read new frame */
 			capture_new_img(hDataCap);
 		}
 
-		if(FD_ISSET(fdMsg, &rdSet)) {
+		if(FD_ISSET(hDataCap->fdMsg, &rdSet)) {
 			/* process msg */
 			msg_process(hDataCap, &msgBuf);
 		}
@@ -516,7 +694,7 @@ DataCapHandle data_capture_create(DataCapAttrs *attrs)
 		ERR("creater converter failed.");
 		goto exit;
 	}
-	
+
 
 	/* init our running evironment */
 	ret = data_capture_config(hDataCap);
@@ -611,6 +789,9 @@ Int32 data_capture_delete(DataCapHandle hDataCap, MsgHandle hCurMsg)
 
 	if(hDataCap->hConverter)
 		converter_delete(hDataCap->hConverter);
+
+	if(hDataCap->hDetector)
+		detector_delete(hDataCap->hDetector);
 
 	free(hDataCap);
 

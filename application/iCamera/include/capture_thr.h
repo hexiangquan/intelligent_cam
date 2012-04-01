@@ -3,23 +3,24 @@
   Copyright (C), 2001-2011, DCN Co., Ltd.
 
  ******************************************************************************
-  File Name     : cam_ctrl_thread.h
+  File Name     : capture_thr.h
   Version       : Initial Draft
   Author        : Sun
-  Created       : 2012/3/23
+  Created       : 2012/3/6
   Last Modified :
-  Description   : cam_ctrl_thread.c header file
+  Description   : capture_thr.c header file
   Function List :
   History       :
-  1.Date        : 2012/3/23
+  1.Date        : 2012/3/6
     Author      : Sun
     Modification: Created file
 
 ******************************************************************************/
-#ifndef __CAM_CTRL_THREAD_H__
-#define __CAM_CTRL_THREAD_H__
+#ifndef __CAPTURE_THR_H__
+#define __CAPTURE_THR_H__
 
-#include "icam_ctrl.h"
+#include "params_mng.h"
+#include "frame_dispatch.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -53,15 +54,11 @@
  * routines' implementations                    *
  *----------------------------------------------*/
 
-/* params for thread */
+/* init argument for this thread */
 typedef struct {
-	ICamCtrlHandle 		hCamCtrl;	//handle for camera ctrl
-	pthread_mutex_t		*mutex;		//mutex
-	int					sock;		//connect socket
-	void				*dataBuf;	//data buf 
-	Int32				bufLen;		//len of buf
-}CamCtrlThrParams;
-
+	ParamsMngHandle hParamsMng;
+	FrameDispHandle	hDispatch;
+}CapThrArg;
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -69,7 +66,7 @@ extern "C"{
 #endif
 #endif /* __cplusplus */
 
-extern void *cam_ctrl_thread(void *arg);
+extern void *capture_thr(void *arg);
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -78,4 +75,4 @@ extern void *cam_ctrl_thread(void *arg);
 #endif /* __cplusplus */
 
 
-#endif /* __CAM_CTRL_THREAD_H__ */
+#endif /* __CAPTURE_THR_H__ */

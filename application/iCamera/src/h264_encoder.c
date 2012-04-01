@@ -78,8 +78,9 @@ EncoderHandle h264_encoder_create(IN ParamsMngHandle hParamsMng, IN pthread_mute
 
 	encInitParams = H264ENC_INIT_DEFAULT;
 	encInitParams.maxWidth = 1952;
-	encInitParams.maxHeight = 1088;
+	encInitParams.maxHeight = 1232;
 	encInitParams.maxFrameRate = 30;
+	encInitParams.maxBitRate = CAM_H264_MAX_BIT_RATE * 1000;
 	
 	encAttrs.name = VID_ENC_NAME;
 	encAttrs.msgName = MSG_VID_ENC;

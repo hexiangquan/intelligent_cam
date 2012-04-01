@@ -355,11 +355,13 @@ static Int32 main_loop(MainEnv *envp)
 		goto exit;
 
 	/* create msg */
-	hMsg = msg_create(MSG_MAIN, NULL, MSG_FLAG_NONBLK);
+	hMsg = msg_create(MSG_MAIN, NULL, 0);
 	if(!hMsg) {
 		ERR("create msg failed");
 		goto exit;
 	}
+
+	msg_set_recv_timeout(hMsg, 1);
 
 	/* catch signals */
 	signal(SIGINT, sig_handler);
@@ -378,7 +380,7 @@ static Int32 main_loop(MainEnv *envp)
 
 		/* recv msg */
 		status = msg_recv(hMsg, (MsgHeader *)&msgBuf, sizeof(msgBuf), 0);
-		if(status > 0) {
+		if(status >= 0) {
 			msg_process(&msgBuf, envp);
 		}
 			

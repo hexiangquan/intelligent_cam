@@ -64,8 +64,8 @@ static Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data);
 #define MSG_RECV_TIMEOUT	25	//second
 #define HEAT_BEAT_INTERVAL	60	//second
 
-#define TEST_SEND_TIME
-
+//#define TEST_SEND_TIME
+#define PRINT_FPS			1
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -84,6 +84,8 @@ struct UploadObj {
 	CamImgUploadProto		protol;
 	ParamsMngHandle			hParamsMng;
 	const char				*savePath;
+	Int32					frameCnt;
+	time_t 					lastSnd;
 };
 
 /* fxns for none upload */
@@ -258,6 +260,8 @@ UploadHandle upload_create(UploadAttrs *attrs)
 		}
 	}
 
+	hUpload->lastSnd = time(NULL);
+
 	return hUpload;
 
 err_quit:
@@ -379,14 +383,14 @@ Int32 upload_disconnect(UploadHandle hUpload)
 		return E_NO;
 	}
 
-	
 	if(hUpload->isConnected) {
+		hUpload->isConnected = FALSE;
 		pthread_mutex_lock(&hUpload->mutex);
 		err = hUpload->fxns->disconnect(hUpload->handle);
 		pthread_mutex_unlock(&hUpload->mutex);
 		return err;
 	}
-	hUpload->isConnected = FALSE;
+	
 	return E_NO;
 }
 
@@ -436,7 +440,7 @@ static Int32 upload_save_frame(UploadHandle hUpload, const ImgMsg *data)
 		err = hUpload->fxns->saveFrame(hUpload->handle, data);
 	else {
 		/* try using default save function  */
-		DBG("<%d> save frame to jpeg ", data->index);
+		//DBG("<%d> save frame to jpeg ", data->index);
 		err = jpg_encoder_save_frame(data, hUpload->savePath);
 	}
 
@@ -509,13 +513,22 @@ static Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data)
 	timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
 	DBG("<%d> send frame ok, size: %u KB, cost: %.2f ms", data->index, data->dimension.size>>10, timeUse/1000);
 #endif
-	
+
+#ifdef PRINT_FPS
+	hUpload->frameCnt++;
+	if(time(NULL) - hUpload->lastSnd > 8) {
+		INFO("upload frame fps: %d", hUpload->frameCnt >> 3);
+		hUpload->frameCnt = 0;
+		hUpload->lastSnd = time(NULL);
+	}
+#endif
+
 	return E_NO;
 	
 save_frame:
 	/* send err, save to local */
 	err = upload_save_frame(hUpload, data);
-	
+
 	return err;
 }
 
