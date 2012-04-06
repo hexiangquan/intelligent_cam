@@ -502,7 +502,7 @@ enum VehicleDetectorId
 	DETECTOR_IO = 1,			//IO trigger
 	DETECTOR_TORY_EP,			//Tory epolice detector
 	DETECTOR_TORY_CP,			//Tory checkpost detector
-	DETECTOR_TORY_EP_NEW,		//Tory new epolice detector
+	DETECTOR_TORY_EP_V2,		//Tory new epolice detector
 	DETECTOR_VIDEO_TRIG,		//Video trigger detector
 	DETECTOR_MAX
 };
@@ -512,7 +512,7 @@ enum VehicleDetectorId
 #define DETECTOR_FLAG_LOOP2_POS_CAP		(1 << 1)	//Capture @ positive edge of loop2
 #define DETECTOR_FLAG_LOOP1_NEG_CAP		(1 << 2)	//Capture @ negative edge of loop1
 #define DETECTOR_FLAG_LOOP2_NEG_CAP		(1 << 3)	//Capture @ negative edge of loop2
-#define DETECTOR_FLAG_OVERSPEED_CAP		(1 << 4)	//capture when overspeed
+#define DETECTOR_FLAG_OVERSPEED_CAP		(1 << 4)	//capture only when overspeed
 #define DETECTOR_FLAG_DELAY_CAP			(1 << 5)	//delay capture
 
 

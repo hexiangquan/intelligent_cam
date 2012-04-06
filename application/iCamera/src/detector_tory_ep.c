@@ -1,12 +1,75 @@
+/******************************************************************************
+
+  Copyright (C), 2001-2011, DCN Co., Ltd.
+
+ ******************************************************************************
+  File Name     : detector_tory_ep.c
+  Version       : Initial Draft
+  Author        : Sun
+  Created       : 2012/4/5
+  Last Modified :
+  Description   : detecor parse for Tory EP
+  Function List :
+              cp_cap_parse
+              ep_cap_parse
+              parse_trigger_data
+              recv_start_code
+              retrograde_cap_parse
+              tory_ep_cap_pre_parse
+              tory_ep_close
+              tory_ep_control
+              tory_ep_detect
+              tory_ep_open
+              tory_ep_start
+              tory_ep_stop
+              tory_ep_update
+              tory_retrograde_cap_pre_parse
+  History       :
+  1.Date        : 2012/4/5
+    Author      : Sun
+    Modification: Created file
+
+******************************************************************************/
 #include "detector.h"
 #include "uart.h"
 #include "log.h"
 
+/*----------------------------------------------*
+ * external variables                           *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * external routine prototypes                  *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * internal routine prototypes                  *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * project-wide global variables                *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * module-wide global variables                 *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * constants                                    *
+ *----------------------------------------------*/
+
+/*----------------------------------------------*
+ * macros                                       *
+ *----------------------------------------------*/
 #define CAP_TABLE_SIZE 			4
 #define RX_BUF_SIZE				5
 #define DETECTOR_ID_TORY_EP		0x0F
 #define RECV_TRIG_TIMEOUT		20 //ms
 #define TORY_EP_DEBUG
+
+/*----------------------------------------------*
+ * routines' implementations                    *
+ *----------------------------------------------*/
 
 /* Run time params */
 typedef struct {
@@ -172,11 +235,11 @@ void tory_retrograde_cap_pre_parse(Uint16 reCapFlags, Uint8 reCapTable[])
     Modification : Created function
 
 *****************************************************************************/
-static Int32 tory_ep_start(DetectorToryEp *dev) 
+Int32 tory_ep_start(Int32 *fd, Uint8 timeout) 
 {
 	Int32 ret = E_NO;
 
-	if(dev->fd <= 0) {
+	if(*fd <= 0) {
 		/* open uart */
 		ret = uart_open(UART_RS485, UART_B9600, UART_D8, UART_S1, UART_POFF);
 		if(ret < 0) {
@@ -185,12 +248,12 @@ static Int32 tory_ep_start(DetectorToryEp *dev)
 		}
 
 		/* record fd */
-		dev->fd = ret;
+		*fd = ret;
 
 		/* set timeout for 1 byte recv */
-		ret = uart_set_timeout(dev->fd, 1, dev->timeout);
+		ret = uart_set_timeout(*fd, 1, timeout);
 	} else 
-		UART_FLUSH(dev->fd);
+		UART_FLUSH(*fd);
 
 	return ret;
 }
@@ -210,10 +273,10 @@ static Int32 tory_ep_start(DetectorToryEp *dev)
     Modification : Created function
 
 *****************************************************************************/
-static Int32 tory_ep_stop(DetectorToryEp *dev) 
+Int32 tory_ep_stop(Int32 fd) 
 {
-	if(dev->fd > 0)
-		UART_FLUSH(dev->fd);
+	if(fd > 0)
+		UART_FLUSH(fd);
 
 	return E_NO;
 }
@@ -249,7 +312,7 @@ static Int32 tory_ep_open(DetectorHandle hDetector)
 	dev->timeout = 1;
 
 	/* open uart */
-	ret = tory_ep_start(dev);
+	ret = tory_ep_start(&dev->fd, dev->timeout);
 	if(ret) {
 		ERR("start failed");
 		goto free_buf;
@@ -591,7 +654,7 @@ static Int32 tory_ep_detect(DetectorHandle hDetector, CaptureInfo *capInfo)
 
 	/* check if we have already start */
 	if(dev->fd <= 0)
-		tory_ep_start(dev);
+		tory_ep_start(&dev->fd, dev->timeout);
 
 	/* Clear to 0 */
 	capInfo->capCnt = 0;
@@ -694,10 +757,10 @@ static Int32 tory_ep_control(DetectorHandle hDetector, DetectorCmd cmd, void *ar
 			status = uart_set_timeout(dev->fd, 1, *(Uint32 *)arg/100);
 		break;
 	case DETECTOR_CMD_START:
-		status = tory_ep_start(dev);
+		status = tory_ep_start(&dev->fd, dev->timeout);
 		break;
 	case DETECTOR_CMD_STOP:
-		status = tory_ep_stop(dev);
+		status = tory_ep_stop(dev->fd);
 		break;
 	default:
 		status = E_UNSUPT;

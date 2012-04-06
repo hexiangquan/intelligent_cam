@@ -172,8 +172,8 @@ static Int32 data_capture_get_fds(DataCapHandle hDataCap)
 	hDataCap->fdMax = MAX(hDataCap->fdMsg, hDataCap->fdCap);
 	/* get detector fd */
 	ret = detector_control(hDataCap->hDetector, DETECTOR_CMD_GET_FD, &hDataCap->fdDetect, sizeof(Int32));
-	assert(ret == E_NO);
-	hDataCap->fdMax = MAX(hDataCap->fdMax, hDataCap->fdDetect) + 1;
+	if(ret == E_NO);
+		hDataCap->fdMax = MAX(hDataCap->fdMax, hDataCap->fdDetect) + 1;
 
 	return ret;
 }
@@ -426,17 +426,20 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 	}
 
 	/* choose strem channel Id */
-	Int32 		streamId;
-	CaptureInfo	*capInfo;
+	Int32 		streamId = 0;
+	CaptureInfo	*capInfo = &hDataCap->defCapInfo;
 	
-	if(hDataCap->dstName[1] && hDataCap->encImg) {
-		streamId = 1;
-		dstName = hDataCap->dstName[1];
-		hDataCap->encImg = FALSE;
-		capInfo = &hDataCap->capInfo;
-	} else {
-		streamId = 0;
-		capInfo = &hDataCap->defCapInfo;
+	if(hDataCap->encImg) {
+		/* check frame index here */
+		Uint16 frameIndex = 0;
+		
+		if(hDataCap->capIndex < 0 || hDataCap->capIndex >= frameIndex) {
+			if(hDataCap->dstName[1])
+				streamId = 1;
+			dstName = hDataCap->dstName[1];
+			hDataCap->encImg = FALSE;
+			capInfo = &hDataCap->capInfo;
+		}
 	}
 
 	/* do convert */
@@ -702,6 +705,11 @@ DataCapHandle data_capture_create(DataCapAttrs *attrs)
 		goto exit;	
 	}
 
+	/* init detector */
+	ret = detector_config(hDataCap);
+	//if(ret)
+		//goto exit;
+
 	return hDataCap;
 
 exit:
@@ -769,7 +777,7 @@ Int32 data_capture_delete(DataCapHandle hDataCap, MsgHandle hCurMsg)
 	if(!hDataCap)
 		return E_INVAL;
 	
-	if(hDataCap->pid > 0) {
+	if(hDataCap->pid) {
 		/* send exit cmd */
 		data_capture_send_cmd(hDataCap, APPCMD_EXIT, hCurMsg);
 		

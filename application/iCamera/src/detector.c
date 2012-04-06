@@ -63,6 +63,12 @@
 /* tory ep detector fxns */
 extern const DetectorFxns TORY_EP_FXNS;
 
+/* tory cp detector fxns */
+extern const DetectorFxns TORY_CP_FXNS;
+
+/* tory ep v2 fxns */
+extern const DetectorFxns TORY_EP2_FXNS;
+
 /*****************************************************************************
  Prototype    : detector_close
  Description  : close detector so it will stop workinng
@@ -168,7 +174,10 @@ static Int32 detector_set_params(DetectorHandle hDetector, const CamDetectorPara
 			hDetector->fxns = &TORY_EP_FXNS;
 			break;
 		case DETECTOR_TORY_CP:
-			hDetector->fxns = NULL;
+			hDetector->fxns = &TORY_CP_FXNS;
+			break;
+		case DETECTOR_TORY_EP_V2:
+			hDetector->fxns = &TORY_EP2_FXNS;
 			break;
 		default:
 			ERR("unsupported detector: %d...", params->detecotorId);
