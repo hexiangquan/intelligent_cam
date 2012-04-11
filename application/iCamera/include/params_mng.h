@@ -19,7 +19,15 @@
 #ifndef __APP_PARAMS_MNG_H__
 #define __APP_PARAMS_MNG_H__
 
-#include "cam_params.h"
+#include "cam_info.h"
+#include "cam_osd.h"
+#include "cam_upload.h"
+#include "cam_img_adj.h"
+#include "cam_encode.h"
+#include "cam_io.h"
+#include "cam_detector.h"
+#include "cam_status.h"
+#include "cam_file.h"
 #include <pthread.h>
 
 /*----------------------------------------------*
@@ -51,8 +59,6 @@
  *----------------------------------------------*/
 
 #define APP_PARAMS_MAGIC	0xC00DBEEF
-
-#define FILE_SAVE_PATH		"/media/mmc"
 
 
 /*----------------------------------------------*
@@ -169,6 +175,7 @@ typedef enum {
 	PMCMD_G_IMGOSDINFO,
 	PMCMD_G_VIDOSDINFO,
 	PMCMD_G_VIDUPLOADPROTO,
+	PMCMD_G_CONVTERPARAMS,
 	PMCMD_MAX1,
 	
 }ParamsMngCtrlCmd;

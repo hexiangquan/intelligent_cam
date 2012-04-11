@@ -19,7 +19,7 @@
 #ifndef __CONVERTER_H__
 #define __CONVERTER_H__
 
-#include "params_mng.h"
+#include "img_convert.h"
 #include "capture.h"
 #include "app_msg.h"
 
@@ -57,13 +57,15 @@
 typedef struct ConverterObj *ConverterHandle;
 
 typedef struct {
-	ParamsMngHandle hParamsMng;		//handle for get / set cfg params
 	Uint16			maxImgWidth;	//max width of out image
 	Uint16			maxImgHeight;	//max height of out image
 	Int32			flags;			//flags for ctrl
 	Uint32			bufNum;			//num of buffer in pool to alloc
 }ConverterAttrs;
 
+typedef struct {
+	ImgConvDynParams	convDyn[2];
+}ConverterParams;
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -86,7 +88,7 @@ extern "C"{
     Modification : Created function
 
 *****************************************************************************/
-extern ConverterHandle converter_create(ConverterAttrs *attrs);
+extern ConverterHandle converter_create(ConverterAttrs *attrs, const ConverterParams *params);
 
 /*****************************************************************************
  Prototype    : converter_delete
@@ -139,7 +141,7 @@ extern Int32 converter_run(ConverterHandle hConverter, FrameBuf *rawBuf, Int32 s
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 converter_params_update(ConverterHandle hConverter);
+extern Int32 converter_params_update(ConverterHandle hConverter, ConverterParams *params);
 
 #ifdef __cplusplus
 #if __cplusplus

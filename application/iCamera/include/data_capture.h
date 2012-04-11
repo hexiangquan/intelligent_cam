@@ -19,7 +19,9 @@
 #ifndef __DATA_CAPTURE_H__
 #define __DATA_CAPTURE_H__
 
-#include "params_mng.h"
+#include "cam_status.h"
+#include "cam_detector.h"
+#include "converter.h"
 #include "capture.h"
 #include "msg.h"
 
@@ -57,9 +59,12 @@
 
 /* init argument for this module */
 typedef struct {
-	ParamsMngHandle hParamsMng;
-	Uint16			maxOutWidth;
-	Uint16			maxOutHeight;
+	Uint16				maxOutWidth;
+	Uint16				maxOutHeight;
+	CamWorkMode			workMode;
+	CamDetectorParam	detectorParams;
+	ConverterParams		convParams;
+	CapHandle			hCapture;
 }DataCapAttrs;
 
 typedef struct DataCapObj *DataCapHandle;
@@ -85,7 +90,7 @@ extern "C"{
     Modification : Created function
 
 *****************************************************************************/
-extern DataCapHandle data_capture_create(DataCapAttrs *attrs);
+extern DataCapHandle data_capture_create(const DataCapAttrs *attrs);
 
 /*****************************************************************************
  Prototype    : data_capture_delete
@@ -137,7 +142,7 @@ extern Int32 data_capture_run(DataCapHandle hDataCap);
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_set_work_mode(DataCapHandle hDataCap, MsgHandle hCurMsg);
+extern Int32 data_capture_set_work_mode(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamWorkMode *workMode);
 
 /*****************************************************************************
  Prototype    : data_capture_conv_params
@@ -155,7 +160,63 @@ extern Int32 data_capture_set_work_mode(DataCapHandle hDataCap, MsgHandle hCurMs
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_conv_params(DataCapHandle hDataCap, MsgHandle hCurMsg);
+extern Int32 data_capture_set_conv_params(DataCapHandle hDataCap, MsgHandle hCurMsg, const ConverterParams *params);
+
+/*****************************************************************************
+ Prototype    : data_capture_set_detector_params
+ Description  : set detector params
+ Input        : DataCapHandle hDataCap          
+                MsgHandle hCurMsg               
+                const CamDetectorParam *params  
+ Output       : None
+ Return Value : extern
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 data_capture_set_detector_params(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamDetectorParam *params);
+
+/*****************************************************************************
+ Prototype    : data_capture_get_input_info
+ Description  : get input info
+ Input        : DataCapHandle hDataCap   
+                CamInputInfo *inputInfo  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 data_capture_get_input_info(DataCapHandle hDataCap, ImgDimension *inputInfo);
+
+/*****************************************************************************
+ Prototype    : data_capture_ctrl
+ Description  : change capture status
+ Input        : DataCapHandle hDataCap  
+                MsgHandle hCurMsg       
+                CamCapCtrl ctrl         
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 data_capture_ctrl(DataCapHandle hDataCap, MsgHandle hCurMsg, Int32 ctrl);
 
 #ifdef __cplusplus
 #if __cplusplus

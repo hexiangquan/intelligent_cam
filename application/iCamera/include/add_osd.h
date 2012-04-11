@@ -21,7 +21,7 @@
 
 #include "osd.h"
 #include "app_msg.h"
-#include "cam_params.h"
+#include "cam_osd.h"
 
 /*----------------------------------------------*
  * external variables                           *

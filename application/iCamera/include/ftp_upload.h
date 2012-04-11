@@ -20,7 +20,7 @@
 #define __FTP_UPLOAD_H__
 
 #include "upload.h"
-#include "cam_params.h"
+#include "cam_upload.h"
 
 /*----------------------------------------------*
  * external variables                           *

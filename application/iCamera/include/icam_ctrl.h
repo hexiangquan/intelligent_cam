@@ -18,10 +18,19 @@
 ******************************************************************************/
 #ifndef __ICAM_CTRL_H__
 #define __ICAM_CTRL_H__
-	
-#include "cam_params.h"
+
 #include "common.h"
-#include "msg.h"
+#include "msg.h"	
+#include "cam_info.h"
+#include "cam_time.h"
+#include "cam_osd.h"
+#include "cam_upload.h"
+#include "cam_img_adj.h"
+#include "cam_encode.h"
+#include "cam_io.h"
+#include "cam_detector.h"
+#include "cam_status.h"
+#include "cam_file.h"
 
 /*----------------------------------------------*
  * external variables                           *

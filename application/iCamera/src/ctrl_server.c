@@ -24,6 +24,12 @@
 #include "cam_time.h"
 #include <pthread.h>
 #include "app_msg.h"
+#include "data_capture.h"
+#include "encoder.h"
+#include "jpg_encoder.h"
+#include "h264_encoder.h"
+#include "params_mng.h"
+#include "cap_init.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -67,13 +73,75 @@ typedef struct {
 /* thread environment */
 struct CtrlSrvObj{
 	ParamsMngHandle hParamsMng;		//params manage handle
+	CapHandle		hCapture;		//image capture handle
+	DataCapHandle	hDataCap;		//data capture handle
+	EncoderHandle	hJpgEncoder;	//jpeg encoder object
+	EncoderHandle	hH264Encoder;	//H.264 encoder object
 	MsgHandle		hMsg;			//msg handle for IPC
 	CtrlMsg			msgBuf;			//buf for recv msg
 	pthread_t		pid;			//pid of thread
+	pthread_mutex_t encMutex;		//mutex for encoders
 	Bool			exit;			//flag for exit
 	const char		*msgName;		//our msg name for IPC
 };
 
+/*****************************************************************************
+ Prototype    : cap_info_update
+ Description  : update capture input info
+ Input        : CtrlSrvHandle hCtrlSrv  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 cap_info_update(CtrlSrvHandle hCtrlSrv)
+{
+	Int32 ret;
+	
+	/* get input info and set to param manager */
+	CapInputInfo inputInfo;
+	ret = capture_get_input_info(hCtrlSrv->hCapture, &inputInfo);
+	if(ret)
+		return ret;
+	
+	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_S_CAPINFO, 
+			&inputInfo, sizeof(inputInfo));
+
+	return ret;
+}
+
+/*****************************************************************************
+ Prototype    : conv_params_update
+ Description  : update converter params
+ Input        : CtrlSrvHandle hCtrlSrv  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 conv_params_update(CtrlSrvHandle hCtrlSrv)
+{
+	Int32 ret;
+	
+	/* update params in sub module */
+	ConverterParams params;
+	params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_CONVTERPARAMS, &params, sizeof(params));
+	ret = data_capture_set_conv_params(hCtrlSrv->hDataCap, hCtrlSrv->hMsg, &params);
+
+	return ret;
+}
 
 /*****************************************************************************
  Prototype    : ctrl_server_thread
@@ -123,6 +191,10 @@ static void *ctrl_server_thread(void *arg)
 		switch(msgHdr->cmd) {
 		case APPCMD_EXIT:
 			hCtrlSrv->exit = TRUE;
+			needResp = FALSE;
+			break;
+		case APPCMD_SET_CAP_INPUT:
+			ret = cap_info_update(hCtrlSrv);
 			needResp = FALSE;
 			break;
 		case ICAMCMD_G_VERSION:
@@ -261,8 +333,7 @@ static void *ctrl_server_thread(void *arg)
 		case ICAMCMD_S_IMGENHANCE:
 			ret = params_mng_control(hParamsMng, PMCMD_S_IMGADJPARAMS, data, msgHdr->dataLen);
 			if(!ret) {
-				/* tell other tasks to update params */
-				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_CAP, APPCMD_SET_IMG_CONV, 0, 0);
+				ret = conv_params_update(hCtrlSrv);
 			}
 			break;
 		case ICAMCMD_G_IMGENHANCE:
@@ -276,7 +347,7 @@ static void *ctrl_server_thread(void *arg)
 				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_VID_ENC, APPCMD_SET_ENC_PARAMS, 0, 0);
 				/* tell capture to update convert params */
 				if(!ret)
-					ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_CAP, APPCMD_SET_IMG_CONV, 0, 0);
+					ret = conv_params_update(hCtrlSrv);
 			}
 			break;
 		case ICAMCMD_G_H264PARAMS:
@@ -294,7 +365,7 @@ static void *ctrl_server_thread(void *arg)
 			ret = params_mng_control(hParamsMng, PMCMD_S_WORKMODE, data, msgHdr->dataLen);
 			if(!ret) {
 				/* tell other tasks to update params */
-				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_CAP, APPCMD_SET_WORK_MODE, 0, 0);
+				ret = data_capture_set_work_mode(hCtrlSrv->hDataCap, hCtrlSrv->hMsg, (CamWorkMode *)data);
 				usleep(100000);
 				app_hdr_msg_send(hCtrlSrv->hMsg, MSG_IMG_ENC, APPCMD_SET_ENC_PARAMS, 0, 0);
 				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_VID_ENC, APPCMD_SET_ENC_PARAMS, 0, 0);
@@ -311,7 +382,7 @@ static void *ctrl_server_thread(void *arg)
 				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_IMG_ENC, APPCMD_SET_ENC_PARAMS, 0, 0);
 				/* tell capture to update convert params */
 				if(!ret)
-					ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_CAP, APPCMD_SET_IMG_CONV, 0, 0);
+					ret = conv_params_update(hCtrlSrv);
 			}
 			break;
 		case ICAMCMD_G_IMGENCPARAMS:
@@ -343,7 +414,7 @@ static void *ctrl_server_thread(void *arg)
 			ret = params_mng_control(hParamsMng, PMCMD_S_DETECTORPARAMS, data, msgHdr->dataLen);
 			if(!ret) {
 				/* tell other tasks to update params */
-				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_CAP, APPCMD_SET_TRIG_PARAMS, 0, 0);
+				ret = data_capture_set_detector_params(hCtrlSrv->hDataCap, hCtrlSrv->hMsg, (CamDetectorParam *)data);
 			}
 			break;
 		case ICAMCMD_G_DETECTORPARAMS:
@@ -379,7 +450,7 @@ static void *ctrl_server_thread(void *arg)
 			break;
 		case ICAMCMD_S_CAPCTRL:
 			/* tell other tasks to update params */
-			ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_CAP, APPCMD_CAP_EN, *(Int32 *)data, 0);
+			ret = data_capture_ctrl(hCtrlSrv->hDataCap, hCtrlSrv->hMsg, *(Int32 *)data);
 			break;
 		case ICAMCMD_G_SDROOTPATH:
 			strcpy(data, FILE_SAVE_PATH);
@@ -449,9 +520,10 @@ exit:
 *****************************************************************************/
 CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 {
-	CtrlSrvHandle hCtrlSrv;
+	CtrlSrvHandle 	hCtrlSrv;
+	Int32			ret;
 	
-	assert(attrs && attrs->hParamsMng);
+	assert(attrs && attrs->cfgFileName);
 
 	hCtrlSrv = calloc(1, sizeof(struct CtrlSrvObj));
 	if(!hCtrlSrv) {
@@ -459,8 +531,14 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 		return NULL;
 	}
 
+	/* read params */
+	hCtrlSrv->hParamsMng = params_mng_create(attrs->cfgFileName);
+	if(!hCtrlSrv->hParamsMng) {
+		ERR("create params failed.");
+		goto exit;
+	}
+
 	/* copy attrs */
-	hCtrlSrv->hParamsMng = attrs->hParamsMng;
 	hCtrlSrv->msgName = attrs->msgName;
 
 	/* create msg handle  */
@@ -471,6 +549,53 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	}
 
 	hCtrlSrv->exit = FALSE;
+
+	/* create data capture module (App module) */
+	DataCapAttrs 		dataCapAttrs;
+
+	dataCapAttrs.maxOutWidth = IMG_MAX_WIDTH;
+	dataCapAttrs.maxOutHeight = IMG_MAX_HEIGHT;
+
+	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_WORKMODE, 
+			&dataCapAttrs.workMode, sizeof(dataCapAttrs.workMode));
+
+	/* create image capture module */
+	hCtrlSrv->hCapture = cap_module_init(&dataCapAttrs.workMode, NULL);
+	if(!hCtrlSrv->hCapture) {
+		ERR("create image capture failed");
+		goto exit;
+	}
+
+	/* set input info */
+	ret = cap_info_update(hCtrlSrv);
+	assert(ret == E_NO);
+
+	/* create data capture module */
+	dataCapAttrs.hCapture = hCtrlSrv->hCapture;
+	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_DETECTORPARAMS, 
+			&dataCapAttrs.detectorParams, sizeof(dataCapAttrs.detectorParams));
+	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_CONVTERPARAMS, 
+			&dataCapAttrs.convParams, sizeof(dataCapAttrs.convParams));
+	assert(ret == E_NO);
+	
+	hCtrlSrv->hDataCap = data_capture_create(&dataCapAttrs);
+	if(!hCtrlSrv->hDataCap) {
+		ERR("create data capture failed");
+		goto exit;
+	}
+
+	/* create jpg encoder */
+	pthread_mutex_init(&hCtrlSrv->encMutex, NULL);
+	hCtrlSrv->hJpgEncoder = jpg_encoder_create(hCtrlSrv->hParamsMng, &hCtrlSrv->encMutex);
+	if(!hCtrlSrv->hJpgEncoder) {
+		goto exit;
+	}
+
+	/* create video encoder */
+	hCtrlSrv->hH264Encoder = h264_encoder_create(hCtrlSrv->hParamsMng, &hCtrlSrv->encMutex);
+	if(!hCtrlSrv->hH264Encoder) {
+		goto exit;
+	}
 	
 	return hCtrlSrv;
 
@@ -510,6 +635,30 @@ Int32 ctrl_server_run(CtrlSrvHandle hCtrlSrv)
 		hCtrlSrv->pid = 0;
 		return E_NOMEM;
 	}
+
+	/* start data capture */
+	err = data_capture_run(hCtrlSrv->hDataCap);
+	if(err ) {
+		ERR("data capture run failed...");
+		return err;
+	}
+
+#if 1
+	/* run encode thread */
+	DBG("start running encoders");
+
+	err = encoder_run(hCtrlSrv->hJpgEncoder);
+	if(err) {
+		ERR("jpg encoder run failed...");
+		return err;
+	}
+
+	err = encoder_run(hCtrlSrv->hH264Encoder);
+	if(err) {
+		ERR("h264 encoder run failed...");
+		return err;
+	}
+#endif
 
 	return E_NO;
 }
@@ -551,6 +700,29 @@ Int32 ctrl_server_delete(CtrlSrvHandle hCtrlSrv, MsgHandle hCurMsg)
 	/* free msg handle */
 	if(hCtrlSrv->hMsg)
 		msg_delete(hCtrlSrv->hMsg);
+
+	/* call encoders exit */
+	if(hCtrlSrv->hJpgEncoder)
+		encoder_delete(hCtrlSrv->hJpgEncoder, hCurMsg);
+
+	if(hCtrlSrv->hH264Encoder)
+		encoder_delete(hCtrlSrv->hH264Encoder, hCurMsg);
+
+	/* exit data capture */
+	if(hCtrlSrv->hDataCap)
+		data_capture_delete(hCtrlSrv->hDataCap, hCurMsg);
+
+	/* delete image capture */
+	if(hCtrlSrv->hCapture)
+		capture_delete(hCtrlSrv->hCapture);
+
+	pthread_mutex_destroy(&hCtrlSrv->encMutex);
+
+	/* save and free params */
+	if(hCtrlSrv->hParamsMng) {
+		params_mng_write_back(hCtrlSrv->hParamsMng);
+		params_mng_delete(hCtrlSrv->hParamsMng);
+	}
 
 	free(hCtrlSrv);
 

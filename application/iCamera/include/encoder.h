@@ -20,9 +20,9 @@
 #define __IMG_ENC_THR_H__
 
 #include "params_mng.h"
-#include "frame_dispatch.h"
 #include "alg.h"
 #include <pthread.h>
+#include "app_msg.h"
 
 /*----------------------------------------------*
  * external variables                           *

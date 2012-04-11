@@ -21,7 +21,7 @@
 #include "params_mng.h"
 #include "log.h"
 #include "crc16.h"
-#include "img_convert.h"
+#include "converter.h"
 #include "capture.h"
 #include "jpg_enc.h"
 #include "h264_enc.h"
@@ -757,11 +757,13 @@ static Int32 get_img_conv_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 	if(!data || size < sizeof(ImgConvDynParams)) 
 		return E_INVAL;
 
+	#if 0
 	Int32 err = wait_cap_info_set(hParamsMng);
 	if(err) {
 		ERR("capture input info has not set.");
 		return err;
 	}
+	#endif
 
 	ImgConvDynParams *params = (ImgConvDynParams *)data;
 	AppParams *appCfg = &hParamsMng->appParams;
@@ -810,7 +812,7 @@ static Int32 get_img_conv_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 		/* raw output, disable convert */
 		params->outAttrs[0].enbale = FALSE;
 	}
-	
+
 	return E_NO;
 } 
 
@@ -857,6 +859,43 @@ static Int32 get_stream2_out_attrs(ParamsMngHandle hParamsMng, void *data, Int32
 		outAttrs->enbale = FALSE;
 
 	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : get_converter_params
+ Description  : get converter params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_converter_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	Int32 err;
+	
+	if(!data || size < sizeof(ConverterParams)) 
+		return E_INVAL;
+	
+	ConverterParams *params = (ConverterParams *)data;
+
+	err = get_img_conv_dyn(hParamsMng, &params->convDyn[0], sizeof(params->convDyn[0]));
+	if(err)
+		return err;
+
+	/* set same params */
+	params->convDyn[1] = params->convDyn[0];
+	err = get_stream2_out_attrs(hParamsMng, &params->convDyn[1].outAttrs[0], sizeof(ConvOutAttrs));
+
+	return err;
 }
 
 /*****************************************************************************
@@ -2769,6 +2808,7 @@ static const PmCtrlInfo g_paramsConvert[] = {
 	{.cmd = PMCMD_G_IMGOSDINFO, .fxn = get_img_osd_info, },
 	{.cmd = PMCMD_G_VIDOSDINFO, .fxn = get_vid_osd_info, },
 	{.cmd = PMCMD_G_VIDUPLOADPROTO, .fxn = get_vid_upload_proto,},
+	{.cmd = PMCMD_G_CONVTERPARAMS, .fxn = get_converter_params, },
 	{.cmd = PMCMD_MAX1, .fxn = NULL,},
 };
 

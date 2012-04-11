@@ -26,6 +26,7 @@
 ******************************************************************************/
 #include "detector.h"
 #include "log.h"
+#include "detector_uart_generic.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -59,15 +60,6 @@
 /*----------------------------------------------*
  * routines' implementations                    *
  *----------------------------------------------*/
-
-/* tory ep detector fxns */
-extern const DetectorFxns TORY_EP_FXNS;
-
-/* tory cp detector fxns */
-extern const DetectorFxns TORY_CP_FXNS;
-
-/* tory ep v2 fxns */
-extern const DetectorFxns TORY_EP2_FXNS;
 
 /*****************************************************************************
  Prototype    : detector_close
@@ -170,18 +162,9 @@ static Int32 detector_set_params(DetectorHandle hDetector, const CamDetectorPara
 		
 		/* diff detector Id, change fxns */
 		switch(params->detecotorId) {
-		case DETECTOR_TORY_EP:
-			hDetector->fxns = &TORY_EP_FXNS;
-			break;
-		case DETECTOR_TORY_CP:
-			hDetector->fxns = &TORY_CP_FXNS;
-			break;
-		case DETECTOR_TORY_EP_V2:
-			hDetector->fxns = &TORY_EP2_FXNS;
-			break;
 		default:
-			ERR("unsupported detector: %d...", params->detecotorId);
-			return E_INVAL;
+			hDetector->fxns = &DETECTOR_UART_FXNS;
+			break;
 		}
 
 		hDetector->params = *params;
@@ -328,8 +311,16 @@ Int32 detector_control(DetectorHandle hDetector, DetectorCmd cmd, void *arg, Int
 		}
 		break;
 	case DETECTOR_CMD_GET_ID:
-		if(arg && len >= sizeof(Uint16))
+		if(arg && len >= sizeof(Uint16)) {
 			*(Uint16 *)arg = hDetector->params.detecotorId;
+			ret = E_NO;
+		}
+		break;
+	case DETECTOR_CMD_GET_FD:
+		if(len >= sizeof(Int32)) {
+			*(Int32 *)arg = hDetector->fd;
+			ret = E_NO;
+		}
 		break;
 	default:
 		if(hDetector->fxns && hDetector->fxns->control)

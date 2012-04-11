@@ -64,7 +64,6 @@
 /* private data for converter */
 struct ConverterObj {
 	AlgHandle			hImgConv;
-	ParamsMngHandle		hParamsMng;
 	ImgConvInArgs		convInArgs[CONV_MAX_STREAM_NUM];
 	ImgDimension		outDim[CONV_MAX_STREAM_NUM];
 	BufPoolHandle		hBufPool;
@@ -86,20 +85,18 @@ struct ConverterObj {
     Modification : Created function
 
 *****************************************************************************/
-Int32 converter_params_update(ConverterHandle hConverter)
+Int32 converter_params_update(ConverterHandle hConverter, ConverterParams *params)
 {
-	ImgConvDynParams 	convDynParams;
-	Int32				ret;
+	Int32				ret = E_NO;
+	ImgConvDynParams	*convDynParams = &params->convDyn[0];
 
-	/* get img convert dynamic params */
-	ret = params_mng_control( hConverter->hParamsMng, 
-				PMCMD_G_IMGCONVDYN, &convDynParams, sizeof(convDynParams));
-	if(ret) {
-		ERR("get img conv dyn params failed");
-		return ret;
+	/* valid img convert dynamic params */
+	if(!params) {
+		ERR("invalid img conv params");
+		return E_INVAL;
 	}
 
-	if(!convDynParams.outAttrs[0].enbale) {
+	if(!convDynParams->outAttrs[0].enbale) {
 		/* need not convert, just return */
 		hConverter->flags &= ~CONVERTER_FLAG_EN;
 		return E_NO;
@@ -116,14 +113,14 @@ Int32 converter_params_update(ConverterHandle hConverter)
 		convInitParams.prevDevName = NULL;	//use default name
 		convInitParams.rszDevName = NULL;
 		
-		hConverter->hImgConv = img_conv_create(&convInitParams, &convDynParams);
+		hConverter->hImgConv = img_conv_create(&convInitParams, convDynParams);
 		if(!hConverter->hImgConv) {
 			ERR("create convert handle failed!");
 			return E_INVAL;
 		}
 	} else {
 		/* update dyn params */
-		ret = alg_set_dynamic_params(hConverter->hImgConv, &convDynParams);
+		ret = alg_set_dynamic_params(hConverter->hImgConv, convDynParams);
 		if(ret) {
 			ERR("set dynamic params failed");
 			return ret;
@@ -132,25 +129,20 @@ Int32 converter_params_update(ConverterHandle hConverter)
 
 	/* use outattrs in dyn params  for stream1 convert */
 	ImgConvInArgs *inArgs = &hConverter->convInArgs[0];
-	inArgs->outAttrs[0] = convDynParams.outAttrs[0];
-	inArgs->outAttrs[1] = convDynParams.outAttrs[1];
+	inArgs->outAttrs[0] = convDynParams->outAttrs[0];
+	inArgs->outAttrs[1] = convDynParams->outAttrs[1];
 	inArgs->size = sizeof(ImgConvInArgs);
 
 	/* set convert out dimisions for stream1 */
-	hConverter->outDim[0].width = convDynParams.outAttrs[0].width;
-	hConverter->outDim[0].height = convDynParams.outAttrs[0].height;
-	hConverter->outDim[0].size = convDynParams.outAttrs[0].width * convDynParams.outAttrs[0].height * 3 / 2;
+	hConverter->outDim[0].width = convDynParams->outAttrs[0].width;
+	hConverter->outDim[0].height = convDynParams->outAttrs[0].height;
+	hConverter->outDim[0].size = convDynParams->outAttrs[0].width * convDynParams->outAttrs[0].height * 3 / 2;
 	hConverter->outDim[0].bytesPerLine = hConverter->outDim[0].width;
-	hConverter->outDim[0].colorSpace = convDynParams.outAttrs[0].pixFmt;
+	hConverter->outDim[0].colorSpace = convDynParams->outAttrs[0].pixFmt;
 
 	/* get stream2 out params */
+	hConverter->convInArgs[1].outAttrs[0] = params->convDyn[1].outAttrs[0];
 	ConvOutAttrs *pConvOut = &hConverter->convInArgs[1].outAttrs[0];
-	ret = params_mng_control( hConverter->hParamsMng, 
-				PMCMD_G_2NDSTREAMATTRS, pConvOut, sizeof(ConvOutAttrs));
-	if(ret) {
-		ERR("get img conv dyn params failed");
-		return ret;
-	}
 
 	inArgs = &hConverter->convInArgs[1];
 	inArgs->size = sizeof(ImgConvInArgs);
@@ -256,7 +248,7 @@ free_buf:
     Modification : Created function
 
 *****************************************************************************/
-ConverterHandle converter_create(ConverterAttrs *attrs)
+ConverterHandle converter_create(ConverterAttrs *attrs, const ConverterParams *params)
 {
 	assert(attrs && attrs->bufNum > 0);
 
@@ -282,10 +274,9 @@ ConverterHandle converter_create(ConverterAttrs *attrs)
 		goto exit;
 
 	/* set params */
-	hConverter->hParamsMng = attrs->hParamsMng;
 	hConverter->flags = attrs->flags;
 	
-	ret = converter_params_update(hConverter);
+	ret = converter_params_update(hConverter, (ConverterParams *)params);
 	if(ret) {
 		goto exit;
 	}

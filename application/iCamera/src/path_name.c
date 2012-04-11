@@ -25,7 +25,7 @@
 #include "path_name.h"
 #include "log.h"
 #include "net_utils.h"
-#include "cam_params.h"
+#include "cam_detector.h"
 
 /*----------------------------------------------*
  * external variables                           *

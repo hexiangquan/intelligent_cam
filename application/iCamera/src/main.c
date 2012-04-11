@@ -27,16 +27,11 @@
 #include "alg.h"
 #include <pthread.h>
 #include "cam_time.h"
+#include "cam_file.h"
 #include "app_msg.h"
-#include "params_mng.h"
 #include "buffer.h"
-#include "data_capture.h"
-#include "encoder.h"
 #include <signal.h>
 #include "ctrl_server.h"
-#include "img_convert.h"
-#include "jpg_encoder.h"
-#include "h264_encoder.h"
 #include "icam_ctrl.h"
 
 /*----------------------------------------------*
@@ -82,12 +77,7 @@ typedef struct {
 	Bool			exit;
 	Bool			reboot;
 	pthread_t		pid[CAM_MAX_THREAD_NUM];
-	ParamsMngHandle hParamsMng;
-	DataCapHandle	hDataCap;
-	EncoderHandle	hJpgEncoder;
-	EncoderHandle	hH264Encoder;
 	CtrlSrvHandle	hCtrlSrv;
-	pthread_mutex_t	encMutex;
 }MainEnv;
 
 static Bool s_exit = FALSE;
@@ -119,46 +109,11 @@ static Int32 app_init(MainEnv *envp)
 		ERR("module init failed!");
 		return ret;
 	}
-
-	/* read params */
-	envp->hParamsMng = params_mng_create(envp->cfgFileName);
-	if(!envp->hParamsMng) {
-		ERR("create params failed.");
-		return E_IO;
-	}
-
 	
-	/* create data capture module (App module) */
-	DataCapAttrs dataCapAttrs;
-
-	dataCapAttrs.hParamsMng = envp->hParamsMng;
-	dataCapAttrs.maxOutWidth = IMG_MAX_WIDTH;
-	dataCapAttrs.maxOutHeight = IMG_MAX_HEIGHT;
-	
-	envp->hDataCap = data_capture_create(&dataCapAttrs);
-	if(!envp->hDataCap) {
-		ERR("create data capture failed");
-		return E_INVAL;
-	}
-
-	
-	/* create jpg encoder */
-	pthread_mutex_init(&envp->encMutex, NULL);
-	envp->hJpgEncoder = jpg_encoder_create(envp->hParamsMng, &envp->encMutex);
-	if(!envp->hJpgEncoder) {
-		return E_IO;
-	}
-
-	/* create video encoder */
-	envp->hH264Encoder = h264_encoder_create(envp->hParamsMng, &envp->encMutex);
-	if(!envp->hH264Encoder) {
-		return E_IO;
-	}
-
 	/* create ctrl server */
 	CtrlSrvAttrs ctrlSrvAttrs;
 
-	ctrlSrvAttrs.hParamsMng = envp->hParamsMng;
+	ctrlSrvAttrs.cfgFileName = envp->cfgFileName;
 	ctrlSrvAttrs.msgName = ICAM_MSG_NAME;
 	
 	envp->hCtrlSrv = ctrl_server_create(&ctrlSrvAttrs);
@@ -188,30 +143,6 @@ static Int32 app_run(MainEnv *envp)
 {
 	Int32 		err;
 
-	/* start data capture */
-	err = data_capture_run(envp->hDataCap);
-	if(err ) {
-		ERR("data capture run failed...");
-		return err;
-	}
-
-#if 1
-	/* run encode thread */
-	DBG("start running encoders");
-
-	err = encoder_run(envp->hJpgEncoder);
-	if(err) {
-		ERR("jpg encoder run failed...");
-		return err;
-	}
-
-	err = encoder_run(envp->hH264Encoder);
-	if(err) {
-		ERR("h264 encoder run failed...");
-		return err;
-	}
-#endif
-
 	/* run ctrl server */
 	err = ctrl_server_run(envp->hCtrlSrv);
 	if(err) {
@@ -240,28 +171,12 @@ static Int32 app_run(MainEnv *envp)
 *****************************************************************************/
 static void app_exit(MainEnv *envp, MsgHandle hMsg)
 {
-	/* call encoders exit */
-	if(envp->hJpgEncoder)
-		encoder_delete(envp->hJpgEncoder, hMsg);
-
-	if(envp->hH264Encoder)
-		encoder_delete(envp->hH264Encoder, hMsg);
-
 	/* call ctrl server exit */
 	if(envp->hCtrlSrv)
 		ctrl_server_delete(envp->hCtrlSrv, hMsg);
 
-	/* exit data capture */
-	if(envp->hDataCap)
-		data_capture_delete(envp->hDataCap, hMsg);
-
 	if(hMsg)
 		msg_delete(hMsg);
-
-	if(envp->hParamsMng)
-		params_mng_delete(envp->hParamsMng);
-
-	pthread_mutex_destroy(&envp->encMutex);
 
 	alg_exit();
 

@@ -19,7 +19,7 @@
 #ifndef __DETECTOR_H__
 #define __DETECTOR_H__
 
-#include "cap_info.h"
+#include "cam_detector.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -91,6 +91,7 @@ typedef struct {
 
 /* object of this module */
 struct DetectorObj {
+	Int32				fd;			//fd for driver
 	const DetectorFxns	*fxns;
 	CamDetectorParam	params;
 	void				*private;
@@ -105,6 +106,9 @@ struct DetectorObj {
 
 #define DETECTOR_SET_PRIVATE(hDetector, data) \
 	(hDetector->private = (void *)data)
+
+#define DETECTOR_SET_FD(hDetector, fd) \
+	(hDetector->fd = fd)
 
 
 #ifdef __cplusplus

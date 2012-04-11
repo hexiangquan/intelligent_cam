@@ -59,8 +59,6 @@
 #define CAPTHR_STAT_CAP_STARTED		(1 << 1)	//capture started
 #define CAPTHR_STAT_TRIG			(1 << 2)	//tirgger mode
 
-#define CAP_DEVICE					"/dev/video0"
-#define CAP_BUF_NUM					3
 #define CONV_BUF_NUM				2
 
 #define CAP_TRIG_TEST
@@ -74,7 +72,9 @@
 
 /* thread running environment */
 struct DataCapObj{
-	ParamsMngHandle 	hParamsMng;
+	CamWorkMode			workMode;
+	CamDetectorParam	detectorParams;
+	ConverterParams		convParams;
 	CapHandle			hCap;
 	CapInputInfo		inputInfo;
 	ConverterHandle		hConverter;
@@ -91,61 +91,6 @@ struct DataCapObj{
 	const char 			*dstName[2];
 };
 
-/*****************************************************************************
- Prototype    : cap_module_init
- Description  : create capture module
- Input        : ParamsMngHandle hParamsMng  
-                CamWorkMode *workMode       
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/3/19
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static CapHandle cap_module_init(ParamsMngHandle hParamsMng)
-{
-	/* get current work mode  & img enhance params */
-	CapAttrs		capAttrs;
-	CapInputInfo	inputInfo;
-	CapHandle		hCap;
-	CamWorkMode 	workMode;
-	Int32			ret;
-
-	/* fill attrs for capture create */
-	capAttrs.devName = CAP_DEVICE;
-	capAttrs.inputType = CAP_INPUT_CAMERA;
-	capAttrs.userAlloc = TRUE;
-	capAttrs.bufNum = CAP_BUF_NUM;
-	capAttrs.defRefCnt = 1;
-
-	ret = params_mng_control(hParamsMng, PMCMD_G_WORKMODE, &workMode, sizeof(workMode));
-	assert(ret == E_NO);
-
-	capAttrs.std = 
-		(workMode.resType == CAM_RES_FULL_FRAME) ? CAP_STD_FULL_FRAME : CAP_STD_HIGH_SPEED;
-	capAttrs.mode = 
-		(workMode.capMode == CAM_CAP_MODE_CONTINUE) ? CAP_MODE_CONT : CAP_MODE_TRIG;
-	
-	/* create capture object */
-	hCap = capture_create(&capAttrs);
-	if(!hCap) {
-		ERR("create capture handle failed...");
-		return NULL;
-	}
-
-	capture_get_input_info(hCap, &inputInfo);
-
-	/* set capture info to params manager */
-	ret = params_mng_control(hParamsMng, PMCMD_S_CAPINFO, &inputInfo, sizeof(CapInputInfo));
-	assert(ret == E_NO);
-
-	return hCap;
-}
 
 /*****************************************************************************
  Prototype    : data_capture_get_fds
@@ -196,16 +141,14 @@ static Int32 data_capture_get_fds(DataCapHandle hDataCap)
 *****************************************************************************/
 static Int32 data_capture_config(DataCapHandle hDataCap)
 {
-	CamWorkMode			workMode;
+	CamWorkMode			*workMode = &hDataCap->workMode;
 	Int32				ret;
 	Int32				bufRefCnt = 1;
 
 	DBG("set work mode");
-	ret = params_mng_control(hDataCap->hParamsMng, PMCMD_G_WORKMODE, &workMode, sizeof(workMode));
-	assert(ret == E_NO);
-
+	
 	/* alloc encode for continously stream, test */
-	if(workMode.capMode == CAM_CAP_MODE_CONTINUE) {
+	if(workMode->capMode == CAM_CAP_MODE_CONTINUE) {
 		hDataCap->encImg = FALSE;
 		hDataCap->status &= ~CAPTHR_STAT_TRIG;
 	} else {
@@ -215,13 +158,13 @@ static Int32 data_capture_config(DataCapHandle hDataCap)
 	hDataCap->dstName[1] = NULL;
 	hDataCap->status |= CAPTHR_STAT_CONV_EN;
 	
-	if(workMode.format == CAM_FMT_JPEG) {
+	if(workMode->format == CAM_FMT_JPEG) {
 		hDataCap->dstName[0] = MSG_IMG_ENC;
 		DBG("snd stream to jpg only");
-	} else if(workMode.format == CAM_FMT_H264) {
+	} else if(workMode->format == CAM_FMT_H264) {
 		hDataCap->dstName[0] = MSG_VID_ENC;
 		DBG("snd stream to h.264 only");
-	} else if(workMode.format == CAM_FMT_JPEG_H264) {
+	} else if(workMode->format == CAM_FMT_JPEG_H264) {
 		hDataCap->dstName[0] = MSG_VID_ENC;
 		hDataCap->dstName[1] = MSG_IMG_ENC;
 		bufRefCnt = 1; //convert only in one format
@@ -248,8 +191,8 @@ static Int32 data_capture_config(DataCapHandle hDataCap)
 	CaptureStd	std;
 	CaptureMode mode;
 	
-	std = (workMode.resType == CAM_RES_HIGH_SPEED) ? CAP_STD_HIGH_SPEED : CAP_STD_FULL_FRAME;
-	mode = (workMode.capMode == CAM_CAP_MODE_CONTINUE) ? CAP_MODE_CONT : CAP_MODE_TRIG;
+	std = (workMode->resType == CAM_RES_HIGH_SPEED) ? CAP_STD_HIGH_SPEED : CAP_STD_FULL_FRAME;
+	mode = (workMode->capMode == CAM_CAP_MODE_CONTINUE) ? CAP_MODE_CONT : CAP_MODE_TRIG;
 
 	/* Change attrs */
 	ret = capture_config(hDataCap->hCap, std, mode);
@@ -259,16 +202,16 @@ static Int32 data_capture_config(DataCapHandle hDataCap)
 	}
 	
 	/* Init msg for new image */
-	CapInputInfo inputInfo;
-	
-	ret = capture_get_input_info(hDataCap->hCap, &inputInfo);
+
+	ret = capture_get_input_info(hDataCap->hCap, &hDataCap->inputInfo);
 	assert(ret == E_NO);
 
 	/* set capture info to params manager */
-	ret = params_mng_control(hDataCap->hParamsMng, PMCMD_S_CAPINFO, &inputInfo, sizeof(CapInputInfo));
-	assert(ret == E_NO);
+	if(app_hdr_msg_send(hDataCap->hMsg, MSG_CTRL, APPCMD_SET_CAP_INPUT, 0, 0)) {
+		ERR("send msg to update input info failed");
+	}
 	
-	hDataCap->capDim = inputInfo;
+	hDataCap->capDim = hDataCap->inputInfo;
 	
 	DBG("capture out size: %u X %u", hDataCap->capDim.width, hDataCap->capDim.height);
 
@@ -297,17 +240,12 @@ static Int32 data_capture_config(DataCapHandle hDataCap)
 *****************************************************************************/
 static Int32 detector_config(DataCapHandle hDataCap)
 {
-	CamDetectorParam 	detectorParams;
+	CamDetectorParam 	*detectorParams = &hDataCap->detectorParams;
 	Int32				ret;
-
-	/* get current params */
-	ret = params_mng_control(hDataCap->hParamsMng, PMCMD_G_DETECTORPARAMS, 
-			&detectorParams, sizeof(detectorParams));
-	assert(ret == E_NO);
 
 	if(!hDataCap->hDetector) {
 		/* create */
-		hDataCap->hDetector = detector_create(&detectorParams);
+		hDataCap->hDetector = detector_create(detectorParams);
 		if(!hDataCap->hDetector) {
 			ERR("create new detector failed");
 			return E_IO;
@@ -322,7 +260,7 @@ static Int32 detector_config(DataCapHandle hDataCap)
 	} else {
 		/* cfg detector */
 		ret = detector_control(hDataCap->hDetector, DETECTOR_CMD_SET_PARAMS, 
-				&detectorParams, sizeof(detectorParams));
+				detectorParams, sizeof(CamDetectorParam));
 		if(!ret) {
 			ERR("set detector params failed");
 			return ret;
@@ -511,7 +449,7 @@ static Int32 msg_process(DataCapHandle hDataCap, CommonMsg *msgBuf)
 		err = data_capture_config(hDataCap);
 		break;
 	case APPCMD_SET_IMG_CONV:
-		err = converter_params_update(hDataCap->hConverter);
+		err = converter_params_update(hDataCap->hConverter, &hDataCap->convParams);
 		break;
 	case APPCMD_SET_TRIG_PARAMS:
 		err = detector_config(hDataCap);
@@ -662,9 +600,9 @@ exit:
     Modification : Created function
 
 *****************************************************************************/
-DataCapHandle data_capture_create(DataCapAttrs *attrs)
+DataCapHandle data_capture_create(const DataCapAttrs *attrs)
 {
-	assert(attrs && attrs->hParamsMng);
+	assert(attrs);
 
 	DataCapHandle 	hDataCap;
 	Int32 			ret;
@@ -681,23 +619,33 @@ DataCapHandle data_capture_create(DataCapAttrs *attrs)
 		goto exit;
 	}
 	
-	hDataCap->hParamsMng = attrs->hParamsMng;
-	hDataCap->hCap = cap_module_init(attrs->hParamsMng);
+	hDataCap->workMode = attrs->workMode;
+	hDataCap->hCap = attrs->hCapture;
+	if(!hDataCap->hCap) {
+		ERR("create cap module failed...");
+		goto exit;
+	}
+
+	capture_get_input_info(hDataCap->hCap, &hDataCap->inputInfo);
 
 	/* create converter */
-	ConverterAttrs convAttrs;
-	convAttrs.hParamsMng = attrs->hParamsMng;
+	ConverterAttrs 	convAttrs;
+	hDataCap->convParams = attrs->convParams;
+
 	convAttrs.maxImgWidth = attrs->maxOutWidth;
 	convAttrs.maxImgHeight = attrs->maxOutHeight;
 	convAttrs.bufNum = CONV_BUF_NUM;
 	convAttrs.flags = 0;
 
-	hDataCap->hConverter = converter_create(&convAttrs);
+	/* set input to current info */
+	hDataCap->hConverter = converter_create(&convAttrs, &hDataCap->convParams);
 	if(!hDataCap->hConverter) {
 		ERR("creater converter failed.");
 		goto exit;
 	}
 
+	/* record params */
+	hDataCap->detectorParams = attrs->detectorParams;
 
 	/* init our running evironment */
 	ret = data_capture_config(hDataCap);
@@ -791,10 +739,6 @@ Int32 data_capture_delete(DataCapHandle hDataCap, MsgHandle hCurMsg)
 	if(hDataCap->hMsg)
 		msg_delete(hDataCap->hMsg);
 
-	/* delete capture handle */
-	if(hDataCap->hCap)
-		capture_delete(hDataCap->hCap);
-
 	if(hDataCap->hConverter)
 		converter_delete(hDataCap->hConverter);
 
@@ -854,8 +798,13 @@ Int32 data_capture_run(DataCapHandle hDataCap)
     Modification : Created function
 
 *****************************************************************************/
-Int32 data_capture_set_work_mode(DataCapHandle hDataCap, MsgHandle hCurMsg)
+Int32 data_capture_set_work_mode(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamWorkMode *workMode)
 {
+	if(!workMode)
+		return E_INVAL;
+
+	hDataCap->workMode = *workMode;
+
 	return data_capture_send_cmd(hDataCap, APPCMD_SET_WORK_MODE, hCurMsg);
 }
 
@@ -875,9 +824,93 @@ Int32 data_capture_set_work_mode(DataCapHandle hDataCap, MsgHandle hCurMsg)
     Modification : Created function
 
 *****************************************************************************/
-Int32 data_capture_conv_params(DataCapHandle hDataCap, MsgHandle hCurMsg)
-{
+Int32 data_capture_set_conv_params(DataCapHandle hDataCap, MsgHandle hCurMsg, const ConverterParams *params)
+{	
+	if(!params)
+		return E_INVAL;
+	
+	hDataCap->convParams = *params;
+
 	return data_capture_send_cmd(hDataCap, APPCMD_SET_IMG_CONV, hCurMsg);
 }
 
+/*****************************************************************************
+ Prototype    : data_capture_set_detector_params
+ Description  : set detector params
+ Input        : DataCapHandle hDataCap          
+                MsgHandle hCurMsg               
+                const CamDetectorParam *params  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 data_capture_set_detector_params(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamDetectorParam *params)
+{	
+	if(!params)
+		return E_INVAL;
+	
+	hDataCap->detectorParams = *params;
+
+	return data_capture_send_cmd(hDataCap, APPCMD_SET_TRIG_PARAMS, hCurMsg);
+}
+
+
+/*****************************************************************************
+ Prototype    : data_capture_get_input_info
+ Description  : get input info
+ Input        : DataCapHandle hDataCap   
+                CamInputInfo *inputInfo  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 data_capture_get_input_info(DataCapHandle hDataCap, ImgDimension *inputInfo)
+{
+	if(!hDataCap || !inputInfo) {
+		return E_INVAL;
+	}
+
+	*inputInfo = hDataCap->inputInfo;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : data_capture_ctrl
+ Description  : change capture status
+ Input        : DataCapHandle hDataCap  
+                MsgHandle hCurMsg       
+                CamCapCtrl ctrl         
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 data_capture_ctrl(DataCapHandle hDataCap, MsgHandle hCurMsg, Int32 ctrl)
+{
+	if(!hDataCap)
+		return E_INVAL;
+	
+	return app_hdr_msg_send(hCurMsg, msg_get_name(hDataCap->hMsg), APPCMD_CAP_EN, ctrl, 0);
+}
 

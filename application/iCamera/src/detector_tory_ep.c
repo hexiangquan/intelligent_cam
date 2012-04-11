@@ -30,8 +30,7 @@
     Modification: Created file
 
 ******************************************************************************/
-#include "detector.h"
-#include "uart.h"
+#include "detector_uart_generic.h"
 #include "log.h"
 
 /*----------------------------------------------*
@@ -61,26 +60,12 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
-#define CAP_TABLE_SIZE 			4
-#define RX_BUF_SIZE				5
 #define DETECTOR_ID_TORY_EP		0x0F
-#define RECV_TRIG_TIMEOUT		20 //ms
 #define TORY_EP_DEBUG
 
 /*----------------------------------------------*
  * routines' implementations                    *
  *----------------------------------------------*/
-
-/* Run time params */
-typedef struct {
-	Int32			fd;									//Rs485 fd
-	Uint16			groupId[APP_MAX_CAP_CNT];			//GroupNum for each way
-	Uint16			redlightTime[APP_MAX_CAP_CNT];		//Redlight time record for each way
-	Uint8			epCapTable[CAP_TABLE_SIZE];			//Epolice trigger code to frame id table
-	Uint8			retrogradeCapTable[CAP_TABLE_SIZE];	//Retrograde trigger code to frame id table
-	Uint8			lastFrameId;						// Trigger code for the last frame 
-	Uint8			timeout;							//recv timeout
-}DetectorToryEp;
 
 
 /*****************************************************************************
@@ -108,42 +93,42 @@ static void tory_ep_cap_pre_parse(Uint16 redLightCapFlags, Uint8 epCapTable[], U
 	switch(redLightCapFlags & 0x0F) {
 	/* Only cap at loop1 pos edge */ 
 	case DETECTOR_FLAG_LOOP1_POS_CAP:
-		epCapTable[1] = FRAME_EPOLICE_1ST;	//First frame 
+		epCapTable[1] = FRAME_TRIG_BASE;	//First frame 
 		*lastFrameId = 0x01;
 		break;
 	/* Only cap at loop1 negative edge */  
 	case DETECTOR_FLAG_LOOP1_NEG_CAP:
-		epCapTable[2] = FRAME_EPOLICE_1ST;
+		epCapTable[2] = FRAME_TRIG_BASE;
 		*lastFrameId = 0x02;
 		break;
 	/* Cap at loop1 pos edge and loop1 negative edge */
 	case (DETECTOR_FLAG_LOOP1_NEG_CAP|DETECTOR_FLAG_LOOP1_POS_CAP):
-		epCapTable[1] = FRAME_EPOLICE_1ST;
-		epCapTable[2] = FRAME_EPOLICE_2ND;
+		epCapTable[1] = FRAME_TRIG_BASE;
+		epCapTable[2] = FRAME_TRIG_BASE + 1;
 		*lastFrameId = 0x02;
 		break;
 	/* Only cap at loop2 negative edge */ 
 	case DETECTOR_FLAG_LOOP2_NEG_CAP:
-		epCapTable[3] = FRAME_EPOLICE_1ST;
+		epCapTable[3] = FRAME_TRIG_BASE;
 		*lastFrameId = 0x03;
 		break;
 	/* Cap at loop1 pos edge and loop2 negative edge */
 	case (DETECTOR_FLAG_LOOP2_NEG_CAP|DETECTOR_FLAG_LOOP1_POS_CAP):
-		epCapTable[1] = FRAME_EPOLICE_1ST;
-		epCapTable[3] = FRAME_EPOLICE_2ND;
+		epCapTable[1] = FRAME_TRIG_BASE;
+		epCapTable[3] = FRAME_TRIG_BASE + 1;
 		*lastFrameId = 0x03;
 		break;
 	/* Cap at loop1 negative and loop2 negative edge */
 	case (DETECTOR_FLAG_LOOP2_NEG_CAP|DETECTOR_FLAG_LOOP1_NEG_CAP):
-		epCapTable[2] = FRAME_EPOLICE_1ST;
-		epCapTable[3] = FRAME_EPOLICE_2ND;
+		epCapTable[2] = FRAME_TRIG_BASE;
+		epCapTable[3] = FRAME_TRIG_BASE + 1;
 		*lastFrameId = 0x03;
 		break;
 	/* Cap at loop1 pos, loop1 negative and loop2 negative edge */
 	case (DETECTOR_FLAG_LOOP2_NEG_CAP|DETECTOR_FLAG_LOOP1_NEG_CAP|DETECTOR_FLAG_LOOP1_POS_CAP):
-		epCapTable[1] = FRAME_EPOLICE_1ST;
-		epCapTable[2] = FRAME_EPOLICE_2ND;
-		epCapTable[3] = FRAME_EPOLICE_3RD;
+		epCapTable[1] = FRAME_TRIG_BASE;
+		epCapTable[2] = FRAME_TRIG_BASE + 1;
+		epCapTable[3] = FRAME_TRIG_BASE + 2;
 		*lastFrameId = 0x03;
 		break;
 	default:
@@ -184,233 +169,99 @@ void tory_retrograde_cap_pre_parse(Uint16 reCapFlags, Uint8 reCapTable[])
 	switch(reCapFlags & 0x0F) {
 	/* Only cap at loop1 pos edge */
 	case DETECTOR_FLAG_LOOP1_POS_CAP:
-		reCapTable[2] = FRAME_RETROGRADE_1ST;
+		reCapTable[2] = FRAME_TRIG_BASE;
 		break;
 	/* Only cap at loop2 pos edge */
 	case DETECTOR_FLAG_LOOP2_POS_CAP:
-		reCapTable[1] = FRAME_RETROGRADE_1ST;
+		reCapTable[1] = FRAME_TRIG_BASE;
 		break;
 	/* Cap at loop2 pos edge and loop1 pos edge */
 	case DETECTOR_FLAG_LOOP2_POS_CAP|DETECTOR_FLAG_LOOP1_POS_CAP:
-		reCapTable[1] = FRAME_RETROGRADE_1ST;
-		reCapTable[2] = FRAME_RETROGRADE_2ND;
+		reCapTable[1] = FRAME_TRIG_BASE;
+		reCapTable[2] = FRAME_TRIG_BASE + 1;
 		break;
 	/* Cap at loop2 neg edge */
 	case DETECTOR_FLAG_LOOP2_NEG_CAP:
-		reCapTable[3] = FRAME_RETROGRADE_1ST;
+		reCapTable[3] = FRAME_TRIG_BASE;
 		break;
 	/* Cap at loop2 neg edge and loop1 pos edge */
 	case DETECTOR_FLAG_LOOP2_NEG_CAP|DETECTOR_FLAG_LOOP1_POS_CAP:
-		reCapTable[2] = FRAME_RETROGRADE_1ST;
-		reCapTable[3] = FRAME_RETROGRADE_2ND;
+		reCapTable[2] = FRAME_TRIG_BASE;
+		reCapTable[3] = FRAME_TRIG_BASE + 1;
 		break;
 	/* Cap at loop2 neg edge and loop2 pos edge */
 	case DETECTOR_FLAG_LOOP2_NEG_CAP|DETECTOR_FLAG_LOOP2_POS_CAP:
-		reCapTable[1] = FRAME_RETROGRADE_1ST;
-		reCapTable[3] = FRAME_RETROGRADE_2ND;
+		reCapTable[1] = FRAME_TRIG_BASE;
+		reCapTable[3] = FRAME_TRIG_BASE + 1;
 		break;
 	/* Cap at loop2 pos edge, loop1 pos edge and loop2 neg edge */
 	case DETECTOR_FLAG_LOOP2_NEG_CAP|DETECTOR_FLAG_LOOP2_POS_CAP|DETECTOR_FLAG_LOOP1_POS_CAP:
-		reCapTable[1] = FRAME_RETROGRADE_1ST;
-		reCapTable[2] = FRAME_RETROGRADE_2ND;
-		reCapTable[3] = FRAME_RETROGRADE_3RD;
+		reCapTable[1] = FRAME_TRIG_BASE;
+		reCapTable[2] = FRAME_TRIG_BASE + 1;
+		reCapTable[3] = FRAME_TRIG_BASE + 2;
 		break;
 	default:
 		break;
 	}
 }
 
+
 /*****************************************************************************
- Prototype    : tory_ep_start
- Description  : start recv data
- Input        : DetectorToryEp *dev  
+ Prototype    : tory_ep_pre_parse
+ Description  : pre parse trigger params
+ Input        : DetectorUart *dev               
+                const CamDetectorParam *params  
  Output       : None
  Return Value : static
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/30
+  1.Date         : 2012/4/9
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-Int32 tory_ep_start(Int32 *fd, Uint8 timeout) 
+static void tory_ep_pre_parse(DetectorUart *dev, const CamDetectorParam *params)
 {
-	Int32 ret = E_NO;
-
-	if(*fd <= 0) {
-		/* open uart */
-		ret = uart_open(UART_RS485, UART_B9600, UART_D8, UART_S1, UART_POFF);
-		if(ret < 0) {
-			ERR("open UART failed");
-			return ret;
-		}
-
-		/* record fd */
-		*fd = ret;
-
-		/* set timeout for 1 byte recv */
-		ret = uart_set_timeout(*fd, 1, timeout);
-	} else 
-		UART_FLUSH(*fd);
-
-	return ret;
+	if(!dev || !params)
+		return;
+	
+	tory_ep_cap_pre_parse(params->redLightCapFlag, dev->epCapTable, &dev->lastFrameCode[TRIG_EP]);
+	tory_retrograde_cap_pre_parse(params->retrogradeCapFlag, dev->reCapTable);
 }
 
+
 /*****************************************************************************
- Prototype    : tory_ep_stop
- Description  : stop recv data
- Input        : DetectorToryEp *dev  
+ Prototype    : tory_ep_sync
+ Description  : sync start code
+ Input        : DetectorUart *dev  
+                Uint8 data         
  Output       : None
  Return Value : static
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/30
+  1.Date         : 2012/4/6
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-Int32 tory_ep_stop(Int32 fd) 
+static Bool tory_ep_sync(DetectorUart *dev, Uint8 data)
 {
-	if(fd > 0)
-		UART_FLUSH(fd);
-
-	return E_NO;
-}
-
-/*****************************************************************************
- Prototype    : tory_ep_open
- Description  : open device
- Input        : DetectorHandle hDetector  
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/3/30
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static Int32 tory_ep_open(DetectorHandle hDetector)
-{
-	Int32				ret = 0;
-	DetectorToryEp 		*dev;
-
-	assert(hDetector);
-
-	dev = calloc(1, sizeof(DetectorToryEp));
-	if(!dev) {
-		ERR("memory allocation failed.");
-		return  E_NOMEM;
+	if(data == DETECTOR_ID_TORY_EP) {
+		return TRUE;
 	}
 
-	dev->timeout = 1;
-
-	/* open uart */
-	ret = tory_ep_start(&dev->fd, dev->timeout);
-	if(ret) {
-		ERR("start failed");
-		goto free_buf;
-	}
-	
-	/* Pre parse capture flags */
-	const CamDetectorParam *params = DETECTOR_GET_PARAMS(hDetector);
-	
-	tory_ep_cap_pre_parse(params->redLightCapFlag, dev->epCapTable, &dev->lastFrameId);
-	tory_retrograde_cap_pre_parse(params->retrogradeCapFlag, dev->retrogradeCapTable);
-
-	/* set private data as our dev info */
-	DETECTOR_SET_PRIVATE(hDetector, dev);
-
-	return E_NO;
-
-free_buf:
-
-	if(dev->fd > 0)
-		close(dev->fd);
-	
-	if(dev)
-		free(dev);
-	return ret;
+	return FALSE;
 }
 
-/*****************************************************************************
- Prototype    : tory_ep_close
- Description  : close device
- Input        : DetectorHandle hDetector  
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/3/30
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static Int32 tory_ep_close(DetectorHandle hDetector)
-{
-	DetectorToryEp 	*dev = DETECTOR_GET_PRIVATE(hDetector);
-	
-	if(!hDetector || !dev)
-		return E_INVAL;
-
-	if(dev->fd > 0)
-		close(dev->fd);
-
-	free(dev);
-
-	/* set private data as NULL */
-	DETECTOR_SET_PRIVATE(hDetector, NULL);
-	
-	return E_NO;
-}
-
-/*****************************************************************************
- Prototype    : recv_start_code
- Description  : Receive start code accodring to protocol
- Input        : GIO_Handle hUart    
-                Uint8 *pBuf         
-                Uint32 unTimeoutMs  
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2011/8/9
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static inline Int32 recv_start_code(Int32 fd, Uint8 *buf)
-{
-	Int32 status;
-
-	while(1) {
-		status = read(fd, buf, 1);
-		if(status != 1) {
-			#ifdef TORY_EP2_DEBUG
-			ERR("recv start code timeout.");		
-			#endif
-			return E_TIMEOUT;
-		}
-
-		if(buf[0] == DETECTOR_ID_TORY_EP)
-			return E_NO;
-	}
-}
 
 /*****************************************************************************
  Prototype    : ep_cap_parse
  Description  : parse ep data
- Input        : DetectorToryEp *dev       
+ Input        : DetectorUart *dev       
                 CamDetectorParam *params  
                 Uint8 *rxBuf              
                 CaptureInfo *capInfo      
@@ -425,14 +276,13 @@ static inline Int32 recv_start_code(Int32 fd, Uint8 *buf)
     Modification : Created function
 
 *****************************************************************************/
-static Int32 ep_cap_parse(DetectorToryEp *dev, const CamDetectorParam *params, Uint8 *rxBuf, CaptureInfo *capInfo)
+static Int32 ep_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uint8 *rxBuf, TriggerInfo *info)
 {	
 	Int32 wayNum;
-	Int32 index = capInfo->capCnt;
 
 	wayNum = (rxBuf[1]>>4) & 0x0F;
 
-	if(wayNum > APP_MAX_CAP_CNT || rxBuf[2] >= CAP_TABLE_SIZE)
+	if(wayNum > APP_MAX_CAP_CNT)
 		return E_INVAL;
 
 	/* Record redlight time, unit: 10ms */
@@ -444,33 +294,28 @@ static Int32 ep_cap_parse(DetectorToryEp *dev, const CamDetectorParam *params, U
 		return E_NOTEXIST; //Should not capture at this position
 
 	/* Set frame Id and flag */
-	capInfo->triggerInfo[index].frameId = dev->epCapTable[rxBuf[2]];
-	capInfo->triggerInfo[index].flags = 0;
+	info->frameId = dev->epCapTable[rxBuf[2]];
+	info->flags = 0;
 
 	/* Way Number */
-	capInfo->triggerInfo[index].wayNum = wayNum;
+	info->wayNum = wayNum;
 
 	/* Redlight time, unit: 10ms */
-	capInfo->triggerInfo[index].redlightTime =
-		dev->redlightTime[wayNum - 1]; 
+	info->redlightTime = dev->redlightTime[wayNum - 1]; 
 	
 	/* Set redlight flag */
-	capInfo->triggerInfo[index].flags |= TRIG_INFO_RED_LIGHT;
+	info->flags |= TRIG_INFO_RED_LIGHT;
 
 	/* Group Num */
-	if(capInfo->triggerInfo[index].frameId == FRAME_EPOLICE_1ST)
+	if(info->frameId == FRAME_TRIG_BASE)
 		dev->groupId[wayNum - 1]++;
-	capInfo->triggerInfo[index].groupId= dev->groupId[wayNum - 1];
+	info->groupId = dev->groupId[wayNum - 1];
 
 	/* Check if delay cap is set */
 	if((params->redLightCapFlag & DETECTOR_FLAG_DELAY_CAP) &&
-		rxBuf[2] == dev->lastFrameId) {
-		capInfo->triggerInfo[index].flags |= TRIG_INFO_DELAY_CAP;
-		capInfo->flags |= CAPINFO_FLAG_DELAY_CAP;
+		rxBuf[2] == dev->lastFrameCode[TRIG_EP]) {
+		info->flags |= TRIG_INFO_DELAY_CAP;
 	}
-
-	/* Capture count increase */
-	capInfo->capCnt++;
 	
 	return E_NO;
 }
@@ -479,7 +324,7 @@ static Int32 ep_cap_parse(DetectorToryEp *dev, const CamDetectorParam *params, U
 /*****************************************************************************
  Prototype    : retrograde_cap_parse
  Description  : parse retrograde data
- Input        : DetectorToryEp *dev       
+ Input        : DetectorUart *dev       
                 CamDetectorParam *params  
                 Uint8 *rxBuf              
                 CaptureInfo *capInfo      
@@ -494,37 +339,33 @@ static Int32 ep_cap_parse(DetectorToryEp *dev, const CamDetectorParam *params, U
     Modification : Created function
 
 *****************************************************************************/
-static Int32 retrograde_cap_parse(DetectorToryEp *dev, const CamDetectorParam *params, Uint8 *rxBuf, CaptureInfo *capInfo)
+static Int32 retrograde_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uint8 *rxBuf, TriggerInfo *info)
 {
 	Int32 wayNum;
-	Int32 index = capInfo->capCnt;
 
 	/* Way Number */
 	wayNum = (rxBuf[1] >> 4) & 0x0F;
 
-	if(wayNum > APP_MAX_CAP_CNT || rxBuf[2] >= CAP_TABLE_SIZE)
+	if(wayNum > APP_MAX_CAP_CNT)
 		return E_INVAL;
 
 	/* Check if capture is needed at this position */
-	if(dev->retrogradeCapTable[rxBuf[2]] == 0xFF)
+	if(dev->reCapTable[rxBuf[2]] == 0xFF)
 		return E_NOTEXIST; //Should not capture at this position
 
 	/* Set frame Id and flag */
-	capInfo->triggerInfo[index].frameId = dev->retrogradeCapTable[rxBuf[2]];
-	capInfo->triggerInfo[index].flags = 0;
+	info->frameId = dev->reCapTable[rxBuf[2]];
+	info->flags = 0;
 
-	capInfo->triggerInfo[index].wayNum = wayNum;
+	info->wayNum = wayNum;
 
 	/* Set retrograde flag */
-	capInfo->triggerInfo[index].flags |= TRIG_INFO_RETROGRADE;
+	info->flags |= TRIG_INFO_RETROGRADE;
 	
 	/* Group Num */
-	if(capInfo->triggerInfo[index].frameId == FRAME_RETROGRADE_1ST)
+	if(info->frameId == FRAME_TRIG_BASE)
 		dev->groupId[wayNum - 1]++;
-	capInfo->triggerInfo[index].groupId = dev->groupId[wayNum - 1];
-
-	/* Capture count increase */
-	capInfo->capCnt++;
+	info->groupId = dev->groupId[wayNum - 1];
 	
 	return E_NO;
 }
@@ -532,7 +373,7 @@ static Int32 retrograde_cap_parse(DetectorToryEp *dev, const CamDetectorParam *p
 /*****************************************************************************
  Prototype    : cp_cap_parse
  Description  : parse data for green light
- Input        : DetectorToryEp *dev       
+ Input        : DetectorUart *dev       
                 CamDetectorParam *params  
                 Uint8 *rxBuf              
                 CaptureInfo *capInfo      
@@ -547,10 +388,9 @@ static Int32 retrograde_cap_parse(DetectorToryEp *dev, const CamDetectorParam *p
     Modification : Created function
 
 *****************************************************************************/
-static Int32 cp_cap_parse(DetectorToryEp *dev, const CamDetectorParam *params, Uint8 *rxBuf, CaptureInfo *capInfo)
+static Int32 cp_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uint8 *rxBuf, TriggerInfo *info)
 {
 	Int32 wayNum;
-	Int32 index = capInfo->capCnt;
 
 	/* Check if capture is needed at this position */
 	if(!(params->greenLightCapFlag & DETECTOR_FLAG_LOOP1_NEG_CAP))
@@ -563,31 +403,28 @@ static Int32 cp_cap_parse(DetectorToryEp *dev, const CamDetectorParam *params, U
 		return E_INVAL;
 	
 	/* Set frame Id and flag */
-	capInfo->triggerInfo[index].frameId = FRAME_EPOLICE_CP;
-	capInfo->triggerInfo[index].flags = 0;
+	info->frameId = FRAME_TRIG_BASE;
+	info->flags = 0;
 
 	/* Way Number */
-	capInfo->triggerInfo[index].wayNum = wayNum;
+	info->wayNum = wayNum;
 
 	/* Group Num */
 	dev->groupId[wayNum - 1]++;
-	capInfo->triggerInfo[index].groupId = dev->groupId[wayNum - 1];
+	info->groupId = dev->groupId[wayNum - 1];
 
 	/* Calc speed */
-	capInfo->triggerInfo[index].speed = detector_calc_speed(params, wayNum, (rxBuf[5]<<8)|rxBuf[6]);
-	if(capInfo->triggerInfo[index].speed > params->limitSpeed)
-		capInfo->triggerInfo[index].flags |= TRIG_INFO_OVERSPEED;
-
-	/* Capture count increase */
-	capInfo->capCnt++;
+	info->speed = detector_calc_speed(params, wayNum, (rxBuf[5]<<8)|rxBuf[6]);
+	if(info->speed > params->limitSpeed)
+		info->flags |= TRIG_INFO_OVERSPEED;
 
 	return E_NO;
 }
 
 /*****************************************************************************
- Prototype    : parse_trigger_data
+ Prototype    : tory_ep_parse
  Description  : parse trigger data
- Input        : DetectorToryEp *dev             
+ Input        : DetectorUart *dev             
                 const CamDetectorParam *params  
                 Uint8 *rxBuf                    
                 CaptureInfo *capInfo            
@@ -602,7 +439,7 @@ static Int32 cp_cap_parse(DetectorToryEp *dev, const CamDetectorParam *params, U
     Modification : Created function
 
 *****************************************************************************/
-static inline Int32 parse_trigger_data(DetectorToryEp *dev, const CamDetectorParam *params, Uint8 *rxBuf, CaptureInfo *capInfo)
+static Int32 tory_ep_parse(DetectorUart *dev, const CamDetectorParam *params, Uint8 *rxBuf, TriggerInfo *info)
 {
 	/* Validate data */
 	if((rxBuf[1] & 0x0F) != 0x01 || rxBuf[2] > 0x03)
@@ -610,172 +447,63 @@ static inline Int32 parse_trigger_data(DetectorToryEp *dev, const CamDetectorPar
 
 	if(!rxBuf[2]) {
 		/* Check post */
-		return cp_cap_parse(dev, params, rxBuf, capInfo);
+		return cp_cap_parse(dev, params, rxBuf, info);
 	}
 
 	if(rxBuf[3] || rxBuf[4]) {
 		/* Epolice mode */
-		return ep_cap_parse(dev, params, rxBuf, capInfo);
+		return ep_cap_parse(dev, params, rxBuf, info);
 	}
 
 	/* Retrograde */
-	return retrograde_cap_parse(dev, params, rxBuf, capInfo);
+	return retrograde_cap_parse(dev, params, rxBuf, info);
 	
 }
 
+
 /*****************************************************************************
- Prototype    : DetectorToryEp_wait_trig
- Description  : Wait trigger signal
- Input        : VehicleDetectorParams *pDetectorParams  
-                CaptureInfo *capInfo                   
-                Uint32 unTimeout                        
-                void *pRunTimeParams                    
+ Prototype    : tory_ep_init
+ Description  : init device
+ Input        : DetectorUart *dev  
+                Uint16 detectorId  
  Output       : None
  Return Value : static
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2011/8/15
+  1.Date         : 2012/4/9
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-static Int32 tory_ep_detect(DetectorHandle hDetector, CaptureInfo *capInfo)
+static Int32 tory_ep_init(DetectorUart *dev, Uint16 detectorId)
 {
-	Uint8	rxBuf[RX_BUF_SIZE];
-	Int32	status = 0;
-	Int32 	i;
-	DetectorToryEp   *dev = DETECTOR_GET_PRIVATE(hDetector);
-	const CamDetectorParam *params = DETECTOR_GET_PARAMS(hDetector);
-
-	if(!params || !capInfo || !dev)
-		return E_INVAL;
-
-	/* check if we have already start */
-	if(dev->fd <= 0)
-		tory_ep_start(&dev->fd, dev->timeout);
-
-	/* Clear to 0 */
-	capInfo->capCnt = 0;
-	
-	/* Recieve and parse trigger data */
-	for(i = 0; i < APP_MAX_CAP_CNT; i++) {	
-		/* Check if there is trigger data sent */
-		status = recv_start_code(dev->fd, rxBuf);
-		if(status) {
-			if(capInfo->capCnt) //We have received some data
-				status = E_NO;
-			else
-				status = E_NOTEXIST;
-			break;
-		}
-		
-		status = read(dev->fd, rxBuf + 1, 4);
-		if(status != 4) {	
-			#ifdef TORY_EP_DEBUG
-			ERR("recv trigger code timeout.");	
-			#endif
-			break;
-		}
-
-		/* Parse trigger data */
-		parse_trigger_data(dev, params, rxBuf, capInfo);
+	if(!dev || detectorId != DETECTOR_TORY_EP) {
+		return  E_INVAL;
 	}
 
-	return status;
-}
+	/* init params */
+	dev->devName = UART_RS485;
+	dev->baudRate = UART_B9600;
+	dev->dataBits = UART_D8;
+	dev->parity = UART_POFF;
+	dev->stopBits = UART_S1;
 
-/*****************************************************************************
- Prototype    : tory_ep_update
- Description  : update params
- Input        : DetectorToryEp *dev             
-                const CamDetectorParam *params  
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/3/30
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static inline Int32 tory_ep_update(DetectorToryEp *dev, const CamDetectorParam *params)
-{
-	if(!params)
-		return E_INVAL;
-
-	/* Reparse Ep and retrograde table */
-	tory_ep_cap_pre_parse(params->redLightCapFlag, dev->epCapTable, &dev->lastFrameId);
-	tory_retrograde_cap_pre_parse(params->retrogradeCapFlag, dev->retrogradeCapTable);
+	dev->packetLen = 5;
+	dev->private = NULL;
 
 	return E_NO;
 }
 
-/*****************************************************************************
- Prototype    : tory_ep_control
- Description  : process cmd 
- Input        : DetectorHandle hDetector  
-                DetectorCmd cmd           
-                void *arg                 
-                Int32 len                 
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/3/30
-    Author       : Sun
-    Modification : Created function
 
-*****************************************************************************/
-static Int32 tory_ep_control(DetectorHandle hDetector, DetectorCmd cmd, void *arg, Int32 len)
-{
-	Int32	 				status = E_INVAL;
-	DetectorToryEp          *dev = DETECTOR_GET_PRIVATE(hDetector);
-	const CamDetectorParam  *params = DETECTOR_GET_PARAMS(hDetector);
-	
-	if(!dev || !params)	
-		return E_INVAL;
-
-	switch(cmd) {
-	case DETECTOR_CMD_SET_PARAMS:
-		if(len == sizeof(CamDetectorParam))
-			status = tory_ep_update(dev, (CamDetectorParam *)arg);
-		break;
-	case DETECTOR_CMD_GET_FD:
-		if(len >= sizeof(Int32)) {
-			*(Int32 *)arg = dev->fd;
-			status = E_NO;
-		}
-		break;
-	case DETECTOR_CMD_SET_TIMEOUT:
-		if(len == sizeof(Uint32))
-			status = uart_set_timeout(dev->fd, 1, *(Uint32 *)arg/100);
-		break;
-	case DETECTOR_CMD_START:
-		status = tory_ep_start(&dev->fd, dev->timeout);
-		break;
-	case DETECTOR_CMD_STOP:
-		status = tory_ep_stop(dev->fd);
-		break;
-	default:
-		status = E_UNSUPT;
-		break;	
-	}
-
-	return status;
-}
-
-/* Global data for this detector functions */
-const DetectorFxns TORY_EP_FXNS = {
-	.open = tory_ep_open,
-	.close = tory_ep_close,
-	.detect = tory_ep_detect,
-	.control = tory_ep_control,
+/* opt fxns for uart detector */
+const DetectorUartFxns tory_ep_opts = {
+	.init = tory_ep_init,
+	.capPreParse = tory_ep_pre_parse,
+	.startCodeSync = tory_ep_sync,
+	.singleTrigParse = tory_ep_parse,
+	.exit = NULL,
 };
 
 

@@ -19,7 +19,6 @@
 #ifndef __CTRL_SERVER_H__
 #define __CTRL_SERVER_H__
 
-#include "params_mng.h"
 #include "msg.h"
 
 /*----------------------------------------------*
@@ -58,7 +57,7 @@ typedef struct CtrlSrvObj *CtrlSrvHandle;
 
 /* init argument for this thread */
 typedef struct {
-	ParamsMngHandle hParamsMng;
+	const char		*cfgFileName;
 	const char 		*msgName;
 }CtrlSrvAttrs;
 

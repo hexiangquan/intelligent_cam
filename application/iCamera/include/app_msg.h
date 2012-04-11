@@ -3,9 +3,8 @@
 
 #include "msg.h"
 #include "buffer.h"
-#include "cam_params.h"
-#include "capture.h"
-#include "cap_info.h"
+#include "cam_time.h"
+#include "cam_detector.h"
 
 #define MSG_MAX_LEN		1024
 
@@ -17,7 +16,7 @@
 #define MSG_IMG_ENC		MSG_ROOT"/msgImgEnc"
 #define MSG_VID_ENC		MSG_ROOT"/msgVidEnc"
 #define MSG_IMG_TX		MSG_ROOT"/msgImgTx"
-#define MSG_CTRL		MSG_ROOT"/msgCtrl"
+#define MSG_CTRL		MSG_ROOT"/iCamCtrl"
 
 
 /* enable crc check sum of data between threads */
@@ -52,6 +51,7 @@ typedef enum _AppCmd {
 	APPCMD_SET_TRIG_PARAMS,		//set trigger params
 	APPCMD_SET_AE_PARAMS,		//set auto exposure params
 	APPCMD_SET_AWB_PARAMS,		//set auto white balance params
+	APPCMD_SET_CAP_INPUT,		//update cap input info
 	APPCMD_MAX
 }AppCmd;
 
