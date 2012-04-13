@@ -20,7 +20,6 @@
 #define __H264_ENCODER_H__
 
 #include "encoder.h"
-#include "params_mng.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -54,16 +53,13 @@
  * routines' implementations                    *
  *----------------------------------------------*/
 
-
-
-
 #ifdef __cplusplus
 #if __cplusplus
 extern "C"{
 #endif
 #endif /* __cplusplus */
 
-extern EncoderHandle h264_encoder_create(IN ParamsMngHandle hParamsMng, IN pthread_mutex_t *mutex);
+extern EncoderHandle h264_encoder_create(IN EncoderParams *encParams, IN UploadParams *uploadParams, IN pthread_mutex_t *mutex);
 
 #ifdef __cplusplus
 #if __cplusplus

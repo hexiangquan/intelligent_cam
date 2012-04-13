@@ -162,11 +162,11 @@ typedef enum {
 	PMCMD_S_RESTOREDEFAULT,
 	PMCMD_MAX0,
 
-	/* thread module cmds */
+	/* app module cmds */
 	PMCMD_G_IMGCONVDYN = PMCMD_BASE1,
 	PMCMD_G_2NDSTREAMATTRS,
 	PMCMD_G_JPGENCDYN,
-	PMCMD_S_CAPINFO,	/* This cmd should be set before any other thread cmds */
+	PMCMD_S_CAPINFO,	/* This cmd should be set before any app module cmds */
 	PMCMD_G_CAPINFO,
 	PMCMD_G_IMGOSDDYN,
 	PMCMD_G_H264ENCDYN,
@@ -174,8 +174,10 @@ typedef enum {
 	PMCMD_G_IMGUPLOADPARAMS,
 	PMCMD_G_IMGOSDINFO,
 	PMCMD_G_VIDOSDINFO,
-	PMCMD_G_VIDUPLOADPROTO,
+	PMCMD_G_VIDUPLOADPARAMS,
 	PMCMD_G_CONVTERPARAMS,
+	PMCMD_G_IMGENCODERPARAMS,
+	PMCMD_G_VIDENCODERPARAMS,
 	PMCMD_MAX1,
 	
 }ParamsMngCtrlCmd;

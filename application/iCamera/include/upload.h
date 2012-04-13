@@ -21,7 +21,7 @@
 
 #include "common.h"
 #include "app_msg.h"
-#include "params_mng.h"
+#include "cam_upload.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -85,14 +85,19 @@ typedef struct _UploadFxns {
 	Int32  (*delete)(void *handle);
 }UploadFxns;
 
+/* attrs for create */
 typedef struct {
-	CamImgUploadProto 		protol;			//protocol to send
-	ParamsMngHandle			hParamsMng;		//handle for params manage
 	Uint32					reConTimeout;	//reconnect timeout in second	
 	Int32					flags;			//ctrl flags
 	const char				*msgName;		//msg name for ansyn thread
 	const char				*savePath;		//path for save frame when err happens
 }UploadAttrs;
+
+/* params can be set at run time */
+typedef struct {
+	CamImgUploadProto 		protol;			//protocol to send
+	Int8					paramsBuf[512];	//low level params for TCP, FTP etc. transfer
+}UploadParams;
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -117,7 +122,7 @@ extern "C"{
     Modification : Created function
 
 *****************************************************************************/
-extern UploadHandle upload_create(UploadAttrs *attrs);
+extern UploadHandle upload_create(UploadAttrs *attrs, UploadParams *params);
 
 /*****************************************************************************
  Prototype    : upload_delete
@@ -220,7 +225,7 @@ extern Int32 upload_send_heartbeat(UploadHandle hUpload);
     Modification : Created function
 
 *****************************************************************************/
-Int32 upload_update_params(UploadHandle hUpload);
+Int32 upload_update_params(UploadHandle hUpload, UploadParams *params);
 
 /*****************************************************************************
  Prototype    : upload_send_frame

@@ -20,7 +20,6 @@
 #define __JPG_ENCODER_H__
 
 #include "encoder.h"
-#include "params_mng.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -78,7 +77,7 @@ extern "C"{
     Modification : Created function
 
 *****************************************************************************/
-extern EncoderHandle jpg_encoder_create(IN ParamsMngHandle hParamsMng, IN pthread_mutex_t *mutex);
+extern EncoderHandle jpg_encoder_create(IN EncoderParams *encParams, IN UploadParams *uploadParams, IN pthread_mutex_t *mutex);
 
 /*****************************************************************************
  Prototype    : jpg_encoder_save_frame

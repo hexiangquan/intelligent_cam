@@ -85,6 +85,11 @@ struct CtrlSrvObj{
 	const char		*msgName;		//our msg name for IPC
 };
 
+typedef enum {
+	ENCODER_IMG = 0,
+	ENCODER_VID,
+}EncoderType;
+
 /*****************************************************************************
  Prototype    : cap_info_update
  Description  : update capture input info
@@ -142,6 +147,83 @@ static Int32 conv_params_update(CtrlSrvHandle hCtrlSrv)
 
 	return ret;
 }
+
+/*****************************************************************************
+ Prototype    : encoder_params_update
+ Description  : update encoder params
+ Input        : CtrlSrvHandle hCtrlSrv  
+                Bool isImgEnc           
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/13
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 encoder_params_update(CtrlSrvHandle hCtrlSrv, EncoderType type)
+{
+	Int32				ret;
+	EncoderParams 		encParams;
+	EncoderHandle		hEncoder;
+	ParamsMngCtrlCmd	cmd;
+
+	if(type == ENCODER_IMG) {
+		cmd = PMCMD_G_IMGENCODERPARAMS;
+		hEncoder = hCtrlSrv->hJpgEncoder;
+	} else {
+		cmd = PMCMD_G_VIDENCODERPARAMS;
+		hEncoder = hCtrlSrv->hH264Encoder;
+	}
+
+	/* update params in encoder */
+	params_mng_control(hCtrlSrv->hParamsMng, cmd, &encParams, sizeof(encParams));
+	ret = encoder_set_enc_params(hEncoder, hCtrlSrv->hMsg, &encParams);
+
+	return ret;
+}
+
+/*****************************************************************************
+ Prototype    : encoder_upload_update
+ Description  : update encoder upload
+ Input        : CtrlSrvHandle hCtrlSrv  
+                Bool isImgEnc           
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/13
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 encoder_upload_update(CtrlSrvHandle hCtrlSrv, EncoderType type)
+{
+	Int32				ret;
+	UploadParams 		uploadParams;
+	EncoderHandle		hEncoder;
+	ParamsMngCtrlCmd	cmd;
+
+	if(type == ENCODER_IMG) {
+		cmd = PMCMD_G_IMGUPLOADPARAMS;
+		hEncoder = hCtrlSrv->hJpgEncoder;
+	} else {
+		cmd = PMCMD_G_VIDUPLOADPARAMS;
+		hEncoder = hCtrlSrv->hH264Encoder;
+	}
+
+	/* update params in encoder */
+	params_mng_control(hCtrlSrv->hParamsMng, cmd, &uploadParams, sizeof(uploadParams));
+	ret = encoder_set_upload(hEncoder, hCtrlSrv->hMsg, &uploadParams);
+
+	return ret;
+}
+
 
 /*****************************************************************************
  Prototype    : ctrl_server_thread
@@ -236,9 +318,9 @@ static void *ctrl_server_thread(void *arg)
 		case ICAMCMD_S_OSDPARAMS:
 			ret = params_mng_control(hParamsMng, PMCMD_S_OSDPARAMS, data, msgHdr->dataLen);
 			if(!ret) {
-				/* tell other tasks to update params */
-				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_IMG_ENC, APPCMD_SET_ENC_PARAMS, 0, 0);
-				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_VID_ENC, APPCMD_SET_ENC_PARAMS, 0, 0);
+				/* update encoder params */
+				ret = encoder_params_update(hCtrlSrv, ENCODER_IMG);
+				ret = encoder_params_update(hCtrlSrv, ENCODER_VID);
 			}
 			break;	
 		case ICAMCMD_G_OSDPARAMS:
@@ -255,7 +337,7 @@ static void *ctrl_server_thread(void *arg)
 		case ICAMCMD_S_RTPPARAMS:
 			ret = params_mng_control(hParamsMng, PMCMD_S_RTPPARAMS, data, msgHdr->dataLen);
 			if(!ret) {
-				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_VID_ENC, APPCMD_SET_UPLOAD_PARAMS, 0, 0);
+				ret = encoder_upload_update(hCtrlSrv, ENCODER_VID);
 			}
 			break;
 		case ICAMCMD_G_RTPPARAMS:
@@ -265,8 +347,8 @@ static void *ctrl_server_thread(void *arg)
 		case ICAMCMD_S_UPLOADPROTO:
 			ret = params_mng_control(hParamsMng, PMCMD_S_IMGTRANSPROTO, data, msgHdr->dataLen);
 			if(!ret) {
-				/* tell other tasks to update params */
-				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_IMG_ENC, APPCMD_SET_UPLOAD_PARAMS, 0, 0);
+				/* update img encoder */
+				ret = encoder_upload_update(hCtrlSrv, ENCODER_IMG);
 			}
 			break;
 		case ICAMCMD_G_UPLOADPROTO:
@@ -276,8 +358,8 @@ static void *ctrl_server_thread(void *arg)
 		case ICAMCMD_S_IMGSRVINFO:
 			ret = params_mng_control(hParamsMng, PMCMD_S_TCPSRVINFO, data, msgHdr->dataLen);
 			if(!ret) {
-				/* tell other tasks to update params */
-				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_IMG_ENC, APPCMD_SET_UPLOAD_PARAMS, 0, 0);
+				/* update img encoder */
+				ret = encoder_upload_update(hCtrlSrv, ENCODER_IMG);
 			}
 			break;
 		case ICAMCMD_G_IMGSRVINFO:
@@ -287,8 +369,8 @@ static void *ctrl_server_thread(void *arg)
 		case ICAMCMD_S_FTPSRVINFO:
 			ret = params_mng_control(hParamsMng, PMCMD_S_FTPSRVINFO, data, msgHdr->dataLen);
 			if(!ret) {
-				/* tell other tasks to update params */
-				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_IMG_ENC, APPCMD_SET_UPLOAD_PARAMS, 0, 0);
+				/* update img encoder */
+				ret = encoder_upload_update(hCtrlSrv, ENCODER_IMG);
 			}
 			break;
 		case ICAMCMD_G_FTPSRVINFO:
@@ -343,9 +425,9 @@ static void *ctrl_server_thread(void *arg)
 		case ICAMCMD_S_H264PARAMS:
 			ret = params_mng_control(hParamsMng, PMCMD_S_H264ENCPARAMS, data, msgHdr->dataLen);
 			if(!ret) {
-				/* tell other tasks to update params */
-				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_VID_ENC, APPCMD_SET_ENC_PARAMS, 0, 0);
-				/* tell capture to update convert params */
+				/* update img encoder */
+				ret = encoder_params_update(hCtrlSrv, ENCODER_VID);
+				/* capture update convert params */
 				if(!ret)
 					ret = conv_params_update(hCtrlSrv);
 			}
@@ -367,8 +449,8 @@ static void *ctrl_server_thread(void *arg)
 				/* tell other tasks to update params */
 				ret = data_capture_set_work_mode(hCtrlSrv->hDataCap, hCtrlSrv->hMsg, (CamWorkMode *)data);
 				usleep(100000);
-				app_hdr_msg_send(hCtrlSrv->hMsg, MSG_IMG_ENC, APPCMD_SET_ENC_PARAMS, 0, 0);
-				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_VID_ENC, APPCMD_SET_ENC_PARAMS, 0, 0);
+				ret = encoder_params_update(hCtrlSrv, ENCODER_IMG);
+				ret = encoder_params_update(hCtrlSrv, ENCODER_VID);
 			}
 			break;
 		case ICAMCMD_G_WORKMODE:
@@ -379,7 +461,7 @@ static void *ctrl_server_thread(void *arg)
 			ret = params_mng_control(hParamsMng, PMCMD_S_IMGENCPARAMS, data, msgHdr->dataLen);
 			if(!ret) {
 				/* tell other tasks to update params */
-				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_IMG_ENC, APPCMD_SET_ENC_PARAMS, 0, 0);
+				ret = encoder_params_update(hCtrlSrv, ENCODER_IMG);
 				/* tell capture to update convert params */
 				if(!ret)
 					ret = conv_params_update(hCtrlSrv);
@@ -572,7 +654,7 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 
 	/* create data capture module */
 	dataCapAttrs.hCapture = hCtrlSrv->hCapture;
-	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_DETECTORPARAMS, 
+	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_DETECTORPARAMS, 
 			&dataCapAttrs.detectorParams, sizeof(dataCapAttrs.detectorParams));
 	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_CONVTERPARAMS, 
 			&dataCapAttrs.convParams, sizeof(dataCapAttrs.convParams));
@@ -584,15 +666,34 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 		goto exit;
 	}
 
-	/* create jpg encoder */
+	/* init lock */
 	pthread_mutex_init(&hCtrlSrv->encMutex, NULL);
-	hCtrlSrv->hJpgEncoder = jpg_encoder_create(hCtrlSrv->hParamsMng, &hCtrlSrv->encMutex);
+	
+	EncoderParams 	encParams;
+	UploadParams	uploadParams;
+
+	/* get img enc & upload params */
+	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_IMGENCODERPARAMS, 
+			&encParams, sizeof(encParams));
+	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_IMGUPLOADPARAMS, 
+			&uploadParams, sizeof(uploadParams));
+	assert(ret == E_NO);
+
+	/* create jpg encoder */
+	hCtrlSrv->hJpgEncoder = jpg_encoder_create(&encParams, &uploadParams, &hCtrlSrv->encMutex);
 	if(!hCtrlSrv->hJpgEncoder) {
 		goto exit;
 	}
 
+	/* get vid enc & upload params */
+	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_VIDENCODERPARAMS, 
+			&encParams, sizeof(encParams));
+	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_VIDUPLOADPARAMS, 
+			&uploadParams, sizeof(uploadParams));
+	assert(ret == E_NO);
+
 	/* create video encoder */
-	hCtrlSrv->hH264Encoder = h264_encoder_create(hCtrlSrv->hParamsMng, &hCtrlSrv->encMutex);
+	hCtrlSrv->hH264Encoder = h264_encoder_create(&encParams, &uploadParams, &hCtrlSrv->encMutex);
 	if(!hCtrlSrv->hH264Encoder) {
 		goto exit;
 	}
@@ -701,13 +802,17 @@ Int32 ctrl_server_delete(CtrlSrvHandle hCtrlSrv, MsgHandle hCurMsg)
 	if(hCtrlSrv->hMsg)
 		msg_delete(hCtrlSrv->hMsg);
 
+	DBG("delete jpg encoder");
+	
 	/* call encoders exit */
 	if(hCtrlSrv->hJpgEncoder)
 		encoder_delete(hCtrlSrv->hJpgEncoder, hCurMsg);
 
+	DBG("delete h.264 encoder");
 	if(hCtrlSrv->hH264Encoder)
 		encoder_delete(hCtrlSrv->hH264Encoder, hCurMsg);
 
+	DBG("delete data capture encoder");
 	/* exit data capture */
 	if(hCtrlSrv->hDataCap)
 		data_capture_delete(hCtrlSrv->hDataCap, hCurMsg);

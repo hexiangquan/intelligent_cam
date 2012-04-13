@@ -30,6 +30,7 @@
 #include "ftp_upload.h"
 #include "version.h"
 #include "linux/types.h"
+#include "encoder.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -479,33 +480,36 @@ static Int32 get_img_upload_params(ParamsMngHandle hParamsMng, void *data, Int32
 	if(!data) 
 		return E_INVAL;
 
-	AppParams 	*appCfg = &hParamsMng->appParams;
-	Int32		err = E_NO;
+	AppParams 		*appCfg = &hParamsMng->appParams;
+	Int32			err = E_NO;
+	UploadParams	*params = (UploadParams *)data;
+	
+	if(size < sizeof(UploadParams)) {
+		return E_NOMEM;
+	}
 
+	/* set upload protol */
+	params->protol = appCfg->imgTransType;
+
+	/* set params according to proto */
 	switch(appCfg->imgTransType) {
-	case CAM_UPLOAD_PROTO_FTP:
-		if(size < sizeof(FtpUploadParams))
-			err = E_NOMEM;
-		else {
-			FtpUploadParams *params = (FtpUploadParams *)data;
-			params->srvInfo = appCfg->ftpSrvInfo;
-			params->roadInfo = appCfg->roadInfo;
-			params->size = sizeof(FtpUploadParams);
+		case CAM_UPLOAD_PROTO_FTP: {
+			FtpUploadParams *ftpParams = (FtpUploadParams *)params->paramsBuf;
+			ftpParams->srvInfo = appCfg->ftpSrvInfo;
+			ftpParams->roadInfo = appCfg->roadInfo;
+			ftpParams->size = sizeof(FtpUploadParams);
+			break;
 		}
-		break;
-	case CAM_UPLOAD_PROTO_TCP:
-		if(size < sizeof(ImgTcpUploadParams))
-			err = E_NOMEM;
-		else {
-			ImgTcpUploadParams *params = (ImgTcpUploadParams *)data;
-			params->srvInfo = appCfg->tcpImgSrvInfo;
-			params->devInfo = appCfg->devInfo;
-			params->size = sizeof(ImgTcpUploadParams);
+		case CAM_UPLOAD_PROTO_TCP: {
+			ImgTcpUploadParams *tcpParams = (ImgTcpUploadParams *)params->paramsBuf;
+			tcpParams->srvInfo = appCfg->tcpImgSrvInfo;
+			tcpParams->devInfo = appCfg->devInfo;
+			tcpParams->size = sizeof(ImgTcpUploadParams);
+			break;
 		}
-		break;
-	case CAM_UPLOAD_PROTO_NONE:
-	default:
-		break;
+		case CAM_UPLOAD_PROTO_NONE:
+		default:
+			break;
 	}
 
 	return err;
@@ -2677,6 +2681,89 @@ static Int32 get_vid_osd_info(ParamsMngHandle hParamsMng, void *data, Int32 size
 }
 
 /*****************************************************************************
+ Prototype    : get_img_encoder_params
+ Description  : get img encoder params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/13
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_img_encoder_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(EncoderParams)) 
+		return E_INVAL;
+
+	EncoderParams	*params = (EncoderParams *)data;
+	Int32			err;
+
+	/* get osd info for img */
+	err = get_img_osd_info(hParamsMng, &params->osdInfo, sizeof(params->osdInfo));
+	if(err)
+		return err;
+
+	/* get osd dyn params for img */
+	err = get_img_osd_dyn(hParamsMng, &params->osdDyn, sizeof(params->osdDyn));
+	if(err)
+		return err;
+
+	/* get img encode dyn params */
+	err = get_jpg_enc_dyn(hParamsMng, params->encDynBuf, sizeof(params->encDynBuf));
+	
+	return err;
+}
+
+
+/*****************************************************************************
+ Prototype    : get_vid_encoder_params
+ Description  : get h.264 encoder params
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/13
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 get_vid_encoder_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size < sizeof(EncoderParams)) 
+		return E_INVAL;
+
+	EncoderParams	*params = (EncoderParams *)data;
+	Int32			err;
+
+	/* get osd info for img */
+	err = get_vid_osd_info(hParamsMng, &params->osdInfo, sizeof(params->osdInfo));
+	if(err)
+		return err;
+
+	/* get osd dyn params for img */
+	err = get_vid_osd_dyn(hParamsMng, &params->osdDyn, sizeof(params->osdDyn));
+	if(err)
+		return err;
+
+	/* get img encode dyn params */
+	err = get_h264_enc_dyn(hParamsMng, params->encDynBuf, sizeof(params->encDynBuf));
+	
+	return err;
+}
+
+/*****************************************************************************
  Prototype    : get_vid_upload_proto
  Description  : get video upload protocol
  Input        : ParamsMngHandle hParamsMng  
@@ -2693,15 +2780,16 @@ static Int32 get_vid_osd_info(ParamsMngHandle hParamsMng, void *data, Int32 size
     Modification : Created function
 
 *****************************************************************************/
-static Int32 get_vid_upload_proto(ParamsMngHandle hParamsMng, void *data, Int32 size)
+static Int32 get_vid_upload_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 {
-	if(!data || size < sizeof(CamImgUploadProto)) 
+	if(!data || size < sizeof(UploadParams)) 
 		return E_INVAL;
 
-	AppParams *appCfg = &hParamsMng->appParams;
+	//AppParams *appCfg = &hParamsMng->appParams;
+	UploadParams *params = (UploadParams *)data;
 	
 	/* Copy data */
-	*(CamImgUploadProto *)data = CAM_UPLOAD_PROTO_RTP;
+	params->protol = CAM_UPLOAD_PROTO_RTP;
 
 	return E_NO;
 }
@@ -2807,8 +2895,10 @@ static const PmCtrlInfo g_paramsConvert[] = {
 	{.cmd = PMCMD_G_IMGUPLOADPARAMS, .fxn = get_img_upload_params, },
 	{.cmd = PMCMD_G_IMGOSDINFO, .fxn = get_img_osd_info, },
 	{.cmd = PMCMD_G_VIDOSDINFO, .fxn = get_vid_osd_info, },
-	{.cmd = PMCMD_G_VIDUPLOADPROTO, .fxn = get_vid_upload_proto,},
+	{.cmd = PMCMD_G_VIDUPLOADPARAMS, .fxn = get_vid_upload_params,},
 	{.cmd = PMCMD_G_CONVTERPARAMS, .fxn = get_converter_params, },
+	{.cmd = PMCMD_G_IMGENCODERPARAMS, .fxn = get_img_encoder_params, },
+	{.cmd = PMCMD_G_VIDENCODERPARAMS, .fxn = get_vid_encoder_params, },
 	{.cmd = PMCMD_MAX1, .fxn = NULL,},
 };
 

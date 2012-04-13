@@ -131,7 +131,7 @@ static const EncoderOps c_jpgEncOps = {
     Modification : Created function
 
 *****************************************************************************/
-EncoderHandle jpg_encoder_create(IN ParamsMngHandle hParamsMng, IN pthread_mutex_t *mutex)
+EncoderHandle jpg_encoder_create(IN EncoderParams *encParams, IN UploadParams *uploadParams, IN pthread_mutex_t *mutex)
 {
 	
 	EncoderAttrs		encAttrs;
@@ -148,18 +148,12 @@ EncoderHandle jpg_encoder_create(IN ParamsMngHandle hParamsMng, IN pthread_mutex
 	encAttrs.encFxns = &JPGENC_ALG_FXNS;
 	encAttrs.encInitParams = &jpgEncInitParams;
 	encAttrs.encOps = &c_jpgEncOps;
-	encAttrs.hParamsMng = hParamsMng;
 	encAttrs.poolBufNum = IMG_ENC_POOL_BUF_NUM;
 	encAttrs.saveRootPath = SD_MNT_PATH;
-	encAttrs.cmdGetEncDyn = PMCMD_G_JPGENCDYN;
-	encAttrs.cmdGetOsdDyn = PMCMD_G_IMGOSDDYN;
-	encAttrs.cmdGetOsdInfo = PMCMD_G_IMGOSDINFO;
-	encAttrs.cmdGetUploadProto = PMCMD_G_IMGTRANSPROTO;
 	encAttrs.mutex = mutex;
-	
 	encAttrs.encBufSize = IMG_MAX_WIDTH * IMG_MAX_HEIGHT * 8 / 10;
 
-	hJpgEncoder = encoder_create(&encAttrs);
+	hJpgEncoder = encoder_create(&encAttrs, encParams, uploadParams);
 	if(!hJpgEncoder) {
 		ERR("create jpg encoder error...");
 		return NULL;

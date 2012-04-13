@@ -82,7 +82,6 @@ struct UploadObj {
 	pthread_mutex_t			mutex;
 	Bool					exit;
 	CamImgUploadProto		protol;
-	ParamsMngHandle			hParamsMng;
 	const char				*savePath;
 	Int32					frameCnt;
 	time_t 					lastSnd;
@@ -196,12 +195,11 @@ exit:
     Modification : Created function
 
 *****************************************************************************/
-UploadHandle upload_create(UploadAttrs *attrs)
+UploadHandle upload_create(UploadAttrs *attrs, UploadParams *params)
 {
 	UploadHandle hUpload;
-	Int8		 params[1024];
 
-	if(!attrs || !attrs->hParamsMng)
+	if(!attrs)
 		return NULL;
 
 	hUpload = calloc(1, sizeof(struct UploadObj));
@@ -213,44 +211,45 @@ UploadHandle upload_create(UploadAttrs *attrs)
 	hUpload->isConnected = FALSE;
 	hUpload->connectTimeout = attrs->reConTimeout;
 	hUpload->msgName = attrs->msgName;
-	hUpload->hParamsMng = attrs->hParamsMng;
 	hUpload->savePath = attrs->savePath;
+	hUpload->flags = attrs->flags;
 
-	switch(attrs->protol) {
+	/* select low level module */			
+	switch(params->protol) {
 	case CAM_UPLOAD_PROTO_TCP:
 		hUpload->fxns = &TCP_UPLOAD_FXNS;
-		attrs->flags |= UPLOAD_FLAG_ANSYNC;
-		params_mng_control(hUpload->hParamsMng, PMCMD_G_IMGUPLOADPARAMS, params, sizeof(params));
+		hUpload->flags |= UPLOAD_FLAG_ANSYNC;
+		hUpload->protol = CAM_UPLOAD_PROTO_TCP;
 		break;
 	case CAM_UPLOAD_PROTO_FTP:
 		hUpload->fxns = &FTP_UPLOAD_FXNS;
-		attrs->flags |= UPLOAD_FLAG_ANSYNC;
-		params_mng_control(hUpload->hParamsMng, PMCMD_G_IMGUPLOADPARAMS, params, sizeof(params));
+		hUpload->flags |= UPLOAD_FLAG_ANSYNC;
+		hUpload->protol = CAM_UPLOAD_PROTO_FTP;
 		break;
 	case CAM_UPLOAD_PROTO_RTP:
-		//hUpload->fxns = NULL;	//not supported now
+		//hUpload->fxns = NULL; //not supported now
 		//break;
 	case CAM_UPLOAD_PROTO_NONE:
 	default:
-		attrs->protol = CAM_UPLOAD_PROTO_NONE;
+		hUpload->flags &= ~UPLOAD_FLAG_ANSYNC;
+		hUpload->protol = CAM_UPLOAD_PROTO_NONE;
 		hUpload->fxns = &NONE_UPLOAD_FXNS;
 		break;
 	}
 
 	assert(hUpload->fxns);
 
-	/* record protol */
-	hUpload->protol = attrs->protol;
-	hUpload->flags = attrs->flags;
-	pthread_mutex_init(&hUpload->mutex, NULL);
-	
+	/* create new handle */
 	if(hUpload->fxns->create) {
-		hUpload->handle = hUpload->fxns->create(params);
+		hUpload->handle = hUpload->fxns->create(params->paramsBuf);
 		if(!hUpload->handle) {
 			ERR("create sub object failed.");
 			goto err_quit;
 		}
 	}
+	
+	/* init lock */
+	pthread_mutex_init(&hUpload->mutex, NULL);
 	
 	if(hUpload->flags & UPLOAD_FLAG_ANSYNC) {
 		/* create upload thread */
@@ -592,34 +591,27 @@ Int32 upload_send_heartbeat(UploadHandle hUpload)
     Modification : Created function
 
 *****************************************************************************/
-Int32 upload_update_params(UploadHandle hUpload)
+Int32 upload_update_params(UploadHandle hUpload, UploadParams *params)
 {
-	if(!hUpload)
+	if(!hUpload || !params)
 		return E_INVAL;
+
+	if(hUpload->protol != params->protol) {
+		ERR("can not change protol at run time");
+		return E_MODE;
+	}
 
 	if(!hUpload->fxns->setParams)
 		return E_NO;
-
+	
 	if(hUpload->isConnected)
 		upload_disconnect(hUpload);
-
-	Int32 	err;
-	Uint8	params[1024];
 	
-	switch(hUpload->protol) {
-	case CAM_UPLOAD_PROTO_TCP:
-	case CAM_UPLOAD_PROTO_FTP:
-		params_mng_control(hUpload->hParamsMng, PMCMD_G_IMGUPLOADPARAMS, params, sizeof(params));
-		break;
-	case CAM_UPLOAD_PROTO_RTP:
-	case CAM_UPLOAD_PROTO_NONE:
-	default:
-		return E_NO;
-	}
+	Int32 	err;
 
 	/* set params */
 	pthread_mutex_lock(&hUpload->mutex);
-	err = hUpload->fxns->setParams(hUpload->handle, params);
+	err = hUpload->fxns->setParams(hUpload->handle, params->paramsBuf);
 	pthread_mutex_unlock(&hUpload->mutex);
 	
 	return err;

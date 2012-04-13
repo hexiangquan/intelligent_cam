@@ -2,6 +2,7 @@
 #include "h264_encoder.h"
 #include "log.h"
 #include "app_msg.h"
+#include "cam_encode.h"
 
 
 /*****************************************************************************
@@ -70,7 +71,7 @@ static const EncoderOps c_h264EncOps = {
     Modification : Created function
 
 *****************************************************************************/
-EncoderHandle h264_encoder_create(IN ParamsMngHandle hParamsMng, IN pthread_mutex_t *mutex)
+EncoderHandle h264_encoder_create(IN EncoderParams *encParams, IN UploadParams *uploadParams,  IN pthread_mutex_t *mutex)
 {
 	EncoderAttrs		encAttrs;
 	H264EncInitParams	encInitParams;
@@ -88,17 +89,12 @@ EncoderHandle h264_encoder_create(IN ParamsMngHandle hParamsMng, IN pthread_mute
 	encAttrs.encFxns = &H264ENC_ALG_FXNS;
 	encAttrs.encInitParams = &encInitParams;
 	encAttrs.encOps = &c_h264EncOps;
-	encAttrs.hParamsMng = hParamsMng;
 	encAttrs.poolBufNum = VID_ENC_POOL_BUF_NUM;
 	encAttrs.saveRootPath = SD_MNT_PATH;
-	encAttrs.cmdGetEncDyn = PMCMD_G_H264ENCDYN;
-	encAttrs.cmdGetOsdDyn = PMCMD_G_VIDOSDDYN;
-	encAttrs.cmdGetOsdInfo = PMCMD_G_VIDOSDINFO;
-	encAttrs.cmdGetUploadProto = PMCMD_G_VIDUPLOADPROTO;
 	encAttrs.encBufSize = encInitParams.maxWidth * encInitParams.maxHeight * 8 / 10;
 	encAttrs.mutex = mutex;
 
-	hEncoder = encoder_create(&encAttrs);
+	hEncoder = encoder_create(&encAttrs, encParams, uploadParams);
 	if(!hEncoder) {
 		ERR("create h264 encoder error...");
 		return NULL;

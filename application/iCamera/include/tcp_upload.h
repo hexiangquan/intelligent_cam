@@ -21,6 +21,7 @@
 	
 #include "upload.h"
 #include "cam_upload.h"
+#include "cam_info.h"
 
 /*----------------------------------------------*
  * external variables                           *

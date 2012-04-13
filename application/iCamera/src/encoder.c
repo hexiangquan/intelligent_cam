@@ -40,7 +40,7 @@
 /*----------------------------------------------*
  * internal routine prototypes                  *
  *----------------------------------------------*/
-static Int32 upload_update(EncoderHandle hEnc);
+static Int32 upload_update(EncoderHandle hEnc, UploadParams *params);
 
 /*----------------------------------------------*
  * project-wide global variables                *
@@ -71,7 +71,6 @@ struct EncoderObj {
 	const char			*name;			//our module name
 	const char			*saveRootPath;	//root path for save
 	const EncoderOps	*ops;
-	ParamsMngHandle 	hParamsMng;
 	UploadHandle		hUpload;
 	AlgHandle			hEncode;
 	MsgHandle			hMsg;
@@ -80,10 +79,6 @@ struct EncoderObj {
 	CamOsdInfo			osdInfo;
 	BufHandle			hBufEnc;		//buffer for encode out
 	BufPoolHandle		hPoolEnc;
-	ParamsMngCtrlCmd	cmdGetEncDyn;
-	ParamsMngCtrlCmd	cmdGetOsdDyn;
-	ParamsMngCtrlCmd	cmdGetOsdInfo;
-	ParamsMngCtrlCmd	cmdGetUploadProto;
 	CamImgUploadProto	uploadProto;
 	pthread_t			pid;
 	pthread_mutex_t		*mutex;
@@ -106,37 +101,21 @@ struct EncoderObj {
     Modification : Created function
 
 *****************************************************************************/
-static Int32 encoder_init(EncoderHandle hEnc, EncoderAttrs *attrs)
-{
-	Int32	err;
-	Int8	dynParamsBuf[1024];
-	
-	assert(attrs && attrs->hParamsMng && attrs->encFxns && attrs->encInitParams);
+static Int32 encoder_init(EncoderHandle hEnc, EncoderAttrs *attrs, EncoderParams *params)
+{	
+	assert(attrs && params && attrs->encFxns && attrs->encInitParams);
 
 	hEnc->name = attrs->name;
 
 	/* set params input */
-	hEnc->hParamsMng = attrs->hParamsMng;
-	hEnc->cmdGetEncDyn = attrs->cmdGetEncDyn;
-	hEnc->cmdGetOsdDyn = attrs->cmdGetOsdDyn;
-	hEnc->cmdGetOsdInfo = attrs->cmdGetOsdInfo;
-	hEnc->cmdGetUploadProto = attrs->cmdGetUploadProto;
 	hEnc->saveRootPath = attrs->saveRootPath;
 	hEnc->ops = attrs->encOps;
 	hEnc->mutex = attrs->mutex;
 
 	assert(hEnc->ops && hEnc->mutex);
-	
-	/* get dyn params, we may need wait capture ready */
-	err = params_mng_control(hEnc->hParamsMng, hEnc->cmdGetEncDyn, 
-			dynParamsBuf, sizeof(dynParamsBuf));
-	if(err) {
-		ERR("<%s> get enc dyn params failed.", hEnc->name);
-		return err;
-	}
 
 	/* create enc handle */
-	hEnc->hEncode = alg_create(attrs->encFxns, attrs->encInitParams, dynParamsBuf);
+	hEnc->hEncode = alg_create(attrs->encFxns, attrs->encInitParams, params->encDynBuf);
 	if(!hEnc->hEncode) {
 		ERR("<%s> create enc handle failed", hEnc->name);
 		return E_INVAL;
@@ -144,29 +123,19 @@ static Int32 encoder_init(EncoderHandle hEnc, EncoderAttrs *attrs)
 
 	/* create osd handle */
 	OsdInitParams	osdInitParams;
-	OsdDynParams	osdDynParams;
 
 	osdInitParams.size = sizeof(osdInitParams);
 	osdInitParams.asc16Tab = NULL;
 	osdInitParams.hzk16Tab = NULL;
 
-	err = params_mng_control(hEnc->hParamsMng, hEnc->cmdGetOsdDyn, 
-			&osdDynParams, sizeof(osdDynParams));
-	if(err) {
-		ERR("<%s> get enc dyn params failed.", hEnc->name);
-		return err;
-	}	
-	
-	hEnc->hOsd = osd_create(&osdInitParams, &osdDynParams);
+	hEnc->hOsd = osd_create(&osdInitParams, &params->osdDyn);
 	if(!hEnc->hOsd) {
 		ERR("<%s> create osd handle failed", hEnc->name);
 		return E_INVAL;
 	}
 
-	/* get current osd config */
-	err = params_mng_control(hEnc->hParamsMng, hEnc->cmdGetOsdInfo, 
-				&hEnc->osdInfo, sizeof(CamOsdInfo));
-	assert(err == E_NO);
+	/* record current osd config */
+	hEnc->osdInfo = params->osdInfo;
 
 	/* create msg handle  */
 	hEnc->hMsg = msg_create(attrs->msgName, attrs->dstName, 0);
@@ -198,11 +167,6 @@ static Int32 encoder_init(EncoderHandle hEnc, EncoderAttrs *attrs)
 		ERR("<%s> alloc buf for enc failed", hEnc->name);
 		return E_NOMEM;
 	}
-
-	/* update upload params */
-	err = upload_update(hEnc);
-	if(err)
-		return err;
 
 	hEnc->exit = FALSE;
 
@@ -323,28 +287,25 @@ err_quit:
     Modification : Created function
 
 *****************************************************************************/
-static Int32 enc_params_update(EncoderHandle hEnc)
+static Int32 enc_params_update(EncoderHandle hEnc, void *data, Int32 len)
 {
-	OsdDynParams	osdDynParams;
-	Int8			encDynParamsBuf[512];
+	EncoderParams	*params = (EncoderParams *)data;
 	Int32 			err;
 
-	/* update osd params */
-	err = params_mng_control(hEnc->hParamsMng, hEnc->cmdGetOsdDyn, 
-			&osdDynParams, sizeof(osdDynParams));
-	if(!err) {
-		err = osd_control(hEnc->hOsd, OSD_CMD_SET_DYN_PARAMS, &osdDynParams);
-		if(err)
-			ERR("set osd params err.");
+	if(len != sizeof(EncoderParams)) {
+		ERR("invalid len of encoder params");
+		return E_INVAL;
 	}
 
-	err = params_mng_control(hEnc->hParamsMng, hEnc->cmdGetOsdInfo, 
-				&hEnc->osdInfo, sizeof(CamOsdInfo));
+	/* update osd params */
+	err = osd_control(hEnc->hOsd, OSD_CMD_SET_DYN_PARAMS, &params->osdDyn);
+	if(err)
+		ERR("set osd params err.");
+	
+	hEnc->osdInfo = params->osdInfo;
 
 	/* update  enc params */
-	err = params_mng_control(hEnc->hParamsMng, hEnc->cmdGetEncDyn, 
-			encDynParamsBuf, sizeof(encDynParamsBuf));
-	err = alg_control(hEnc->hEncode, ALG_CMD_SET_DYN_PARAMS, encDynParamsBuf);
+	err = alg_control(hEnc->hEncode, ALG_CMD_SET_DYN_PARAMS, params->encDynBuf);
 	if(err)
 		ERR("<%s> set enc dyn params err.", hEnc->name);
 
@@ -366,20 +327,12 @@ static Int32 enc_params_update(EncoderHandle hEnc)
     Modification : Created function
 
 *****************************************************************************/
-static Int32 upload_update(EncoderHandle hEnc)
+static Int32 upload_update(EncoderHandle hEnc, UploadParams *params)
 {
 	/* get upload protol */
-	Int32 				ret;
-	CamImgUploadProto	proto;
+	Int32 	ret = E_NO;
 
-	ret = params_mng_control(hEnc->hParamsMng, hEnc->cmdGetUploadProto, 
-			&proto, sizeof(proto));
-	if(ret) {
-		ERR("get upload proto err.");
-		return ret;
-	}
-
-	if(!hEnc->hUpload || proto != hEnc->uploadProto) {
+	if(!hEnc->hUpload || params->protol != hEnc->uploadProto) {
 		/* create upload handle */
 		UploadAttrs uploadAttrs;
 
@@ -390,20 +343,18 @@ static Int32 upload_update(EncoderHandle hEnc)
 		uploadAttrs.flags = 0;
 		if(hEnc->hPoolEnc)
 			uploadAttrs.flags |= UPLOAD_FLAG_FREE_BUF; //free buffer after send when using pool
-		uploadAttrs.hParamsMng = hEnc->hParamsMng;
 		uploadAttrs.msgName = MSG_IMG_TX;
-		uploadAttrs.protol = proto;
 		uploadAttrs.reConTimeout = UPLOAD_RECON_TIMEOUT;
 		uploadAttrs.savePath = hEnc->saveRootPath;
 
-		hEnc->hUpload = upload_create(&uploadAttrs);
+		hEnc->hUpload = upload_create(&uploadAttrs, params);
 		if(!hEnc->hUpload) {
 			ERR("<%s> create upload failed", hEnc->name);
 			return E_INVAL;
 		}
 	}else {
 		/* update params */
-		ret = upload_update_params(hEnc->hUpload);
+		ret = upload_update_params(hEnc->hUpload, params);
 	}
 
 	return ret;
@@ -443,10 +394,13 @@ static Int32 msg_process(EncoderHandle hEnc, CommonMsg *msgBuf)
 		ret = encode_frame(hEnc, (ImgMsg *)msgBuf);
 		break;
 	case APPCMD_SET_ENC_PARAMS:
-		ret = enc_params_update(hEnc);
+		ret = enc_params_update(hEnc, msgBuf->buf, msgHdr->dataLen);
 		break;
 	case APPCMD_SET_UPLOAD_PARAMS:
-		ret = upload_update(hEnc);
+		if( msgHdr->dataLen == sizeof(UploadParams))
+			ret = upload_update(hEnc, (UploadParams *)msgBuf->buf);
+		else
+			ERR("invalid len of upload params");
 		break;
 	case APPCMD_EXIT:
 		hEnc->exit = TRUE;
@@ -487,6 +441,8 @@ void *encoder_thread(void *arg)
 
 	fdMsg = msg_get_fd(hEnc->hMsg);
 	fdMax = fdMsg + 1;
+
+	DBG("%s thread start", hEnc->name);
 
 	/* start main loop */
 	while(!hEnc->exit) {
@@ -530,9 +486,12 @@ void *encoder_thread(void *arg)
     Modification : Created function
 
 *****************************************************************************/
-EncoderHandle encoder_create(EncoderAttrs *attrs)
+EncoderHandle encoder_create(EncoderAttrs *attrs, EncoderParams *encParams, UploadParams *uploadParams)
 {
 	EncoderHandle hEnc;
+
+	if(!attrs || !encParams || !uploadParams)
+		return NULL;
 
 	hEnc = calloc(1, sizeof(struct EncoderObj));
 	if(!hEnc) {
@@ -542,7 +501,12 @@ EncoderHandle encoder_create(EncoderAttrs *attrs)
 
 	Int32 err;
 
-	err = encoder_init(hEnc, attrs);
+	/* init encoder */
+	err = encoder_init(hEnc, attrs, encParams);
+
+	/* create upload module */
+	err |= upload_update(hEnc, uploadParams);
+	
 	if(err) {
 		encoder_delete(hEnc, NULL);
 		return NULL;
@@ -659,22 +623,70 @@ Int32 encoder_run(EncoderHandle hEnc)
     Modification : Created function
 
 *****************************************************************************/
-Int32 encoder_set_enc_params(EncoderHandle hEnc, MsgHandle hCurMsg)
+Int32 encoder_set_enc_params(EncoderHandle hEnc, MsgHandle hCurMsg, EncoderParams *params)
 {
-	if(!hEnc)
+	if(!hEnc || !params)
 		return E_INVAL;
 
 	Int32 ret = E_NO;
 	
 	if(hEnc->pid > 0 && hCurMsg) {
-		MsgHeader msg;
+		struct {
+			MsgHeader 		hdr;
+			EncoderParams	params;
+		}msg;
 
 		/* send msg to our thread to exit */
-		msg.cmd = APPCMD_SET_ENC_PARAMS;
-		msg.index = 0;
-		msg.dataLen = 0;
-		msg.type = MSG_TYPE_REQU;
-		ret = msg_send(hCurMsg, msg_get_name(hEnc->hMsg), &msg, 0);
+		msg.hdr.cmd = APPCMD_SET_ENC_PARAMS;
+		msg.hdr.index = 0;
+		msg.hdr.dataLen = sizeof(EncoderParams);
+		msg.hdr.type = MSG_TYPE_REQU;
+		msg.params = *params;
+		
+		ret = msg_send(hCurMsg, msg_get_name(hEnc->hMsg), (MsgHeader *)&msg, 0);
+	}
+
+	return ret;
+}
+
+/*****************************************************************************
+ Prototype    : encoder_set_upload
+ Description  : set upload params
+ Input        : EncoderHandle hEnc    
+                MsgHandle hCurMsg     
+                UploadParams *params  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/13
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 encoder_set_upload(EncoderHandle hEnc, MsgHandle hCurMsg, UploadParams *params)
+{
+	if(!hEnc || !params)
+		return E_INVAL;
+
+	Int32 ret = E_NO;
+	
+	if(hEnc->pid > 0 && hCurMsg) {
+		struct {
+			MsgHeader 		hdr;
+			UploadParams	params;
+		}msg;
+
+		/* send msg to our thread to exit */
+		msg.hdr.cmd = APPCMD_SET_UPLOAD_PARAMS;
+		msg.hdr.index = 0;
+		msg.hdr.dataLen = sizeof(UploadParams);
+		msg.hdr.type = MSG_TYPE_REQU;
+		msg.params = *params;
+		
+		ret = msg_send(hCurMsg, msg_get_name(hEnc->hMsg), (MsgHeader *)&msg, 0);
 	}
 
 	return ret;

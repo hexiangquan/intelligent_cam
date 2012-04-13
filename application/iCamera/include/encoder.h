@@ -19,10 +19,12 @@
 #ifndef __IMG_ENC_THR_H__
 #define __IMG_ENC_THR_H__
 
-#include "params_mng.h"
 #include "alg.h"
 #include <pthread.h>
 #include "app_msg.h"
+#include "osd.h"
+#include "cam_osd.h"
+#include "upload.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -68,13 +70,8 @@ typedef struct {
 /* create params for processor module */
 typedef struct {
 	const char			*name;				//object name
-	ParamsMngHandle 	hParamsMng;			//params manage handle
 	void				*encInitParams;		//init params for encoder
 	const AlgFxns		*encFxns;			//encode fxns
-	ParamsMngCtrlCmd	cmdGetEncDyn;		//cmd for get enc dyn params
-	ParamsMngCtrlCmd	cmdGetOsdInfo;		//cmd for get osd info
-	ParamsMngCtrlCmd	cmdGetOsdDyn;		//cmd for get osd dyn params
-	ParamsMngCtrlCmd	cmdGetUploadProto;	//cmd for get upload proto
 	const char			*msgName;			//our msg name
 	const char			*dstName;			//default dest msg name
 	Uint32				encBufSize;
@@ -84,6 +81,12 @@ typedef struct {
 	pthread_mutex_t		*mutex;
 }EncoderAttrs;
 
+/* params for update */
+typedef struct {
+	CamOsdInfo		osdInfo;		//osd info
+	OsdDynParams	osdDyn;			//osd dyn params
+	Int8			encDynBuf[128];	//encode dyn params
+}EncoderParams;
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -106,7 +109,7 @@ extern "C"{
     Modification : Created function
 
 *****************************************************************************/
-EncoderHandle encoder_create(EncoderAttrs *attrs);
+EncoderHandle encoder_create(EncoderAttrs *attrs, EncoderParams *encParams, UploadParams *uploadParams);
 
 /*****************************************************************************
  Prototype    : encoder_delete
@@ -158,7 +161,26 @@ Int32 encoder_run(EncoderHandle hEnc);
     Modification : Created function
 
 *****************************************************************************/
-Int32 encoder_set_enc_params(EncoderHandle hEnc, MsgHandle hCurMsg);
+Int32 encoder_set_enc_params(EncoderHandle hEnc,MsgHandle hCurMsg,EncoderParams * params);
+
+/*****************************************************************************
+ Prototype    : encoder_set_upload
+ Description  : set upload params
+ Input        : EncoderHandle hEnc     
+                MsgHandle hCurMsg      
+                UploadParams * params  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/13
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 encoder_set_upload(EncoderHandle hEnc,MsgHandle hCurMsg, UploadParams * params);
 
 
 #ifdef __cplusplus
