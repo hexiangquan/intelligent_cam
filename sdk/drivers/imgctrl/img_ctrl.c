@@ -30,14 +30,6 @@
 
 #define DEVICE_NAME 		"imgctrl" 
 
-#define AB_MAX_TARGET		255
-#define AB_MAX_GAIN			1023
-
-#define MAX_RED_GAIN		512
-#define MAX_GREEN_GAIN		512
-#define MAX_BLUE_GAIN		512
-
-
 #ifdef _DEBUG 
 #define _DBG(fmt, args...)	printk(KERN_INFO fmt"\n", ##args) 
 #else 
@@ -156,14 +148,14 @@ static int ab_cfg_validate(struct img_ctrl_dev *dev, struct hdcam_ab_cfg *cfg)
 	int i, result;
 	
 	/* validate target vaule */
-	if(cfg->targetValue > AB_MAX_TARGET) {
-		_ERR("target value: %d is bigger than max %d", cfg->targetValue, AB_MAX_TARGET);
+	if(cfg->targetValue > HDCAM_AB_MAX_TARGET) {
+		_ERR("target value: %d is bigger than max %d", cfg->targetValue, HDCAM_AB_MAX_TARGET);
 		return -EINVAL;
 	}
 
 	/* validate max gain */
-	if(cfg->maxGainValue > AB_MAX_GAIN) {
-		_ERR("max gain: %d is bigger than max %d", cfg->maxGainValue, AB_MAX_GAIN);
+	if(cfg->maxGainValue > HDCAM_AB_MAX_GAIN) {
+		_ERR("max gain: %d is bigger than max %d", cfg->maxGainValue, HDCAM_AB_MAX_GAIN);
 		return -EINVAL;
 	}
 
@@ -319,13 +311,142 @@ static int ab_set_cfg(struct img_ctrl_dev *dev, unsigned long usrptr)
 	return result;
 }
 
+/**
+ * awb_cfg_validate - Validate awb cfg params
+ * @dev:       Device pointer
+ * @cfg:        AWB cfg pointer.
+ *
+ * This function checks the value in awb cfg, make sure the params are correct.
+ * It returns 0 if params are valid, otherwise returns negative error value.
+ */
+static int awb_cfg_validate(struct img_ctrl_dev *dev, struct hdcam_awb_cfg *cfg)
+{
+	if( cfg->minRedGain > cfg->maxRedGain || 
+		cfg->minGreenGain > cfg->maxGreenGain ||
+		cfg->minBlueGain > cfg->maxBlueGain ) {
+		_ERR("min gain should not bigger than max gain.");
+		return -EINVAL;
+	}
+
+	if( cfg->maxRedGain > HDCAM_MAX_RED_GAIN || 
+		cfg->maxGreenGain > HDCAM_MAX_GREEN_GAIN ||
+		cfg->maxBlueGain > HDCAM_MAX_BLUE_GAIN ) {
+		_ERR("max gain is bigger than limited value.");
+		return -EINVAL;
+	}
+
+	if( cfg->initRedGain[0] > HDCAM_MAX_RED_GAIN || 
+		cfg->initRedGain[1] > HDCAM_MAX_RED_GAIN ||
+		cfg->initGreenGain[0] > HDCAM_MAX_GREEN_GAIN ||
+		cfg->initGreenGain[1] > HDCAM_MAX_GREEN_GAIN ||
+		cfg->initBlueGain[0] > HDCAM_MAX_BLUE_GAIN || 
+		cfg->initBlueGain[1] > HDCAM_MAX_BLUE_GAIN ) {
+		_ERR("init gain is bigger than limited value.");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
+ * awb_hw_setup - Setup auto white balance hardware
+ * @dev:       Device pointer
+ * @cfg:        AWB cfg params pointer.
+ *
+ * This function set the value in ab cfg to hardware.
+ * It returns 0 if cfg successful, otherwise returns negative error value.
+ */
+static int awb_hw_setup(struct img_ctrl_dev *dev, struct hdcam_awb_cfg *cfg)
+{	
+	u16 data;
+	
+	/* get lock first */
+	spin_lock(&imgctrl_lock);
+
+	/* stop AWB first */
+	data = fpga_read(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL);
+	data &= ~BIT(2);
+	fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
+
+	if(cfg->flags) {
+		/* set init value */
+		fpga_write(dev->fpga_base, FPGA_REG_AWB_RED_INIT_VAL, 
+			(cfg->initRedGain[0] & 0xFF) | ((cfg->initRedGain[1] & 0xFF) << 8));
+		fpga_write(dev->fpga_base, FPGA_REG_AWB_GREEN_INIT_VAL, 
+			(cfg->initGreenGain[0] & 0xFF) | ((cfg->initGreenGain[1] & 0xFF) << 8));
+		fpga_write(dev->fpga_base, FPGA_REG_AWB_BLUE_INIT_VAL, 
+			(cfg->initBlueGain[0] & 0xFF) | ((cfg->initBlueGain[1] & 0xFF) << 8));
+		
+		/* set min & max gains */
+		fpga_write(dev->fpga_base, FPGA_REG_AWB_MAX_RED_GAIN, 
+			cfg->maxRedGain);
+		fpga_write(dev->fpga_base, FPGA_REG_AWB_MAX_BLUE_GAIN, 
+			cfg->maxBlueGain);
+
+		/* set adjust rotio */
+		fpga_write(dev->fpga_base, FPGA_REG_AWB_RED_MODIFY_RATIO, 
+			cfg->redModifyRatio);
+		fpga_write(dev->fpga_base, FPGA_REG_AWB_BLUE_MODIFY_RATIO, 
+			cfg->blueModifyRatio);
+
+		/* set enable flags */
+		if(cfg->flags & HDCAM_AWB_FLAG_EN)
+			data |= BIT(2);
+		fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
+	}
+
+	/* release lock */
+	spin_unlock(&imgctrl_lock);
+
+	return 0;
+}
+
+/**
+ * awb_set_cfg - Configure auto white balance module
+ * @dev:      Device pointer
+ * @usrptr:   User space ptr for AWB cfg params pointer.
+ *
+ * This function set the configure params to awb engine.
+ * It returns 0 if cfg successful, otherwise returns negative error value.
+ */
+static int awb_set_cfg(struct img_ctrl_dev *dev, unsigned long usrptr)
+{
+	struct hdcam_awb_cfg cfg;
+	int result;
+	
+	/* Copy config structure passed by user */
+	if (copy_from_user(&cfg, (struct hdcam_awb_cfg *)usrptr,
+			   sizeof(cfg))) {
+		_ERR("cpy from user failed.");
+		return -EFAULT;
+	}
+
+	/* validate cfg params */
+	result = awb_cfg_validate(dev, &cfg);
+	if(result)
+		return result;
+
+	_DBG("awb flags: 0x%X", (u32)cfg.flags);
+	_DBG("red gain: %u - %u", (u32)cfg.minRedGain, (u32)cfg.maxRedGain);
+	_DBG("green gain: %u - %u", (u32)cfg.minGreenGain, (u32)cfg.maxGreenGain);
+	_DBG("blue gain: %u - %u", (u32)cfg.minBlueGain, (u32)cfg.maxBlueGain);
+
+	/* Call awb_hardware_setup to perform register configuration */
+	result = awb_hw_setup(dev, &cfg);
+	if (result) {
+		/* Change Configuration Structure to original */
+		_ERR("set awb hardware failed");
+	}
+
+	return result;
+}
 
 /**
  * lum_info_setup - Configure lumanice info
  * @dev:       Device pointer
  * @cfg:       user space ptr for lum info params.
  *
- * This function set the lum params for luminance adjust
+ * This function set the lum params for image sensor luminance adjust
  * It returns 0 if cfg successful, otherwise returns negative error value.
  */
 static int lum_info_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
@@ -344,12 +465,11 @@ static int lum_info_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
 	
 
 	/* validate data */
-	if(info.globalGain > AB_MAX_GAIN) {
-		_ERR("gain(%d) is bigger than max %d", info.globalGain, AB_MAX_GAIN);
+	if(info.globalGain > HDCAM_AB_MAX_GAIN) {
+		_ERR("gain(%d) is bigger than max %d", info.globalGain, HDCAM_AB_MAX_GAIN);
 		return -EINVAL;
 	}
 
-	
 	/* get lock first */
 	spin_lock(&imgctrl_lock);
 	
@@ -401,14 +521,14 @@ static int lum_info_read(struct img_ctrl_dev *dev, unsigned long usrptr)
 	return 0;
  }
   
-  /**
-   * chroma_info_setup - Configure chroma info
-   * @dev:		 Device pointer
-   * @cfg:		 user space ptr for lum info params.
-   *
-   * This function set the chroma engine for color adjust
-   * It returns 0 if cfg successful, otherwise returns negative error value.
-   */
+/**
+ * chroma_info_setup - Configure chroma info
+ * @dev:		 Device pointer
+ * @cfg:		 user space ptr for lum info params.
+ *
+ * This function set the chroma engine for color adjust
+ * It returns 0 if cfg successful, otherwise returns negative error value.
+ */
 static int chroma_info_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
 {
 	struct hdcam_chroma_info info;
@@ -423,9 +543,9 @@ static int chroma_info_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
 	_DBG("RGB: %u, %u, %u", info.redGain, info.greenGain, info.blueGain);	  
 
 	/* validate data */
-	if( info.redGain > MAX_RED_GAIN || 
-		info.greenGain > MAX_GREEN_GAIN || 
-		info.blueGain > MAX_BLUE_GAIN) {
+	if( info.redGain > HDCAM_MAX_RED_GAIN || 
+		info.greenGain > HDCAM_MAX_GREEN_GAIN || 
+		info.blueGain > HDCAM_MAX_BLUE_GAIN) {
 	  _ERR("rgb gains are bigger than max value");
 	  return -EINVAL;
 	}
@@ -478,6 +598,87 @@ static int chroma_info_read(struct img_ctrl_dev *dev, unsigned long usrptr)
 		_ERR("cpy to user failed.");
 		return -EFAULT;
 	}
+
+	return 0;
+}
+
+/**
+ * img_enhance_setup - Configure img enhance module
+ * @dev:		 Device pointer
+ * @cfg:		 user space ptr for img enhance cfg.
+ *
+ * This function set the img enhance engine for img quality adjust
+ * It returns 0 if cfg successful, otherwise returns negative error value.
+ */
+static int img_enhance_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
+{
+	u16 data = 0;
+	struct hdcam_img_enhance_cfg cfg;
+
+	/* Copy config structure passed by user */
+	if (copy_from_user(&cfg, (struct hdcam_img_enhance_cfg *)usrptr,
+			 sizeof(cfg))) {
+		_ERR("cpy from user failed.");
+		return -EFAULT;
+	}
+
+	_DBG("enhance flags: 0x%X", (u32)cfg.flags);
+	_DBG("contrast: %u, sharpness: %u, drc: %u", 
+		(u32)cfg.contrast, (u32)cfg.sharpness, (u32)cfg.drcStrength);
+
+	/* validate data */
+	if( cfg.contrast > HDCAM_MAX_CONTRAST || 
+		cfg.sharpness > HDCAM_MAX_SHARPNESS || 
+		cfg.drcStrength > HDCAM_MAX_DRC_STRENGTH ||
+		cfg.brightness > HDCAM_MAX_BRIGHTNESS) {
+	  _ERR("params are bigger than max value");
+	  return -EINVAL;
+	}
+
+	/* get lock first */
+	spin_lock(&imgctrl_lock);
+
+	/* cfg fpga register */
+	if(cfg.flags & HDCAM_ENH_FLAG_CONTRAST_EN) {
+		/* enable contrast */
+		data |= BIT(0);
+		fpga_write(dev->fpga_base, FPGA_REG_CONTRAST, cfg.contrast);
+	}
+
+	if(cfg.flags & HDCAM_ENH_FLAG_SHARP_EN) {
+		/* enable sharpness */
+		data |= BIT(1);
+		fpga_write(dev->fpga_base, FPGA_REG_SHARPNESS, cfg.sharpness);
+	}
+
+	if(cfg.flags & HDCAM_ENH_FLAG_NF_EN) {
+		/* enable median filter */
+		data |= BIT(2);
+	}
+
+	if(cfg.flags & HDCAM_ENH_FLAG_SAT_EN) {
+		/* enable sturation */
+		data |= BIT(3);
+		fpga_write(dev->fpga_base, FPGA_REG_SATURATION, cfg.saturation);
+	}
+
+	if(cfg.flags & HDCAM_ENH_FLAG_DRC_EN) {
+		/* enable dynamic range compression, reserved */
+		data |= BIT(5);
+		fpga_write(dev->fpga_base, FPGA_REG_DRC_STRENGTH, cfg.drcStrength);
+	}
+
+	if(cfg.flags & HDCAM_ENH_FLAG_BRIGHT_EN) {
+		/* set brightness */
+		data |= BIT(4);
+		fpga_write(dev->fpga_base, FPGA_REG_BRIGHTNESS, cfg.brightness);
+	}
+
+	/* set enable ctrl reg */
+	fpga_write(dev->fpga_base, FPGA_REG_IMG_ENHANCE_CTL, data);
+	
+	/* release lock */
+	spin_unlock(&imgctrl_lock);
 
 	return 0;
 }
@@ -551,7 +752,17 @@ static int img_ctrl_ioctl(struct inode *inode, struct file *filep,
 	case IMGCTRL_S_ABCFG:
 		result = ab_set_cfg(dev, arg);
 		break;
+		
+	/* set auto white balance params */
+	case IMGCTRL_S_AWBCFG:
+		result = awb_set_cfg(dev, arg);
+		break;
 
+	/* set image enhance adjust params */
+	case IMGCTRL_S_ENHCFG:
+		result = img_enhance_setup(dev, arg);
+		break;
+	
 	/* Invalid Command */
 	default:
 		_ERR("Invalid cmd");
@@ -579,6 +790,7 @@ static struct miscdevice misc_dev = {
 	.fops = &dev_fops, 
 };
 
+/* device init function, register dev */
 static int __init dev_init(void) 
 { 
 	int ret; 
@@ -589,6 +801,7 @@ static int __init dev_init(void)
 	return ret;
 }
 
+/* device exit function, deregister dev */
 static void __exit dev_exit(void) 
 { 
 	misc_deregister(&misc_dev);

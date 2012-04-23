@@ -70,6 +70,12 @@ TARGET_EXEC_DIR=$(TARGET_FILESYS_DIR)/home/root
 # Target share lib dir
 TARGET_LDLIB_DIR=$(TARGET_FILESYS_DIR)/usr/lib
 
+# version of kernel
+KERNEL_VERSION = 2.6.32.17-davinci1
+
+# Target kernel module install dir
+TARGET_MOD_DIR=$(TARGET_FILESYS_DIR)/lib/modules/$(KERNEL_VERSION)/kernel
+
 # SDK external resources dir
 SDK_RES_DIR=$(PRJ_DIR)/sdk/resource
 

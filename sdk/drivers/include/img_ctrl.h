@@ -1,5 +1,5 @@
 /* *
- * Copyright (C) 2009 Texas Instruments Inc
+ * Copyright (C) 2012 S.K. Sun
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,7 +27,20 @@
 #include <linux/wait.h>
 #include <linux/mutex.h>
 #include <asm/io.h>
-#endif				/* end of #ifdef __KERNEL__ */
+#endif		/* end of #ifdef __KERNEL__ */
+
+/* range of some cfg params */
+#define HDCAM_AB_MAX_TARGET		255
+#define HDCAM_AB_MAX_GAIN		1023
+
+#define HDCAM_MAX_RED_GAIN		512
+#define HDCAM_MAX_GREEN_GAIN	512
+#define HDCAM_MAX_BLUE_GAIN		512
+
+#define HDCAM_MAX_CONTRAST		512
+#define HDCAM_MAX_SHARPNESS		255
+#define HDCAM_MAX_BRIGHTNESS	255
+#define HDCAM_MAX_DRC_STRENGTH	255
 
 /* List of ioctls */
 #pragma pack(1)
@@ -42,8 +55,8 @@
 #pragma  pack()
 
 /* 
-  * Luminance info
-  */
+ * Luminance info
+ */
 struct hdcam_lum_info {
 	__u32	exposureTime;		//exposure time, unit: us
 	__u16	globalGain;			//0~1023, equals 6db~42db
@@ -52,8 +65,8 @@ struct hdcam_lum_info {
 };
 
 /* 
-  * Chroma info, RGB gains
-  */
+ * Chroma info, RGB gains
+ */
 struct hdcam_chroma_info {
 	__u16	redGain;			//Red gain, 0~511
 	__u16	greenGain;			//Green gain,  0~511
@@ -76,8 +89,8 @@ struct hdcam_region {
 };
 
 /* 
-  * auto brightness params 
-  */
+ * auto brightness params 
+ */
 
 #define HDCAM_AB_MAX_ROI		5
 
@@ -100,8 +113,8 @@ struct hdcam_ab_cfg{
 
 
 /*
-  * Auto white balance params
-  */
+ * Auto white balance params
+ */
 #define HDCAM_AWB_FLAG_EN		(1 << 0)		//enable AWB
 
 struct hdcam_awb_cfg{
@@ -121,16 +134,17 @@ struct hdcam_awb_cfg{
 };
 
 /* 
-  * Image enhance params 
-  */
+ * Image enhance params 
+ */
 
 /* Flags for image enhance */
-#define HDCAM_FLAG_CONTRAST_EN		(1 << 0)	//enable contrast adjust
-#define HDCAM_FLAG_SHARP_EN			(1 << 1)	//enable sharpness adjust
-#define HDCAM_FLAG_GAMMA_EN			(1 << 2)	//enable brightness adjust
-#define HDCAM_FLAG_SAT_EN			(1 << 3)	//enable saturation adjust
-#define HDCAM_FLAG_NF_EN			(1 << 4)	//enable nosie filter
-#define HDCAM_IMG_DRC_EN			(1 << 5)	//enable dynamic range compression
+#define HDCAM_ENH_FLAG_CONTRAST_EN		(1 << 0)	//enable contrast adjust
+#define HDCAM_ENH_FLAG_SHARP_EN			(1 << 1)	//enable sharpness adjust
+#define HDCAM_ENH_FLAG_GAMMA_EN			(1 << 2)	//enable brightness adjust
+#define HDCAM_ENH_FLAG_SAT_EN			(1 << 3)	//enable saturation adjust
+#define HDCAM_ENH_FLAG_NF_EN			(1 << 4)	//enable nosie filter
+#define HDCAM_ENH_FLAG_DRC_EN			(1 << 5)	//enable dynamic range compression
+#define HDCAM_ENH_FLAG_BRIGHT_EN		(1 << 6)	//enable brightness 
 
 struct hdcam_img_enhance_cfg{
 	__u16	flags;			//control flag

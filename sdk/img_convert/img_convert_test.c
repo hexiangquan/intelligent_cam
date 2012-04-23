@@ -353,7 +353,7 @@ static Bool main_loop(TestParams *params)
 	msg.hdr.cmd = 0;
 	msg.hdr.dataLen = 0;
 	msg.hdr.index = 0;
-	msg.hdr.magicNum = MSG_MAGIC_SEND;
+	msg.hdr.type = MSG_TYPE_REQU;
 
 	capture_set_def_frame_ref_cnt(hCapture, capRefCnt);
 	

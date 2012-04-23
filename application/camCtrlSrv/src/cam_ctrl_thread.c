@@ -25,7 +25,7 @@
 #include "tcp_cmd_trans.h"
 #include "net_utils.h"
 #include <linux/types.h>
-#include "tcp_cmds.h"
+#include "net_cmds.h"
 
 /*----------------------------------------------*
  * external variables                           *

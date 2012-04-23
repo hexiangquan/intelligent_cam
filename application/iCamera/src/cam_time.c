@@ -21,6 +21,7 @@
 ******************************************************************************/
 #include "cam_time.h"
 #include "log.h"
+#include <linux/types.h>
 
 /*----------------------------------------------*
  * external variables                           *
@@ -100,8 +101,10 @@ Int32 cam_set_time(CamDateTime *dateTime)
 		return E_REFUSED;
 	}
 
-	DBG("cur time:");
-	system("date");
+	DBG("cur time: %04u.%02u.%02u %02u:%02u:%02u",
+		(__u32)dateTime->year, (__u32)dateTime->month, (__u32)dateTime->day,
+		(__u32)dateTime->hour, (__u32)dateTime->minute, (__u32)dateTime->second);
+	//system("date");
 
 	return E_NO;
 }

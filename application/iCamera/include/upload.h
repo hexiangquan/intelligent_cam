@@ -96,7 +96,7 @@ typedef struct {
 /* params can be set at run time */
 typedef struct {
 	CamImgUploadProto 		protol;			//protocol to send
-	Int8					paramsBuf[512];	//low level params for TCP, FTP etc. transfer
+	Int8					paramsBuf[512];//low level params for TCP, FTP etc. transfer
 }UploadParams;
 
 #ifdef __cplusplus

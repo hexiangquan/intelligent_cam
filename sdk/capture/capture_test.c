@@ -3,6 +3,11 @@
 #include "log.h"
 #include <pthread.h>
 #include "jpg_enc.h"
+#include <sys/mman.h>
+#include <sys/ioctl.h>
+#include <asm/types.h>
+#include <linux/videodev2.h>
+
 
 
 #define CAPTURE_DEVICE		"/dev/video0"
@@ -40,6 +45,35 @@ static Bool check_all_zero(void *buf, Int32 bufSize)
 	
 }
 
+static void cap_ctrl_test(CapHandle hCapture)
+{
+	int fd = capture_get_fd(hCapture);
+	assert(fd > 0);
+
+	int ret;
+	struct v4l2_ext_controls extCtrls;
+	struct v4l2_ext_control ctrl;
+	char data[16];
+
+	memset(&extCtrls, 0, sizeof(extCtrls));
+	extCtrls.count = 1;
+	extCtrls.ctrl_class = V4L2_CTRL_CLASS_USER;
+	extCtrls.controls = &ctrl;
+
+	ctrl.id = V4L2_CID_AUTOBRIGHTNESS;
+	ctrl.size = 16;
+	ctrl.string = data;
+
+	while(1) {
+		ret = ioctl(fd, VIDIOC_S_EXT_CTRLS, &extCtrls);
+
+		ERRSTR("ext ctrl returns: %d", ret);
+		sleep(1);
+	}
+				
+
+}
+
 static Bool main_loop(TestParams *params)
 {
 	Bool ret = FALSE;
@@ -75,6 +109,8 @@ static Bool main_loop(TestParams *params)
 
 	if(!hCapture)
 		goto exit;
+
+	//cap_ctrl_test(hCapture);
 
 	//capture_set_def_frame_ref_cnt(hCapture, 3);
 

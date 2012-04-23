@@ -383,7 +383,7 @@ static Int32 msg_process(EncoderHandle hEnc, CommonMsg *msgBuf)
 	/* recv msg */
 	ret = msg_recv(hEnc->hMsg, (MsgHeader *)msgBuf, sizeof(CommonMsg), 0);
 	if(ret < 0) {
-		ERR("img enc thr recv msg err: %s", str_err(ret));
+		ERR("%s recv msg err: %s", hEnc->name, str_err(ret));
 		return ret;
 	}
 

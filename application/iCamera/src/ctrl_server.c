@@ -70,7 +70,7 @@ typedef struct {
 	Int8		buf[CTRL_MSG_BUF_LEN];
 }CtrlMsg;
 
-/* thread environment */
+/* Private data for this object */
 struct CtrlSrvObj{
 	ParamsMngHandle hParamsMng;		//params manage handle
 	CapHandle		hCapture;		//image capture handle
@@ -142,7 +142,12 @@ static Int32 conv_params_update(CtrlSrvHandle hCtrlSrv)
 	
 	/* update params in sub module */
 	ConverterParams params;
-	params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_CONVTERPARAMS, &params, sizeof(params));
+	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_CONVTERPARAMS, 
+			&params, sizeof(params));
+
+	if(ret)
+		return ret;
+
 	ret = data_capture_set_conv_params(hCtrlSrv->hDataCap, hCtrlSrv->hMsg, &params);
 
 	return ret;
@@ -180,7 +185,9 @@ static Int32 encoder_params_update(CtrlSrvHandle hCtrlSrv, EncoderType type)
 	}
 
 	/* update params in encoder */
-	params_mng_control(hCtrlSrv->hParamsMng, cmd, &encParams, sizeof(encParams));
+	ret = params_mng_control(hCtrlSrv->hParamsMng, cmd, &encParams, sizeof(encParams));
+	assert(ret == E_NO);
+	
 	ret = encoder_set_enc_params(hEncoder, hCtrlSrv->hMsg, &encParams);
 
 	return ret;

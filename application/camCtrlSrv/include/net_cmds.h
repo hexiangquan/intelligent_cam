@@ -16,8 +16,10 @@
     Modification: Created file
 
 ******************************************************************************/
-#ifndef __TCP_CMDS_H__
-#define __TCP_CMDS_H__
+#ifndef __NET_CMDS_H__
+#define __NET_CMDS_H__
+
+#include "common.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -150,6 +152,21 @@ enum ConnectRequestMode
 	CONNECT_MODE_RESET = 0xFFFF
 };
 
+/*
+ * udp cmds
+ */
+enum UdpCmds
+{
+	UC_INVALID_REQUEST = 0,
+	UC_GET_CAMERAINFO,
+	UC_RESET_CAMERA,	
+};
+
+/* structure for UC_GET_CAMERAINFO */
+typedef struct {
+	Int8	ipString[18];	//IP addr of this camera
+	Uint16	listenPort;			//cmd listen port 
+}CamListenInfo;
 
 #ifdef __cplusplus
 #if __cplusplus

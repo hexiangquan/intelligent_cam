@@ -88,6 +88,39 @@ static Bool main_loop(TestParams *params)
 		goto exit;
 	}
 
+	struct hdcam_awb_cfg awbCfg;
+
+	memset(&awbCfg, 0, sizeof(awbCfg));
+	awbCfg.flags = 0x01;
+	awbCfg.maxRedGain = 122;
+	awbCfg.maxBlueGain = 157;
+	awbCfg.maxGreenGain = 99;
+	awbCfg.initRedGain[0] = 73;
+	awbCfg.initRedGain[1] = 83;
+	awbCfg.initBlueGain[0] = 23;
+	awbCfg.initBlueGain[1] = 46;
+	
+	err = ioctl(fd, IMGCTRL_S_AWBCFG, &awbCfg);
+	if(err) {
+		ERR("set awb failed");
+		goto exit;
+	}
+
+	struct hdcam_img_enhance_cfg enhanceCfg;
+
+	memset(&enhanceCfg, 0, sizeof(enhanceCfg));
+	enhanceCfg.flags = 
+		HDCAM_ENH_FLAG_CONTRAST_EN | HDCAM_ENH_FLAG_SHARP_EN | HDCAM_ENH_FLAG_DRC_EN;
+	enhanceCfg.contrast = 16;
+	enhanceCfg.sharpness = 24;
+	enhanceCfg.drcStrength = 80;
+	
+	err = ioctl(fd, IMGCTRL_S_ENHCFG, &enhanceCfg);
+	if(err) {
+		ERR("set enhance cfg failed");
+		goto exit;
+	}
+
 	ret = TRUE;
 exit:
 
