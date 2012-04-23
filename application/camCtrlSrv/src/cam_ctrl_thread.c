@@ -68,7 +68,7 @@ static pthread_t	s_curThread = 0;
  *----------------------------------------------*/
 
 typedef struct {
-	Uint32			tcpCmd;			// cmd from client
+	Uint32			tcpCmd;			//cmd from client
 	ICamCtrlCmd		camCmd;			//camera ctrl cmd
 	Int32			flags;			//flags for data parse
 	Int32			requLen;		//data len needed for request, if set to -1, means variable length
@@ -436,7 +436,8 @@ static Int32 cam_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Int8
 	}
 
 	if(cmdInfo->requLen > 0 && cmdInfo->requLen != cmdHdr->dataLen) {
-		ERR("invalid len for cmd: 0x%04X", (__u32)cmdHdr->cmd);
+		ERR("invalid request len %d for cmd: 0x%04X, need: %d", 
+			cmdHdr->dataLen, (__u32)cmdHdr->cmd, cmdInfo->requLen);
 		return E_INVAL;
 	}
 
@@ -457,7 +458,8 @@ static Int32 cam_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Int8
 	Int32 ret = icam_ctrl_run(hCamCtrl, msgHdr, bufLen);
 
 	if(cmdInfo->respLen > 0 && cmdInfo->respLen != msgHdr->dataLen) {
-		ERR("invalid len for cmd: 0x%04X", (__u32)cmdHdr->cmd);
+		ERR("invalid resp len %d for cmd: 0x%04X, need: %d", 
+			msgHdr->dataLen, (__u32)cmdHdr->cmd, cmdInfo->respLen);
 		return E_TRANS;
 	}
 

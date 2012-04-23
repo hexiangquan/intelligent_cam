@@ -82,7 +82,6 @@ typedef struct _AppParams {
 	CamNtpServerInfo		ntpSrvInfo;			//Ntp server info
 	CamExprosureParam		exposureParams;		//exposure params, only effective when AE is disabled
 	CamRGBGains				rgbGains;			//RGB gains
-	CamDRCParam				drcParams;			//Dynamic range compression params 	
 	CamTrafficLightRegions	correctRegs;		//traffic light region to correct
 	CamImgEnhanceParams		imgAdjParams;		//image adjust params
 	CamH264Params			h264EncParams;		//h.264 encode params
@@ -128,8 +127,6 @@ typedef enum {
 	PMCMD_G_EXPPARAMS,
 	PMCMD_S_RGBGAINS,
 	PMCMD_G_RGBGAINS,
-	PMCMD_S_DRCPARAMS,
-	PMCMD_G_DRCPARAMS,
 	PMCMD_S_LIGHTCORRECT,
 	PMCMD_G_LIGHTCORRECT,
 	PMCMD_S_IMGADJPARAMS,

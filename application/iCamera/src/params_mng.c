@@ -1841,69 +1841,6 @@ static Int32 get_rgb_gains(ParamsMngHandle hParamsMng, void *data, Int32 size)
 }
 
 /*****************************************************************************
- Prototype    : set_drc_params
- Description  : set drc params
- Input        : ParamsMngHandle hParamsMng  
-                void *data                  
-                Int32 size                  
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/3/14
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static Int32 set_drc_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
-{
-	if(!data || size != sizeof(CamDRCParam)) 
-		return E_INVAL;
-
-	CamDRCParam *params = (CamDRCParam *)data;
-	AppParams *appCfg = &hParamsMng->appParams;
-
-	/* validate data */
-	
-	/* Copy data */
-	appCfg->drcParams = *params;
-
-	return E_NO;
-}
-
-/*****************************************************************************
- Prototype    : get_drc_params
- Description  : get drc params
- Input        : ParamsMngHandle hParamsMng  
-                void *data                  
-                Int32 size                  
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/3/14
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static Int32 get_drc_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
-{
-	if(!data || size < sizeof(CamDRCParam)) 
-		return E_INVAL;
-
-	AppParams *appCfg = &hParamsMng->appParams;
-	
-	/* Copy data */
-	*(CamDRCParam *)data = appCfg->drcParams;
-
-	return E_NO;
-}
-
-/*****************************************************************************
  Prototype    : validate_region
  Description  : validate region
  Input        : ParamsMngHandle hParamsMng  
@@ -2847,8 +2784,6 @@ static const PmCtrlInfo g_paramsConfig[] = {
 	{.cmd = PMCMD_G_EXPPARAMS, .fxn = get_exposure_params,},
 	{.cmd = PMCMD_S_RGBGAINS, .fxn = set_rgb_gains,},
 	{.cmd = PMCMD_G_RGBGAINS, .fxn = get_rgb_gains,},
-	{.cmd = PMCMD_S_DRCPARAMS, .fxn = set_drc_params,},
-	{.cmd = PMCMD_G_DRCPARAMS, .fxn = get_drc_params,},
 	{.cmd = PMCMD_S_LIGHTCORRECT, .fxn = set_light_regions,},
 	{.cmd = PMCMD_G_LIGHTCORRECT, .fxn = get_light_regions,},
 	{.cmd = PMCMD_S_IMGADJPARAMS, .fxn = set_img_adj_params,},

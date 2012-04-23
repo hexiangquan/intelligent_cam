@@ -114,9 +114,6 @@ typedef enum {
 	/* using struct CamRGBGains for params */
 	ICAMCMD_S_RGBGAINS,
 	ICAMCMD_G_RGBGAINS,
-	/* using struct CamDRCParam for params */
-	ICAMCMD_S_DRCPARAMS,
-	ICAMCMD_G_DRCPARAMS,
 	/* using struct CamTrafficLightRegions for params */
 	ICAMCMD_S_TRAFLIGHTREG,
 	ICAMCMD_G_TRAFLIGHTREG,
@@ -222,9 +219,6 @@ extern Int32 icam_get_detector_params(IN ICamCtrlHandle hCtrl, OUT CamDetectorPa
 /* get device info */
 extern Int32 icam_get_dev_info(IN ICamCtrlHandle hCtrl, OUT CamDeviceInfo *buf);
 
-/* get dynamic range compression params */
-extern Int32 icam_get_drc_params(IN ICamCtrlHandle hCtrl, OUT CamDRCParam *params);
-
 /* get exposure params */
 extern Int32 icam_get_exposure_params(IN ICamCtrlHandle hCtrl, OUT CamExprosureParam *params);
 
@@ -314,9 +308,6 @@ extern Int32 icam_set_detector_params(IN ICamCtrlHandle hCtrl, IN const CamDetec
 
 /* set device info */
 extern Int32 icam_set_dev_info(IN ICamCtrlHandle hCtrl, IN const CamDeviceInfo *info);
-
-/* set dynamic range compression params */
-extern Int32 icam_set_drc_params(IN ICamCtrlHandle hCtrl, IN const CamDRCParam *params);
 
 /* set exposure params, only useful when auto exposure is off */
 extern Int32 icam_set_exposure_params(IN ICamCtrlHandle hCtrl, IN const CamExprosureParam *params);

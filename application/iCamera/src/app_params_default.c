@@ -92,11 +92,6 @@ const AppParams c_appParamsDef = {
 		.greenGain = {0, 0},
 		.blueGain = 30,
 	},
-	.drcParams = {
-		.strength = 0,
-		.flag = 0,
-		.reserved = {0},
-	},
 	.imgAdjParams = {
 		.flags = CAM_IMG_SHARP_EN | CAM_IMG_GAMMA_EN,
 		.contrast = 16,

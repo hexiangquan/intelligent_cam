@@ -405,13 +405,6 @@ static void *ctrl_server_thread(void *arg)
 			ret = params_mng_control(hParamsMng, PMCMD_G_RGBGAINS, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamRGBGains);
 			break;
-		case ICAMCMD_S_DRCPARAMS:
-			ret = params_mng_control(hParamsMng, PMCMD_S_DRCPARAMS, data, msgHdr->dataLen);
-			break;
-		case ICAMCMD_G_DRCPARAMS:
-			ret = params_mng_control(hParamsMng, PMCMD_G_DRCPARAMS, data, CTRL_MSG_BUF_LEN);
-			respLen = sizeof(CamDRCParam);
-			break;
 		case ICAMCMD_S_TRAFLIGHTREG:
 			ret = params_mng_control(hParamsMng, PMCMD_S_LIGHTCORRECT, data, msgHdr->dataLen);
 			break;
