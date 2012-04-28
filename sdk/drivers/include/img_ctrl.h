@@ -52,6 +52,9 @@
 #define IMGCTRL_S_ABCFG		_IOW(IMGCTRL_MAGIC_NO, 5, struct hdcam_ab_cfg *)
 #define IMGCTRL_S_AWBCFG	_IOW(IMGCTRL_MAGIC_NO, 6, struct hdcam_awb_cfg *)
 #define IMGCTRL_S_ENHCFG	_IOW(IMGCTRL_MAGIC_NO, 7, struct hdcam_img_enhance_cfg *)
+//#ifdef _DEBUG
+#define IMGCTRL_HW_TEST		_IO(IMGCTRL_MAGIC_NO, 8)
+//#endif
 #pragma  pack()
 
 /* 

@@ -11,7 +11,18 @@ typedef struct _TestParams {
 	const char *devName;
 	int abEn;
 	int awbEn;
+	int hwTestEn;
 }TestParams;
+
+static void hw_test(int fd)
+{
+	int err = 0;
+	
+	while(!err) {
+		err = ioctl(fd, IMGCTRL_HW_TEST, NULL);
+		usleep(100000);
+	}
+}
 
 static Bool main_loop(TestParams *params)
 {
@@ -24,6 +35,9 @@ static Bool main_loop(TestParams *params)
 		goto exit;
 	}
 
+	if(params->hwTestEn)
+		hw_test(fd);
+	
 	/* test lum info */
 	int err;
 	struct hdcam_lum_info lumInfo;
@@ -140,6 +154,7 @@ static void usage(void)
 	INFO(" -d dev name, default: %s", DEV_NAME);
 	INFO(" -b ab ctrl, 0-enable, 1-disable, default: enable");
 	INFO(" -w awb ctrl, 0-enable, 1-disable, default: enable");
+	INFO(" -t fpga rw test, 0-enable, 1-disable, default: disable");
     INFO("Example:");
     INFO(" use default params: ./imgctrlTest");
     INFO(" use specific params: ./imgctrlTest -s /dev/imgctrl");
@@ -148,12 +163,13 @@ static void usage(void)
 int main(int argc, char **argv)
 {
 	int c;
-    char *options = "d:b:w:h";
+    char *options = "d:b:t:w:h";
 	TestParams params;
 	
 	params.devName = DEV_NAME;
 	params.abEn = 1;
 	params.awbEn = 1;
+	params.hwTestEn = 0;
 
 	while ((c = getopt(argc, argv, options)) != -1) {
 		switch (c) {
@@ -165,6 +181,9 @@ int main(int argc, char **argv)
 			break;
 		case 'w':
 			params.awbEn = atoi(optarg);
+			break;
+		case 't':
+			params.hwTestEn = atoi(optarg);
 			break;
 		case 'h':
 		default:

@@ -75,8 +75,11 @@ typedef struct {
 }LogObj, *LogHandle;
 
 #ifdef __cplusplus
-extern "C" {
+#if __cplusplus
+extern "C"{
 #endif
+#endif /* __cplusplus */
+
 
 LogHandle log_create(LogLevel_t level, int flag, const char * pathName, int maxFileSize);
 
@@ -115,9 +118,12 @@ void log_run(LogHandle hLog, int flag, const char * fmt,...);
 			log_run(hLog, LOG_FLAG_ERR_STR, "Func %s, "fmt, __func__, ##args); \
 	}while(0)
 
-#ifdef __cpluscplus
+#ifdef __cplusplus
+#if __cplusplus
 }
 #endif
+#endif /* __cplusplus */
+
 
 #endif
 

@@ -46,12 +46,12 @@ INC_DIR += -I$(SDK_INC_DIR) -I$(LINUXKERNEL_INSTALL_DIR)/include
 
 C_FLAGS += -Wall -I. -g
 C_FLAGS += $(INC_DIR)
+C_FLAGS += -D_DEBUG
 
 LD_FLAGS := -L$(LIB_PATH) -L$(SDK_LIB_DIR)
 LD_FLAGS += -lpthread
 
-debug: EXTRA_CFLAGS += -D_DEBUG
-
+debug: EXTRA_CFLAGS += -D_DEBUG 
 
 
 .PHONY: clean debug release install default test

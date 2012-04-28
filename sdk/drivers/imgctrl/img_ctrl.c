@@ -74,7 +74,8 @@ static int img_ctrl_open(struct inode *inode, struct file *filp)
 	}
 	
  	filp->private_data = dev;
-	_DBG( "img ctrl opened, fpga base: 0x%04X", (u32)dev->fpga_base); 
+	_DBG("img ctrl opened, fpga base: 0x%04X", (u32)dev->fpga_base); 
+	
 	return 0; 
 
 exit:
@@ -683,6 +684,28 @@ static int img_enhance_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
 	return 0;
 }
 
+#ifdef _DEBUG
+/* test fpga reg rw */
+static void fpga_test(void)
+{
+	u16 data;
+	void __iomem *fpga_base = fpga_get_base();
+	
+	_DBG("fpga version: 0x%04X", 
+		(u32)fpga_read(fpga_base, FPGA_REG_VERSION));
+
+	fpga_write(fpga_base, FPGA_REG_EXPOSURE_TIME0, 0x5A5A);
+	data = fpga_read(fpga_base, FPGA_REG_EXPOSURE_TIME0);
+
+	if(data != 0x5A5A) {
+		_DBG("rw exposure reg diff.");
+	} else {
+		_DBG("rw exposure reg the same.");
+	}
+}
+#endif
+
+
 /**
  * img_ctrl_ioctl - Do ctrl of img ctrl device, such as auto brightness cfg.
  * @inode:  Pointer to inode structure.
@@ -762,6 +785,14 @@ static int img_ctrl_ioctl(struct inode *inode, struct file *filep,
 	case IMGCTRL_S_ENHCFG:
 		result = img_enhance_setup(dev, arg);
 		break;
+
+#ifdef _DEBUG
+	/* test fpag rw */
+	case IMGCTRL_HW_TEST:
+		fpga_test();
+		result = 0;
+		break;
+#endif
 	
 	/* Invalid Command */
 	default:
@@ -798,6 +829,11 @@ static int __init dev_init(void)
 	ret = misc_register(&misc_dev); 
 
 	_DBG(DEVICE_NAME"\tinitialized\n");
+
+#ifdef _DEBUG
+	fpga_test();
+#endif
+
 	return ret;
 }
 
