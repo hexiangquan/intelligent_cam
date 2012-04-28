@@ -30,6 +30,7 @@
 #include "ftp_upload.h"
 #include <pthread.h>
 #include "jpg_encoder.h"
+#include "rtp_upload.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -227,8 +228,10 @@ UploadHandle upload_create(UploadAttrs *attrs, UploadParams *params)
 		hUpload->protol = CAM_UPLOAD_PROTO_FTP;
 		break;
 	case CAM_UPLOAD_PROTO_RTP:
-		//hUpload->fxns = NULL; //not supported now
-		//break;
+		hUpload->fxns = &RTP_UPLOAD_FXNS;
+		hUpload->flags &= ~UPLOAD_FLAG_ANSYNC;
+		hUpload->protol = CAM_UPLOAD_PROTO_RTP;
+		break;
 	case CAM_UPLOAD_PROTO_NONE:
 	default:
 		hUpload->flags &= ~UPLOAD_FLAG_ANSYNC;
