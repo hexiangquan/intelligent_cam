@@ -62,6 +62,8 @@
 #define CAM_CTRL_MAX_CONNECT_NUM	5
 #define CAM_CTRL_TIMEOUT			5	//second
 #define CAM_CTRL_BUF_SIZE			(2 * 1024 * 0124)
+#define ARM_PROG_NAME				"/home/root/iCamera"
+#define FPGA_FIRMAWRE				"/home/root/fpga.bin"
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -69,12 +71,14 @@
 
 /* env of this module */
 typedef struct {
-	Uint16			tcpPort;	//tcp listen port
-	Uint16			udpPort;	//udp listen port
-	Uint32			bufLen;		//size of buffer
-	Int8			*transBuf;	//buf 
-	ICamCtrlHandle	hCamCtrl;	//handle for cam ctrl
-	pthread_mutex_t	mutex;		//mutex for sync
+	Uint16			tcpPort;		//tcp listen port
+	Uint16			udpPort;		//udp listen port
+	Uint32			bufLen;			//size of buffer
+	Int8			*transBuf;		//buf 
+	ICamCtrlHandle	hCamCtrl;		//handle for cam ctrl
+	pthread_mutex_t	mutex;			//mutex for sync
+	const char		*armProg;		//name of arm program for update
+	const char 		*fpgaFirmware;	//name of FPGA firmware
 }CamCtrlSrvEnv;
 
 /*****************************************************************************
@@ -125,6 +129,8 @@ static Int32 tcp_accept(CamCtrlSrvEnv *envp, int listenSock)
 	params->bufLen = envp->bufLen;
 	params->hCamCtrl = envp->hCamCtrl;
 	params->mutex = &envp->mutex;
+	params->armProg = envp->armProg;
+	params->fpgaFirmware = envp->fpgaFirmware;
 
 	if(pthread_create(&pid, NULL, cam_ctrl_thread, params) < 0) {
 		ERRSTR("create thread failed");
@@ -276,6 +282,8 @@ static void usage(void)
 	INFO(" -p tcp listen port, default: %d", CAM_CTRL_SRV_PORT);
 	INFO(" -u udp listen port, default: %d", CAM_UDP_SRV_PORT);
 	INFO(" -l buffer size for communication, default: %d bytes", CAM_CTRL_BUF_SIZE);
+	INFO(" -a arm program file name, default: %s", ARM_PROG_NAME);
+	INFO(" -f fpga firmware file name, default: %s", FPGA_FIRMAWRE);
     INFO(" use default params: ./%s", PROGRAM_NAME);
     INFO(" use specific params: ./%s -p 5400", PROGRAM_NAME);
 }
@@ -299,7 +307,7 @@ static void usage(void)
 Int32 main(Int32 argc, char **argv)
 {
 	Int32 c;
-    const char *options = "p:u:l:h";
+    const char *options = "p:u:l:a:f:h";
 	CamCtrlSrvEnv env;
 	Int32 ret;
 
@@ -309,6 +317,8 @@ Int32 main(Int32 argc, char **argv)
 	env.tcpPort = CAM_CTRL_SRV_PORT;
 	env.bufLen = CAM_CTRL_BUF_SIZE;
 	env.udpPort = CAM_UDP_SRV_PORT;
+	env.armProg = ARM_PROG_NAME;
+	env.fpgaFirmware = FPGA_FIRMAWRE;
 
 	while ((c = getopt(argc, argv, options)) != -1) {
 		switch (c) {
@@ -321,6 +331,12 @@ Int32 main(Int32 argc, char **argv)
 		case 'l':
 			if(atoi(optarg) > 0)
 				env.bufLen = atoi(optarg);
+			break;
+		case 'a':
+			env.armProg = optarg;
+			break;
+		case 'f':
+			env.fpgaFirmware = optarg;
 			break;
 		case 'h':
 		default:

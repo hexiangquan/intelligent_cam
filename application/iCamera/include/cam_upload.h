@@ -7,15 +7,13 @@
   * RTP params for H.264 transfer 
   */
 typedef struct {
-	Int8	dstIp[16];		//Destination IP address
-	Uint16	dstPort;		//Destination port
-	Uint16	localPort;		//Local port for RTP sending
-	Uint16	flag;			//Control flag 
-	Uint8	payloadType;	//Payload type, 0~200	
-	Uint8	reserved;
+	Int8	streamName[16]; //name of this stream
+	Uint16	rtspSrvPort;	//Rtsp server port
+	Uint16	flags;			//flags for ctrl
+	Int32	reserved;
 } CamRtpParams;
 
-#define CAM_RTP_FLAG_EN		(1 << 0) //Enable Rtp send
+#define CAM_RTP_FLAG_EN		(1 << 0) //Enable Rtsp send
 
 /* 
   * Image upload type 

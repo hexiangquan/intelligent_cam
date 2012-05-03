@@ -68,6 +68,7 @@ typedef struct {
 
 /* bit function define for flag in TCP_COMMAND_HEADER */
 #define TCP_CMD_FLAG_SAVE			(1 << 0)
+#define TCP_CMD_FLAG_CHECKSUM		(1 << 1)
 
 /* Command type */
 enum TcpCommandType

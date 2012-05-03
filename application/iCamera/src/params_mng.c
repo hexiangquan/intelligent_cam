@@ -28,9 +28,13 @@
 #include "osd.h"
 #include "tcp_upload.h"
 #include "ftp_upload.h"
+#include "rtp_upload.h"
 #include "version.h"
 #include "linux/types.h"
 #include "encoder.h"
+#include "ext_io.h"
+#include "img_ctrl.h"
+#include <sys/ioctl.h>
 
 /*----------------------------------------------*
  * external variables                           *
@@ -65,6 +69,10 @@ extern const AppParams c_appParamsDef;
 #define PM_FLAG_CAPINFO_SET		(1 << 0)
 #define PM_CMD_MASK				(0xFFFF0000)
 
+#define IMG_CTRL_DEV			"/dev/imgctrl"
+#define IMG_EXTIO_DEV			"/dev/extio"
+
+
 typedef Int32 (*PmCtrlFxn)(ParamsMngHandle hParamsMng, void *data, Int32 size);
 
 typedef struct {
@@ -85,6 +93,8 @@ struct ParamsMngObj {
 	pthread_mutex_t	mutex;			//mutex for lock
 	const char		*cfgFile;		//name of cfg file
 	FILE			*fp;			//file for read/write params
+	int				fdImgCtrl;		//fd for img ctrl dev
+	int				fdExtIo;		//fd for ext io dev
 };
 
 
@@ -157,6 +167,17 @@ ParamsMngHandle params_mng_create(const char *cfgFile)
 		ERRSTR("init mutex failed");
 		goto exit;
 	}
+
+	/* open img ctrl dev */
+	hParamsMng->fdImgCtrl = open(IMG_CTRL_DEV, O_RDWR);
+	if(hParamsMng->fdImgCtrl <= 0)
+		ERRSTR("can't open %s", IMG_CTRL_DEV);
+
+	/* open ext io dev */
+	hParamsMng->fdExtIo = open(IMG_EXTIO_DEV, O_RDWR);
+	if(hParamsMng->fdExtIo <= 0)
+		ERRSTR("can't open %s", IMG_EXTIO_DEV);
+	
 	
 	hParamsMng->fp = fp;
 	hParamsMng->cfgFile = cfgFile;
@@ -199,6 +220,15 @@ Int32 params_mng_delete(ParamsMngHandle hParamsMng)
 		fclose(hParamsMng->fp);
 	
 	pthread_mutex_destroy(&hParamsMng->mutex);
+
+	
+	/* close img ctrl dev */
+	if(hParamsMng->fdImgCtrl > 0)
+		close(hParamsMng->fdImgCtrl);
+
+	if(hParamsMng->fdExtIo > 0)
+		close(hParamsMng->fdExtIo);
+	
 	free(hParamsMng);
 
 	return E_NO;
@@ -547,6 +577,38 @@ static Int32 set_img_adj_params(ParamsMngHandle hParamsMng, void *data, Int32 si
 	}
 
 	hParamsMng->appParams.imgAdjParams = *params;
+
+	if(hParamsMng->fdImgCtrl > 0) {
+		/* sync with hardware */
+		struct hdcam_img_enhance_cfg cfg;
+		cfg.flags = 0;
+		if(params->flags & CAM_IMG_CONTRAST_EN)
+			cfg.flags |= HDCAM_ENH_FLAG_CONTRAST_EN;
+		if(params->flags & CAM_IMG_SHARP_EN)
+			cfg.flags |= HDCAM_ENH_FLAG_SHARP_EN;
+		if(params->flags & CAM_IMG_GAMMA_EN)
+			cfg.flags |= HDCAM_ENH_FLAG_GAMMA_EN;
+		if(params->flags & CAM_IMG_SAT_EN)
+			cfg.flags |= HDCAM_ENH_FLAG_SAT_EN;
+		if(params->flags & CAM_IMG_MED_FILTER_EN)
+			cfg.flags |= HDCAM_ENH_FLAG_NF_EN;
+		if(params->flags & CAM_IMG_DRC_EN)
+			cfg.flags |= HDCAM_ENH_FLAG_DRC_EN;
+		if(params->flags & CAM_IMG_BRIGHTNESS_EN)
+			cfg.flags |= HDCAM_ENH_FLAG_BRIGHT_EN;
+
+		cfg.brightness = params->brightness;
+		cfg.contrast = params->contrast;
+		cfg.drcStrength = params->drcStrength;
+		cfg.saturation = params->saturation;
+		cfg.sharpness = params->sharpness;
+		cfg.reserved[0] = cfg.reserved[1] = 0;
+
+		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_ENHCFG, &cfg) < 0) {
+			return E_IO;
+		}
+	}
+	
 	return E_NO;
 }
 
@@ -1189,7 +1251,13 @@ static Int32 get_version_info(ParamsMngHandle hParamsMng, void *data, Int32 size
 	CamVersionInfo *version = (CamVersionInfo *)data;
 	version->armVer = ICAM_VERSION;
 	version->dspVer = ICAM_VERSION;
-	version->fpgaVer = ICAM_VERSION;
+
+	if(hParamsMng->fdImgCtrl > 0) {
+		/* read from driver */
+		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_G_VER, &version->fpgaVer) < 0) {
+			return E_IO;
+		}
+	}
 	
 	return E_NO;
 }
@@ -1464,13 +1532,14 @@ static Int32 set_rtp_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 	AppParams *appCfg = &hParamsMng->appParams;
 
 	/* validate data */
-	if(!params->dstPort || !params->localPort || params->payloadType > 200) {
+	if(!params->rtspSrvPort) {
 		ERR("invalid rtp params");
 		return E_INVAL;
 	}
 	
 	/* Copy data */
 	appCfg->rtpParams = *params;
+	appCfg->rtpParams.streamName[15] = '\0'; //just in case
 
 	return E_NO;
 }
@@ -1740,6 +1809,20 @@ static Int32 set_exposure_params(ParamsMngHandle hParamsMng, void *data, Int32 s
 	/* Copy data */
 	appCfg->exposureParams = *params;
 
+	if(hParamsMng->fdImgCtrl > 0) {
+		/* sync with hardware */
+		struct hdcam_lum_info info;
+
+		info.exposureTime = params->shutterTime;
+		info.globalGain = params->globalGain;
+		info.apture = 0;
+		info.reserved = 0;
+		
+		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_LUM, &info) < 0) {
+			return E_IO;
+		}
+	}
+
 	return E_NO;
 }
 
@@ -1766,9 +1849,24 @@ static Int32 get_exposure_params(ParamsMngHandle hParamsMng, void *data, Int32 s
 		return E_INVAL;
 
 	AppParams *appCfg = &hParamsMng->appParams;
+
+	if(hParamsMng->fdImgCtrl > 0) {	
+		/* read from hardware */
+		struct hdcam_lum_info info;
+		CamExprosureParam *params = (CamExprosureParam *)data;
+		
+		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_G_LUM, &info) < 0) {
+			return E_IO;
+		}
+		
+		params->shutterTime = info.exposureTime;
+		params->globalGain = info.globalGain;
+		params->reserved = 0;
+	} else {
 	
-	/* Copy data */
-	*(CamExprosureParam *)data = appCfg->exposureParams;
+		/* Copy data */
+		*(CamExprosureParam *)data = appCfg->exposureParams;
+	}
 
 	return E_NO;
 }
@@ -1807,6 +1905,20 @@ static Int32 set_rgb_gains(ParamsMngHandle hParamsMng, void *data, Int32 size)
 	/* Copy data */
 	appCfg->rgbGains = *params;
 
+	if(hParamsMng->fdImgCtrl > 0) {
+		/* sync with hardware */
+		struct hdcam_chroma_info info;
+
+		info.redGain = params->redGain;
+		info.greenGain = params->greenGain[0];
+		info.blueGain = params->blueGain;
+		info.reserved = 0;
+		
+		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_CHROMA, &info) < 0) {
+			return E_IO;
+		}
+	}
+
 	return E_NO;
 }
 
@@ -1833,10 +1945,25 @@ static Int32 get_rgb_gains(ParamsMngHandle hParamsMng, void *data, Int32 size)
 		return E_INVAL;
 
 	AppParams *appCfg = &hParamsMng->appParams;
-	
-	/* Copy data */
-	*(CamRGBGains *)data = appCfg->rgbGains;
 
+	if(hParamsMng->fdImgCtrl > 0) {	
+		/* read from driver */
+		struct hdcam_chroma_info info;
+		CamRGBGains *params = (CamRGBGains *)data;
+		
+		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_G_CHROMA, &info) < 0) {
+			return E_IO;
+		}
+		
+		params->redGain = info.redGain;
+		params->greenGain[0] = info.greenGain;
+		params->greenGain[1] = info.greenGain;
+		params->blueGain = info.blueGain;
+	} else {
+		/* Copy data */
+		*(CamRGBGains *)data = appCfg->rgbGains;
+	}
+	
 	return E_NO;
 }
 
@@ -1905,6 +2032,10 @@ static Int32 set_light_regions(ParamsMngHandle hParamsMng, void *data, Int32 siz
 	/* Copy data */
 	appCfg->correctRegs = *params;
 
+	if(hParamsMng->fdImgCtrl > 0) {
+		/* reserved */
+	}
+
 	return E_NO;
 }
 
@@ -1968,6 +2099,20 @@ static Int32 set_io_cfg(ParamsMngHandle hParamsMng, void *data, Int32 size)
 	/* Copy data */
 	appCfg->ioCfg = *params;
 
+	if(hParamsMng->fdExtIo > 0) {
+		/* sync with hardware */
+		struct hdcam_io_info info;
+
+		info.direction = params->direction;
+		info.status = params->status;
+		info.pos_intr = 0;
+		info.neg_intr = 0;
+		
+		if(ioctl(hParamsMng->fdExtIo, EXTIO_S_GPIO, &info) < 0) {
+			return E_IO;
+		}
+	}
+
 	return E_NO;
 }
 
@@ -1994,9 +2139,22 @@ static Int32 get_io_cfg(ParamsMngHandle hParamsMng, void *data, Int32 size)
 		return E_INVAL;
 
 	AppParams *appCfg = &hParamsMng->appParams;
-	
-	/* Copy data */
-	*(CamIoCfg *)data = appCfg->ioCfg;
+
+	if(hParamsMng->fdExtIo > 0) {
+		/* read from hardware */
+		struct hdcam_io_info info;
+		CamIoCfg *cfg = (CamIoCfg *)data;
+
+		if(ioctl(hParamsMng->fdExtIo, EXTIO_G_GPIO, &info) < 0) {
+			return E_IO;
+		}
+
+		cfg->direction = info.direction;
+		cfg->status = info.status;
+	} else {
+		/* Copy data */
+		*(CamIoCfg *)data = appCfg->ioCfg;
+	}
 
 	return E_NO;
 }
@@ -2039,6 +2197,18 @@ static Int32 set_strobe_params(ParamsMngHandle hParamsMng, void *data, Int32 siz
 	/* Copy data */
 	appCfg->strobeParams = *params;
 
+	if(hParamsMng->fdExtIo > 0) {
+		/* sync with hardware */
+		struct hdcam_strobe_info info;
+
+		info.status = params->ctrlFlags;
+		info.offset = params->offset;
+		
+		if(ioctl(hParamsMng->fdExtIo, EXTIO_S_STROBE, &info) < 0) {
+			return E_IO;
+		}
+	}
+
 	return E_NO;
 }
 
@@ -2065,9 +2235,22 @@ static Int32 get_strobe_params(ParamsMngHandle hParamsMng, void *data, Int32 siz
 		return E_INVAL;
 
 	AppParams *appCfg = &hParamsMng->appParams;
-	
+
 	/* Copy data */
 	*(CamStrobeCtrlParam *)data = appCfg->strobeParams;
+	
+	if(hParamsMng->fdExtIo > 0) {
+		/* read from hardware */
+		struct hdcam_strobe_info info;
+		CamStrobeCtrlParam *params = (CamStrobeCtrlParam *)data;
+
+		if(ioctl(hParamsMng->fdExtIo, EXTIO_G_STROBE, &info) < 0) {
+			return E_IO;
+		}
+
+		params->status = info.status;
+		params->offset = info.offset;
+	}
 
 	return E_NO;
 }
@@ -2250,6 +2433,26 @@ static Int32 set_ae_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 	/* Copy data */
 	appCfg->aeParams = *params;
 
+	
+	if(hParamsMng->fdImgCtrl > 0) {
+		/* sync with hardware */
+		struct hdcam_ab_cfg cfg;
+
+		cfg.flags = params->flags;
+		cfg.targetValue = params->targetValue;
+		cfg.minShutterTime = params->minShutterTime;
+		cfg.maxShutterTime = params->maxShutterTime;
+		cfg.minAperture = params->minAperture;
+		cfg.maxAperture = params->maxAperture;
+		for(i = 0; i < HDCAM_AB_MAX_ROI; i++) {
+			memcpy(&cfg.roi[i], &params->roi[i], sizeof(cfg.roi[i]));
+		}
+		
+		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_ABCFG, &cfg) < 0) {
+			return E_IO;
+		}
+	}
+
 	return E_NO;
 }
 
@@ -2318,6 +2521,32 @@ static Int32 set_awb_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 
 	/* Copy data */
 	appCfg->awbParams = *params;
+
+	if(hParamsMng->fdImgCtrl > 0) {
+		/* sync with hardware */
+		struct hdcam_awb_cfg cfg;
+
+		cfg.flags = params->flags;
+		cfg.minRedGain = params->minValueR;
+		cfg.maxRedGain = params->maxValueR;
+		cfg.maxGreenGain = params->maxValueG;
+		cfg.minGreenGain = params->minValueG;
+		cfg.maxBlueGain = params->maxValueB;
+		cfg.minBlueGain = params->minValueB;
+		cfg.redModifyRatio = params->redModifyRatio;
+		cfg.greenModifyRatio = params->greenModifyRatio;
+		cfg.blueModifyRatio = params->blueModifyRatio;
+		cfg.initRedGain[0] = params->initValueR[0];
+		cfg.initRedGain[1] = params->initValueR[1];
+		cfg.initGreenGain[0] = params->initValueG[0];
+		cfg.initGreenGain[1] = params->initValueG[1];
+		cfg.initBlueGain[0] = params->initValueB[0];
+		cfg.initBlueGain[1] = params->initValueB[1];
+		
+		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_AWBCFG, &cfg) < 0) {
+			return E_IO;
+		}
+	}
 
 	return E_NO;
 }
@@ -2524,6 +2753,17 @@ static Int32 set_spec_cap_params(ParamsMngHandle hParamsMng, void *data, Int32 s
 	/* Copy data */
 	appCfg->specCapParams = *params;
 
+	if(hParamsMng->fdImgCtrl > 0) {
+		/* sync with hardware */
+		struct hdcam_spec_cap_cfg cfg;
+
+		cfg = *(struct hdcam_spec_cap_cfg *)data;
+		
+		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_SEPCCAP, &cfg) < 0) {
+			return E_IO;
+		}
+	}
+
 	return E_NO;
 }
 
@@ -2722,11 +2962,21 @@ static Int32 get_vid_upload_params(ParamsMngHandle hParamsMng, void *data, Int32
 	if(!data || size < sizeof(UploadParams)) 
 		return E_INVAL;
 
-	//AppParams *appCfg = &hParamsMng->appParams;
+	AppParams *appCfg = &hParamsMng->appParams;
 	UploadParams *params = (UploadParams *)data;
+	RtpUploadParams *rtpParams = (RtpUploadParams *)params->paramsBuf;
 	
-	/* Copy data */
-	params->protol = CAM_UPLOAD_PROTO_RTP;
+	if(appCfg->rtpParams.flags & CAM_RTP_FLAG_EN) {
+		/* Copy data */
+		params->protol = CAM_UPLOAD_PROTO_RTP;
+		rtpParams->streamName = appCfg->rtpParams.streamName;
+		rtpParams->rtspPort = appCfg->rtpParams.rtspSrvPort;
+		rtpParams->fmt = FMT_H264;
+		rtpParams->size = sizeof(RtpUploadParams);
+	} else {
+		/* not send */
+		params->protol = CAM_UPLOAD_PROTO_NONE;
+	}
 
 	return E_NO;
 }

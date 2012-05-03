@@ -77,6 +77,7 @@ typedef struct {
 #define CAM_IMG_MED_FILTER_EN	(1 << 4)	//enable median filter
 #define CAM_IMG_NF_EN			(1 << 5)	//enable noise filter
 #define CAM_IMG_DRC_EN			(1 << 6)	//enable dynamic range compression
+#define CAM_IMG_BRIGHTNESS_EN	(1 << 7)	//enable brightness
 
 /*
   * special capture params 

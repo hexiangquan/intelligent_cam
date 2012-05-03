@@ -25,6 +25,7 @@ __attribute__((section("__versions"))) = {
 	{ 0x4c6ff041, "add_preempt_count" },
 	{ 0xfa2a45e, "__memzero" },
 	{ 0xfbc74f64, "__copy_from_user" },
+	{ 0xeae3dfd6, "__const_udelay" },
 	{ 0xa85c710, "kmalloc_caches" },
 	{ 0xbe5f0fe1, "kmem_cache_alloc" },
 	{ 0xf70017a4, "fpga_get_base" },

@@ -77,6 +77,7 @@ install:
 	install -d $(EXEC_DIR)
 	install $(TARGET) $(EXEC_DIR)
 	-cp -p $(EXEC) $(EXEC_INSTALL_PATH)
+	-cp -p $(HEADERS) $(SDK_INC_DIR)
 
 clean:
 	-rm -rf *.o *mod* *.ko .cmem* .tmp*

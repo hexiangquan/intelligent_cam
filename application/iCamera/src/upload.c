@@ -502,7 +502,7 @@ static Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data)
 	pthread_mutex_unlock(&hUpload->mutex);
 	if(err) {
 		/* send err */
-		ERR("<%d> send err", data->index);
+		//ERR("<%d> send err", data->index);
 		upload_disconnect(hUpload);
 		goto save_frame;
 	}

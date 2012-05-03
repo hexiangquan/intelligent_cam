@@ -26,6 +26,7 @@
 #include <linux/miscdevice.h> 
 #include <linux/spinlock.h>
 #include <linux/fpga.h>
+#include <linux/delay.h>
 #include "img_ctrl.h"
 
 #define DEVICE_NAME 		"imgctrl" 
@@ -684,6 +685,130 @@ static int img_enhance_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
 	return 0;
 }
 
+/**
+ * spec_cap_cfg - Configure special capture
+ * @dev:       Device pointer
+ * @cfg:       user space ptr for special capture params.
+ *
+ * This function set the sepcial capture params to hardware
+ * It returns 0 if cfg successful, otherwise returns negative error value.
+ */
+static int spec_cap_cfg(struct img_ctrl_dev *dev, unsigned long usrptr)
+{
+	struct hdcam_spec_cap_cfg cfg;
+	u16 data;
+	
+	/* Copy config structure passed by user */
+	if (copy_from_user(&cfg, (struct hdcam_lum_info *)usrptr,
+			   sizeof(struct hdcam_spec_cap_cfg))) {
+		_ERR("cpy from user failed.");
+		return -EFAULT;
+	}
+	
+
+	/* validate data */
+	if(cfg.globalGain > HDCAM_AB_MAX_GAIN) {
+		_ERR("gain(%d) is bigger than max %d", cfg.globalGain, HDCAM_AB_MAX_GAIN);
+		return -EINVAL;
+	}
+
+	/* get lock first */
+	spin_lock(&imgctrl_lock);
+	
+	/* cfg fpga register */
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_EXP_TIME0, 
+		cfg.exposureTime & 0xFFFF);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_EXP_TIME1, 
+		(cfg.exposureTime >> 16) & 0xFFFF);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AFE_GAIN, 
+		cfg.globalGain);
+
+	data = fpga_read(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL);
+	data &= ~(BIT(0) | BIT(1));
+	if(cfg.strobeCtrl & BIT(0))
+		data |= BIT(0);
+	if(cfg.strobeCtrl & BIT(1))
+		data |= BIT(1);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL, 
+		data);
+
+	/* release lock */
+	spin_unlock(&imgctrl_lock);
+	
+	return 0;
+}
+
+/**
+ * spec_cap_trig - Trigger special capture
+ * @dev:       Device pointer
+ *
+ * This function trigger hardware for sepcial capture
+ * It returns 0 if successful, otherwise returns negative error value.
+ */
+static int spec_cap_trig(struct img_ctrl_dev *dev)
+{
+	u16 data;
+	
+	/* cfg fpga register */
+	data = fpga_read(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL);
+	data |= BIT(15);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL, 
+		data);
+	data &= ~BIT(15);
+	/* wait 1 us for fpga to capture the edge */
+	udelay(1);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL, 
+		data);
+	
+	return 0;
+}
+
+/**
+ * normal_cap_trig - Trigger a normal capture
+ * @dev:       Device pointer
+ *
+ * This function trigger hardware for a normal capture
+ * It returns 0 if successful, otherwise returns negative error value.
+ */
+static int normal_cap_trig(struct img_ctrl_dev *dev)
+{	
+	/* cfg fpga register */
+	fpga_write(dev->fpga_base, FPGA_REG_TRIGGER, 
+		0x0001);
+	/* wait 1 us for fpga to capture the edge */
+	udelay(1);
+	fpga_write(dev->fpga_base, FPGA_REG_TRIGGER, 
+		0x0000);
+	
+	return 0;
+}
+
+
+/**
+ * fpga_version_read - Read fpga version info
+ * @dev:       Device pointer
+ * @usrptr:    User space ptr for version.
+ *
+ * This function get the current fpga firmware version
+ * It returns 0 if cfg successful, otherwise returns negative error value.
+ */
+static int fpga_version_read(struct img_ctrl_dev *dev, unsigned long usrptr)
+{
+	u32 version;
+
+	/* read fpga register */
+	version = fpga_read(dev->fpga_base, FPGA_REG_VERSION);
+
+	/* Copy config structure passed by user */
+	if (copy_to_user((u32 *)usrptr, &version, sizeof(version))) {
+		_ERR("cpy to user failed.");
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
+
 #ifdef _DEBUG
 /* test fpga reg rw */
 static void fpga_test(void)
@@ -750,6 +875,15 @@ static int img_ctrl_ioctl(struct inode *inode, struct file *filep,
 
 	/* Switch according to IOCTL command */
 	switch (cmd) {
+	/* trigger a normal capture */
+	case IMGCTRL_TRIGCAP:
+		result = normal_cap_trig(dev);
+		break;
+		
+	/* trigger a special capture */
+	case IMGCTRL_SPECTRIG:
+		result = spec_cap_trig(dev);
+		break;
 
 	/* set luminance info */
 	case IMGCTRL_S_LUM:
@@ -786,6 +920,16 @@ static int img_ctrl_ioctl(struct inode *inode, struct file *filep,
 		result = img_enhance_setup(dev, arg);
 		break;
 
+	/* get fpga version */
+	case IMGCTRL_G_VER:
+		result = fpga_version_read(dev, arg);
+		break;
+	
+	/* set special capture params */
+	case IMGCTRL_S_SEPCCAP:
+		result = spec_cap_cfg(dev, arg);
+		break;
+		
 #ifdef _DEBUG
 	/* test fpag rw */
 	case IMGCTRL_HW_TEST:

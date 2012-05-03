@@ -697,7 +697,7 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	if(!hCtrlSrv->hH264Encoder) {
 		goto exit;
 	}
-	
+
 	return hCtrlSrv;
 
 exit:

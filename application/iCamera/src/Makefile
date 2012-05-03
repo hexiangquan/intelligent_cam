@@ -62,13 +62,14 @@ CPP_FLAGS ?=
 LD_FLAGS += -L$(SDK_LIB_DIR)
 LD_LIBS := -lpthread -lm -lbuf -lalg -lcapture -lcrc -lmsg -limgconv
 LD_LIBS += -ljpgenc -llog -losd -lh264enc -lnetproto -lnetutils -lftp
+LD_LIBS += -lmediasrv -lcirbuf
 
 # Comment this out if you want to see full compiler and linker output.
 #override VERBOSE = @
 
 # Complier, archive and link commands
 COMPILE = $(VERBOSE) $(CSTOOL_PREFIX)gcc $(CPP_FLAGS) $(C_FLAGS) $(CPP_FLAGS) -c
-LINK = $(VERBOSE) $(CSTOOL_PREFIX)gcc $(LD_FLAGS)
+LINK = $(VERBOSE) $(CSTOOL_PREFIX)g++ $(LD_FLAGS)
 AR = $(VERBOSE) $(CSTOOL_PREFIX)ar
 
 .PHONY: clean install exe rebuild 

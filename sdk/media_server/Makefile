@@ -3,7 +3,7 @@ include $(ROOTDIR)/Rules.make
 
 LIVE_DIR = $(ROOTDIR)/open/live
 EXEC = mediaSrvTest
-LIB_NAME = meidaSrv
+LIB_NAME = mediasrv
 LIB_HEADER = media_server.h
 #wis-streamer
 #PLATFORM=PC

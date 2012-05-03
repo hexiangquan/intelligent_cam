@@ -112,7 +112,8 @@ static const unsigned short c_usCrcTableB[] =
 unsigned short crc16(const void *data, int size)
 {
 	unsigned short	usCrc = 0;
-	unsigned char	ucByte, *pData = (unsigned char *)data;
+	unsigned char	ucByte;
+	const unsigned char *pData = data;
 	
 	
     for (; (size > 0); size--)

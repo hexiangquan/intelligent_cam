@@ -52,8 +52,13 @@
 #define IMGCTRL_S_ABCFG		_IOW(IMGCTRL_MAGIC_NO, 5, struct hdcam_ab_cfg *)
 #define IMGCTRL_S_AWBCFG	_IOW(IMGCTRL_MAGIC_NO, 6, struct hdcam_awb_cfg *)
 #define IMGCTRL_S_ENHCFG	_IOW(IMGCTRL_MAGIC_NO, 7, struct hdcam_img_enhance_cfg *)
+#define IMGCTRL_G_VER		_IOR(IMGCTRL_MAGIC_NO, 8, __u32 *)
+#define IMGCTRL_S_SEPCCAP	_IOW(IMGCTRL_MAGIC_NO, 9, struct hdcam_img_enhance_cfg *)
+#define IMGCTRL_SPECTRIG	_IO(IMGCTRL_MAGIC_NO, 10)
+#define IMGCTRL_TRIGCAP		_IO(IMGCTRL_MAGIC_NO, 11)
+
 //#ifdef _DEBUG
-#define IMGCTRL_HW_TEST		_IO(IMGCTRL_MAGIC_NO, 8)
+#define IMGCTRL_HW_TEST		_IO(IMGCTRL_MAGIC_NO, 12)
 //#endif
 #pragma  pack()
 
@@ -157,6 +162,16 @@ struct hdcam_img_enhance_cfg{
 	__u16	saturation;		//value of saturation, unused at current ver.
 	__u16	drcStrength;	//strength of DRC
 	__u16	reserved[2];	//reserved
+};
+
+/*
+  * Special capture cfg 
+ */
+struct hdcam_spec_cap_cfg{
+	__u32	exposureTime;	// Unit: us
+	__u16	globalGain;		// Range: 0~1023
+	__u16	strobeCtrl;		// Bit[0:1]- strobe0, strobe1, 1-enable, 1-disable
+	__u32	reserved[2];
 };
 
 #endif /* end of #ifdef _IMG_CTRL_H_ */

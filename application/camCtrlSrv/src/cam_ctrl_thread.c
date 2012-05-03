@@ -26,6 +26,7 @@
 #include "net_utils.h"
 #include <linux/types.h>
 #include "net_cmds.h"
+#include "crc16.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -241,6 +242,9 @@ const static CmdInfo s_cmdInfo[] = {
 	/* set Day night mode params */
 	{.tcpCmd = TC_SET_DAYNIGHTMODEPARAMS, .camCmd = ICAMCMD_S_DAYNIGHTMODE, 
 	 .flags = 0, .requLen = sizeof(CamDayNightModeCfg), .respLen = 0,},
+	/* Update fpga, just send msg */
+	{.tcpCmd = TC_FUN_UPDATE_FPGA, .camCmd = ICAMCMD_S_UPDATE_FPGA, 
+	 .flags = 0, .requLen = 0, .respLen = 0,},
 };
 
 /*****************************************************************************
@@ -338,6 +342,7 @@ static Int32 thread_init(CamCtrlThrParams *params)
 
 	/* detatch ourself */
 	pthread_detach(pthread_self());
+	params->reboot = FALSE;
 
 	/* Set trans timeout */
 	ret = set_sock_recv_timeout(sock, CMD_RECV_TIMEOUT);
@@ -364,6 +369,7 @@ static Int32 thread_init(CamCtrlThrParams *params)
 	if(cmdData == CONNECT_MODE_RESET) {
 		result = E_NO;
 		ret = E_MODE; //set to fail so the port will be closed soon
+		params->reboot = TRUE;
 		INFO("client send reset cmd.");
 		goto reply_cmd;
 	}
@@ -467,6 +473,102 @@ static Int32 cam_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Int8
 	cmdHdr->dataLen = msgHdr->dataLen;
 	return ret;
 }
+
+/*****************************************************************************
+ Prototype    : firmware_update
+ Description  : update firmware file
+ Input        : const char *name  
+                const void *data  
+                Int32 len         
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/5/2
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 firmware_update(const char *name, const void *data, Int32 len, Uint32 checksum)
+{
+	FILE 	*fp;
+	Int32 	err;
+	Int8 	*buf = NULL;
+
+	Uint32	crc = crc16(data, len);
+
+	if(crc != checksum) {
+		ERR("check sum: 0x%04X diff of cmd hdr: 0x%04X, len: %d", crc, checksum, len);
+		return E_CHECKSUM;
+	}
+
+	/* open file */
+	fp = fopen(name, "wb");
+	if(!fp) {
+		ERRSTR("can't open %s for write", name);
+		return E_IO;
+	}
+
+	/* set to start */
+	fseek(fp, 0, SEEK_SET);
+
+	/* write data */
+	err = fwrite(data, len, 1, fp);
+	if(err < 0) {
+		ERRSTR("write data failed");
+		err = E_IO;
+		goto exit;
+	}
+
+	/* sync to hard disk & close file */
+	fclose(fp);
+	sync();
+
+	/* open for read */
+	fp = fopen(name, "rb");
+	if(!fp) {
+		ERRSTR("can't open %s for read", name);
+		return E_IO;
+	}
+
+	/* read back & compare */
+	buf = malloc(len);
+	if(!buf) {
+		ERR("alloc buf for cmp failed");
+		err = E_NOMEM;
+		goto exit;
+	}
+
+	/* go back to start */
+	fseek(fp, 0, SEEK_SET);
+	err = fread(buf, len, 1, fp);
+	if(err < 0) {
+		ERRSTR("read data failed");
+		err = E_IO;
+		goto exit;
+	}
+
+	/* compare data */
+	if(memcmp(data, buf, len)) {
+		ERR("data cmp failed");
+		err = E_CHECKSUM;
+		goto exit;
+	}
+
+	err = E_NO;
+	DBG("update %s success...", name);
+
+exit:	
+	fclose(fp);
+
+	if(buf)
+		free(buf);
+
+	return err;
+
+}
 /*****************************************************************************
  Prototype    : ctrl_cmd_process
  Description  : process cmd
@@ -484,9 +586,10 @@ static Int32 cam_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Int8
     Modification : Created function
 
 *****************************************************************************/
-static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, void *dataBuf, Int32 bufLen)
+static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, CamCtrlThrParams *params)
 {
-	Int32 ret = E_INVAL;
+	Int32 	ret = E_INVAL;
+	Int8    *data = (Int8 *)(params->dataBuf) + sizeof(MsgHeader);
 
 	switch(cmdHdr->cmd) {
 	case TC_FUN_CAMERARESET:
@@ -498,13 +601,24 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, voi
 		cmdHdr->dataLen = 0;
 		break;
 	case TC_FUN_UPDATE_DSP:
+		//ret = E_NO;
+		//cmdHdr->dataLen = 0;
+		//break;
 	case TC_FUN_UPDATE_ARM:
-	case TC_FUN_UPDATE_FPGA:
-		ret = E_NO;
+		ret = firmware_update(params->armProg, data, cmdHdr->dataLen, cmdHdr->checkSum);
 		cmdHdr->dataLen = 0;
+		if(ret == E_NO)
+			params->reboot = TRUE;
+		break;
+	case TC_FUN_UPDATE_FPGA:
+		ret = firmware_update(params->fpgaFirmware, data, cmdHdr->dataLen, cmdHdr->checkSum);
+		cmdHdr->dataLen = 0;
+		/* if file update ok, tell icam prog to reload */
+		if(ret == E_NO)
+			params->reboot = TRUE;
 		break;
 	default:
-		ret = cam_cmd_process(hCamCtrl, cmdHdr, dataBuf, bufLen);
+		ret = cam_cmd_process(hCamCtrl, cmdHdr, params->dataBuf, params->bufLen);
 		break;
 	}
 
@@ -540,7 +654,6 @@ void *cam_ctrl_thread(void *arg)
 	Int32				bufLen = params->bufLen;
 	int					sock = params->sock;
 	Int32				errCnt = 0;
-	Bool				reboot = FALSE;
 	
 	assert(params && params->hCamCtrl && params->mutex && params->dataBuf);
 
@@ -553,15 +666,13 @@ void *cam_ctrl_thread(void *arg)
 	}
 
 	/* start loop until connect id is changed */
-	while(s_curThread == pthread_self() && errCnt < MAX_ERR_CNT && !reboot) {
+	while(s_curThread == pthread_self() && errCnt < MAX_ERR_CNT && !params->reboot) {
 		/* recv and process cmd */
 		ret = tcp_cmd_recv(sock, &cmdHdr, dataBuf, bufLen);
 
 		if(!ret) {
 			/* process cmd */
-			ret = ctrl_cmd_process(params->hCamCtrl, &cmdHdr, params->dataBuf, bufLen);
-			if(ret == E_REBOOT)
-				reboot = TRUE;
+			ret = ctrl_cmd_process(params->hCamCtrl, &cmdHdr, params);
 
 			/* reply cmd */
 			ret = tcp_cmd_reply(sock, &cmdHdr, dataBuf, ret);
@@ -585,7 +696,7 @@ exit:
 
 	close(sock);
 
-	if(ret == E_REBOOT || reboot)
+	if(params->reboot)
 		system("shutdown -r now");
 
 	free(arg);

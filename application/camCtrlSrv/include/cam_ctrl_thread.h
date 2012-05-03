@@ -55,11 +55,14 @@
 
 /* params for thread */
 typedef struct {
-	ICamCtrlHandle 		hCamCtrl;	//handle for camera ctrl
-	pthread_mutex_t		*mutex;		//mutex
-	int					sock;		//connect socket
-	void				*dataBuf;	//data buf 
-	Int32				bufLen;		//len of buf
+	ICamCtrlHandle 		hCamCtrl;		//handle for camera ctrl
+	pthread_mutex_t		*mutex;			//mutex
+	int					sock;			//connect socket
+	void				*dataBuf;		//data buf 
+	Int32				bufLen;			//len of buf
+	const char			*armProg;		//name of arm program
+	const char			*fpgaFirmware;	//name of fpga firmware
+	Bool				reboot;			//system reboot
 }CamCtrlThrParams;
 
 

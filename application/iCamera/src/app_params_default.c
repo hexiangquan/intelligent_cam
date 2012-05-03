@@ -10,7 +10,7 @@
 #define TCP_SRV_PORT	9300
 #define OSD_STRING		"HDCAM"
 #define ROAD_NAME		OSD_STRING
-#define RTP_PORT		5400
+#define RTSP_PORT		554
 #define RTP_PAYLOAD		21
 #define FTP_USER_NAME	"test"
 #define FTP_PASS_WORD	"123456"
@@ -42,7 +42,7 @@ const AppParams c_appParamsDef = {
 		},
 		.vidOsd = {
 			.osdString = {OSD_STRING},
-			.flags = CAM_OSD_FLAG_EN | CAM_OSD_FLAG_TEXT_EN,
+			.flags = CAM_OSD_FLAG_EN | CAM_OSD_FLAG_TEXT_EN | CAM_OSD_FLAG_TIME_EN,
 			.color = CAM_OSD_COLOR_YELLOW,
 			.postion = CAM_OSD_POS_UP_LEFT, 
 			.size = CAM_OSD_SIZE_32x32,
@@ -56,12 +56,9 @@ const AppParams c_appParamsDef = {
 		.reserved = 0,
 	},
 	.rtpParams = {
-		.dstIp = {SERVER_IP},
-		.dstPort = RTP_PORT,
-		.localPort = RTP_PORT,
-		.flag = 0,
-		.payloadType = RTP_PAYLOAD,
-		.reserved = 0,
+		.streamName = {"h264"},
+		.rtspSrvPort = RTSP_PORT,
+		.flags = CAM_RTP_FLAG_EN,
 	},
 	.imgTransType = CAM_UPLOAD_PROTO_TCP,
 	.tcpImgSrvInfo = {
@@ -103,11 +100,11 @@ const AppParams c_appParamsDef = {
 		.reserved = 0,
 	},
 	.h264EncParams = {
-		.resolution = H264_RES_1280X720,
+		.resolution = H264_RES_1920X1080,
 		.frameRate = 30,
 		.rateControl = CAM_H264_RC_CVBR,
 		.forceIFrame = 0,
-		.bitRate = 2000,
+		.bitRate = 4000,
 		.IPRatio = 30,
 		.QPInit = 24,
 		.QPMax = 51,
@@ -118,7 +115,7 @@ const AppParams c_appParamsDef = {
 		.flags = 0,
 	},
 	.workMode = {
-		.format = CAM_FMT_JPEG,
+		.format = CAM_FMT_JPEG_H264,
 		.resType = CAM_RES_FULL_FRAME,
 		.capMode = CAM_CAP_MODE_CONTINUE,
 		.flags = 0,

@@ -383,6 +383,7 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 	/* do convert */
 	//DBG("<%d> conv one frame", capFrame->index);
 	imgMsg.dimension = hDataCap->capDim;
+	imgMsg.timeCode = capFrame.timeStamp;
 	cam_convert_time(&capFrame.timeStamp, &imgMsg.timeStamp);
 	err = converter_run(hDataCap->hConverter, &capFrame, streamId, &imgMsg);
 

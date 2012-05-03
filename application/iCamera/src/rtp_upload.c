@@ -108,7 +108,7 @@ static void *rtp_upload_create(void *params)
 	RtpTransObj *rtpTrans;
 	RtpUploadParams *uploadParams = (RtpUploadParams *)params;
 	Int32 type;
-
+	
 	if(!params || uploadParams->size != sizeof(RtpUploadParams)) {
 		ERR("invalid params size");
 		return NULL;
@@ -156,7 +156,7 @@ static void *rtp_upload_create(void *params)
 		ERR("running media server err.");
 		goto exit;
 	}
-
+	
 	return rtpTrans;
 
 exit:
@@ -166,6 +166,8 @@ exit:
 	
 	if(rtpTrans)
 		free(rtpTrans);
+
+	return NULL;
 }
 
 /*****************************************************************************
