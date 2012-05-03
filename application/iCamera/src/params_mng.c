@@ -131,7 +131,7 @@ ParamsMngHandle params_mng_create(const char *cfgFile)
 	Bool useDefault = TRUE;
 	
 	/* read file */
-	FILE *fp = fopen(cfgFile, "wb+");
+	FILE *fp = fopen(cfgFile, "rb");
 	if(!fp) {
 		ERRSTR("open %s failed:", cfgFile);
 	} else {
@@ -151,6 +151,7 @@ ParamsMngHandle params_mng_create(const char *cfgFile)
 				} else {
 					/* everything is good, use this param */
 					useDefault = FALSE;
+					//DBG("reading cfg file success...");
 				}
 			}
 			
@@ -273,6 +274,7 @@ Int32 params_mng_write_back(ParamsMngHandle hParamsMng)
 		}	
 	}
 
+	//DBG("writing cfg to %s...", hParamsMng->cfgFile);
 	ret = fwrite(&hParamsMng->appParams, sizeof(AppParams), 1, hParamsMng->fp);
 	if(ret < 0) {
 		ERRSTR("write cfg file err");

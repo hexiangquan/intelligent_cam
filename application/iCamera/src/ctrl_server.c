@@ -801,18 +801,14 @@ Int32 ctrl_server_delete(CtrlSrvHandle hCtrlSrv, MsgHandle hCurMsg)
 	/* free msg handle */
 	if(hCtrlSrv->hMsg)
 		msg_delete(hCtrlSrv->hMsg);
-
-	DBG("delete jpg encoder");
 	
 	/* call encoders exit */
 	if(hCtrlSrv->hJpgEncoder)
 		encoder_delete(hCtrlSrv->hJpgEncoder, hCurMsg);
 
-	DBG("delete h.264 encoder");
 	if(hCtrlSrv->hH264Encoder)
 		encoder_delete(hCtrlSrv->hH264Encoder, hCurMsg);
 
-	DBG("delete data capture encoder");
 	/* exit data capture */
 	if(hCtrlSrv->hDataCap)
 		data_capture_delete(hCtrlSrv->hDataCap, hCurMsg);
