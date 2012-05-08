@@ -219,17 +219,14 @@ UploadHandle upload_create(UploadAttrs *attrs, UploadParams *params)
 	switch(params->protol) {
 	case CAM_UPLOAD_PROTO_TCP:
 		hUpload->fxns = &TCP_UPLOAD_FXNS;
-		hUpload->flags |= UPLOAD_FLAG_ANSYNC;
 		hUpload->protol = CAM_UPLOAD_PROTO_TCP;
 		break;
 	case CAM_UPLOAD_PROTO_FTP:
 		hUpload->fxns = &FTP_UPLOAD_FXNS;
-		hUpload->flags |= UPLOAD_FLAG_ANSYNC;
 		hUpload->protol = CAM_UPLOAD_PROTO_FTP;
 		break;
 	case CAM_UPLOAD_PROTO_RTP:
 		hUpload->fxns = &RTP_UPLOAD_FXNS;
-		hUpload->flags &= ~UPLOAD_FLAG_ANSYNC;
 		hUpload->protol = CAM_UPLOAD_PROTO_RTP;
 		break;
 	case CAM_UPLOAD_PROTO_NONE:
@@ -438,14 +435,17 @@ static Int32 upload_save_frame(UploadHandle hUpload, const ImgMsg *data)
 {
 	Int32 err = E_NO;
 
-	if(hUpload->fxns->saveFrame)
-		err = hUpload->fxns->saveFrame(hUpload->handle, data);
-	else {
-		/* try using default save function  */
-		//DBG("<%d> save frame to jpeg ", data->index);
-		err = jpg_encoder_save_frame(data, hUpload->savePath);
-	}
-
+	if(!(hUpload->flags & UPLOAD_FLAG_NOT_SAVE)) {
+		if(hUpload->fxns->saveFrame)
+			err = hUpload->fxns->saveFrame(hUpload->handle, data);
+		else {
+			/* try using default save function  */
+			//DBG("<%d> save frame to jpeg ", data->index);
+			err = jpg_encoder_save_frame(data, hUpload->savePath);
+		}
+	} else 
+		err = E_TRANS;
+	
 	/* free buf */
 	if(hUpload->flags & UPLOAD_FLAG_FREE_BUF)
 		err = buf_pool_free(data->hBuf);
@@ -489,7 +489,7 @@ static Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data)
 		}
 	}
 
-#ifdef	TEST_SEND_TIME
+#ifdef TEST_SEND_TIME
 	struct timeval tmStart,tmEnd; 
 	float   timeUse;
 

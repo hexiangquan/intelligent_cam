@@ -299,7 +299,7 @@ static Bool main_loop(TestParams *params)
 	convInArgs.outAttrs[0] = convDynParams.outAttrs[0];
 	convInArgs.outAttrs[1] = convDynParams.outAttrs[1];
 
-#ifndef CONV_IN_CAP_THR
+#ifdef CONV_IN_CAP_THR
 	ThrParams		thrParams[2];
 	pthread_mutex_t mutex;	
 	pthread_t		pid[2];
@@ -324,7 +324,7 @@ static Bool main_loop(TestParams *params)
 	pthread_create(&pid[0], NULL, conv_thread, &thrParams[0]);
 	pthread_create(&pid[1], NULL, conv_thread, &thrParams[1]);
 
-	capRefCnt = 2;
+	capRefCnt = 1;
 #else
 	
 	Uint32 size = convDynParams.outAttrs[0].width * convDynParams.outAttrs[0].height * 2;
@@ -401,7 +401,7 @@ static Bool main_loop(TestParams *params)
 			DBG("<%d> Get frame, index: %d, time: %u.%u", i, frameBuf.index, 
 				(unsigned int)frameBuf.timeStamp.tv_sec, (unsigned int)frameBuf.timeStamp.tv_usec);
 			msg.frame = frameBuf;
-	#ifndef CONV_IN_CAP_THR
+	#ifdef CONV_IN_CAP_THR
 			ret = msg_send(hMsg, NULL, (MsgHeader *)&msg, 0);
 			assert(ret == E_NO);
 			if(ret)
@@ -422,11 +422,11 @@ static Bool main_loop(TestParams *params)
 
 			timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
 		
-		if(err) 
-			ERR("img conv failed");
-		else
-			DBG("<%d> img convert cost: %.2f ms", frameBuf.index, timeUse/1000);
-		capture_free_frame(hCapture, &frameBuf);
+			if(err) 
+				ERR("img conv failed");
+			else
+				DBG("<%d> img convert cost: %.2f ms", frameBuf.index, timeUse/1000);
+			capture_free_frame(hCapture, &frameBuf);
 	#endif		
 			i++;
 			if(params->loopCnt > 0 && i > params->loopCnt) {
@@ -510,7 +510,7 @@ static Bool main_loop(TestParams *params)
 	}
 
 	exit = TRUE;
-#ifndef CONV_IN_CAP_THR
+#ifdef CONV_IN_CAP_THR
 
 	ret = msg_send(hMsg, NULL, (MsgHeader *)&msg, 0);
 	msg_send(hMsg, THR_MSG_NAME1, (MsgHeader *)&msg, 0);

@@ -161,6 +161,8 @@ typedef enum {
 	ICAMCMD_G_SDDIRINFO,
 	/* using ascii string for the dir to send */
 	ICAMCMD_S_SNDDIR,
+	/* using ascii string for single file to send */
+	ICAMCMD_S_SNDFILE,
 	/* restore to factory default params, will reboot */
 	ICAMCMD_S_RESTORECFG,
 	/* update firmware, following data */
@@ -276,8 +278,8 @@ extern Int32 icam_get_time(IN ICamCtrlHandle hCtrl, OUT CamDateTime *buf);
 /* get traffic light region params */
 extern Int32 icam_get_traffic_light_regions(IN ICamCtrlHandle hCtrl, OUT CamTrafficLightRegions *params);
 
-/* get image upload protocol */
-extern Int32 icam_get_upload_proto(IN ICamCtrlHandle hCtrl, OUT CamImgUploadProto *buf);
+/* get image upload cfg */
+extern Int32 icam_get_upload_cfg(IN ICamCtrlHandle hCtrl, OUT CamImgUploadCfg *buf);
 
 /* get firmware version */
 extern Int32 icam_get_version(IN ICamCtrlHandle hCtrl, OUT CamVersionInfo *buf);
@@ -361,7 +363,7 @@ extern Int32 icam_set_time(IN ICamCtrlHandle hCtrl, IN const CamDateTime *dateTi
 extern Int32 icam_set_traffic_light_regions(IN ICamCtrlHandle hCtrl, IN const CamTrafficLightRegions *params);
 
 /* set upload protocol */
-extern Int32 icam_set_upload_proto(IN ICamCtrlHandle hCtrl, IN CamImgUploadProto proto);
+extern Int32 icam_set_upload_cfg(IN ICamCtrlHandle hCtrl, IN CamImgUploadCfg *cfg);
 
 /* set work mode */
 extern Int32 icam_set_work_mode(IN ICamCtrlHandle hCtrl, IN const CamWorkMode *params);

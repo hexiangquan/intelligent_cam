@@ -21,10 +21,18 @@ typedef struct {
 typedef enum {
 	CAM_UPLOAD_PROTO_TCP = 0,
 	CAM_UPLOAD_PROTO_FTP =1,	
-	CAM_UPLOAD_PROTO_NONE,		//don't upload, save to local file system
+	CAM_UPLOAD_PROTO_NONE,			//don't upload, save to local file system
 	CAM_UPLOAD_PROTO_RTP,
 	CAM_UPLOAD_PROTO_MAX,
 } CamImgUploadProto;
+
+#define CAM_AUTO_UPLOAD_EN	(1 << 0)	//enabe auto upload
+#define CAM_AUTO_DEL_EN		(1 << 1)	//delete file after sending to server
+
+typedef struct {
+	Int32	protocol;		//upload protocol, see CamImgUploadProto
+	Int32	flags;			//upload ctrl flags
+}CamImgUploadCfg;
 
 /* 
   * TCP image recv server info 

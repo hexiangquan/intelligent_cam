@@ -48,6 +48,9 @@ EXEC_SRC = $(wildcard *.c)
 EXEC_OBJ = $(addprefix $(OBJ_DIR)/, $(addsuffix .o, $(basename $(EXEC_SRC))))
 EXEC_INSTALL_PATH := $(TARGET_EXEC_DIR)
 
+# dirs for libs
+LIB_DIR = ./ctrl_inf
+
 # Headers depended
 APP_INC = ../include
 HEADERS = $(wildcard *.h) $(wildcard $(APP_INC)/*.h) $(wildcard $(SDK_INC_DIR)/*.h)
@@ -72,7 +75,7 @@ COMPILE = $(VERBOSE) $(CSTOOL_PREFIX)gcc $(CPP_FLAGS) $(C_FLAGS) $(CPP_FLAGS) -c
 LINK = $(VERBOSE) $(CSTOOL_PREFIX)g++ $(LD_FLAGS)
 AR = $(VERBOSE) $(CSTOOL_PREFIX)ar
 
-.PHONY: clean install exe rebuild 
+.PHONY: clean install exe rebuild
 
 all: exe install
 
@@ -87,10 +90,19 @@ $(EXEC_OBJ): $(OBJ_DIR)/%.o: %.c $(HEADERS)
 	@-mkdir -p $(OBJ_DIR)
 	$(COMPILE) -o $@ $<
 
-install:
+lib:
+	make -C $(LIB_DIR)
+
+lib_install:
+	make -C $(LIB_DIR) install
+
+lib_clean:
+	make -C $(LIB_DIR) clean
+
+install: 
 	-cp -p $(EXEC) $(EXEC_INSTALL_PATH)
 	-cp -p $(COMMON_HEADER) $(APP_INC_DIR)
 
-clean:
+clean: 
 	@echo Removing generated files..
 	$(VERBOSE) -rm -rf $(EXEC) $(OBJ_DIR) *~ *.d .dep

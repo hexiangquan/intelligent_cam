@@ -56,6 +56,12 @@
  * routines' implementations                    *
  *----------------------------------------------*/
 
+#ifdef __cplusplus
+#if __cplusplus
+extern "C"{
+#endif
+#endif /* __cplusplus */
+
 /* struct for circular buffer operations */
 struct CirBufObj{
 	Int8 			*buf;
@@ -66,12 +72,6 @@ struct CirBufObj{
 };
 
 typedef struct CirBufObj *CirBufHandle;
-
-#ifdef __cplusplus
-#if __cplusplus
-extern "C"{
-#endif
-#endif /* __cplusplus */
 
 
 /*****************************************************************************

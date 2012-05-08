@@ -79,7 +79,7 @@ struct MediaSrvObj {
 
 
 /* we are using C interfaces */
-extern "C" {
+//extern "C" {
 
 /*****************************************************************************
  Prototype    : media_srv_create
@@ -199,7 +199,7 @@ Int32 media_srv_delete(MediaSrvHandle hSrv)
 	if(hSrv->pid > 0) {
 		/* wait thread exit */
 		hSrv->exit = 1;
-		pthread_kill(hSrv->pid, SIGINT);
+		pthread_kill(hSrv->pid, SIGUSR1);
 		//DBG("wait thread exit: %d...", hSrv->exit);
 		pthread_join(hSrv->pid, NULL);
 	}
@@ -653,5 +653,5 @@ Int32 media_stream_in(MediaSubSessionHandle hSubSession, MediaFrame *frame, Bool
 		return hSubSession->inputDev->audioWrite(frame);
 }
 
-} /* end of extern "C" */
+//} /* end of extern "C" */
 

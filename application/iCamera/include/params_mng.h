@@ -76,7 +76,7 @@ typedef struct _AppParams {
 	CamOsdParams			osdParams;			//osd params
 	CamRoadInfo				roadInfo;			//road info
 	CamRtpParams			rtpParams;			//rtp params for h.264 sending
-	CamImgUploadProto		imgTransType;		//image upload type
+	CamImgUploadCfg			uploadCfg;			//image upload config
 	CamTcpImageServerInfo	tcpImgSrvInfo;		//Tcp Image server info
 	CamFtpImageServerInfo	ftpSrvInfo;			//Ftp server info
 	CamNtpServerInfo		ntpSrvInfo;			//Ntp server info

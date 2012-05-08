@@ -27,6 +27,7 @@
 #include <linux/types.h>
 #include "net_cmds.h"
 #include "crc16.h"
+#include "sd_ctrl.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -106,10 +107,10 @@ const static CmdInfo s_cmdInfo[] = {
 	 .flags = 0, .requLen = sizeof(CamOsdParams), .respLen = 0,},
 	/* get upload protocol */
 	{.tcpCmd = TC_GET_IMAGEUPLOADPROTOCOL, .camCmd = ICAMCMD_G_UPLOADPROTO, 
-	 .flags = 0, .requLen = 0, .respLen = sizeof(Int32),},
+	 .flags = 0, .requLen = 0, .respLen = sizeof(CamImgUploadCfg),},
 	/* set upload protocol */
 	{.tcpCmd = TC_SET_IMAGEUPLOADPROTOCOL, .camCmd = ICAMCMD_S_UPLOADPROTO, 
-	 .flags = 0, .requLen = sizeof(Int32), .respLen = 0,}, 
+	 .flags = 0, .requLen = sizeof(CamImgUploadCfg), .respLen = 0,}, 
 	/* get ntp server info */
 	{.tcpCmd = TC_GET_NTPSERVERINFO, .camCmd = ICAMCMD_G_NTPSRVINFO, 
 	 .flags = 0, .requLen = 0, .respLen = sizeof(CamNtpServerInfo),},
@@ -245,6 +246,12 @@ const static CmdInfo s_cmdInfo[] = {
 	/* Update fpga, just send msg */
 	{.tcpCmd = TC_FUN_UPDATE_FPGA, .camCmd = ICAMCMD_S_UPDATE_FPGA, 
 	 .flags = 0, .requLen = 0, .respLen = 0,},
+	/* send sd dir */
+	{.tcpCmd = TC_SET_RD_SD_DIR, .camCmd = ICAMCMD_S_SNDDIR, 
+	 .flags = 0, .requLen = -1, .respLen = 0,},
+	/* send sd file */
+	{.tcpCmd = TC_SET_RD_SD_FILE, .camCmd = ICAMCMD_S_SNDFILE, 
+	 .flags = 0, .requLen = -1, .respLen = 0,},
 };
 
 /*****************************************************************************
@@ -601,9 +608,9 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 		cmdHdr->dataLen = 0;
 		break;
 	case TC_FUN_UPDATE_DSP:
-		//ret = E_NO;
-		//cmdHdr->dataLen = 0;
-		//break;
+		ret = E_NO;
+		cmdHdr->dataLen = 0;
+		break;
 	case TC_FUN_UPDATE_ARM:
 		ret = firmware_update(params->armProg, data, cmdHdr->dataLen, cmdHdr->checkSum);
 		cmdHdr->dataLen = 0;
@@ -616,6 +623,32 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 		/* if file update ok, tell icam prog to reload */
 		if(ret == E_NO)
 			params->reboot = TRUE;
+		break;
+	case TC_GET_SD_ROOT_PATH:
+		/* get path of sd mount dir */
+		ret = sd_get_root_path(*(Int32 *)data, data, params->bufLen);
+		if(ret > 0) {
+			cmdHdr->dataLen = ret;
+			ret = E_NO;
+		}
+		break;
+	case TC_GET_SD_DIR_INFO:
+		/* get path of sd mount dir */
+		ret = sd_get_dir_info((char *)data, data, params->bufLen);
+		if(ret > 0) {
+			cmdHdr->dataLen = ret;
+			ret = E_NO;
+		}
+		break;
+	case TC_SET_DEL_SD_DIR:
+		/* delete dir in sd card */
+		ret = sd_del_dir((char *)data);
+		cmdHdr->dataLen = 0;
+		break;
+	case TC_SET_FORMAT_SD:
+		/* format sd card */
+		ret = sd_format(*(Int32 *)data);
+		cmdHdr->dataLen = 0;
 		break;
 	default:
 		ret = cam_cmd_process(hCamCtrl, cmdHdr, params->dataBuf, params->bufLen);

@@ -2,7 +2,7 @@
 
 include Rules.make
 
-SUBDIRS = log buffer net_utils ftp alg jpg_enc h264_enc osd capture msg img_convert crc 
+SUBDIRS = log buffer net_utils ftp alg jpg_enc h264_enc osd capture msg img_convert crc cir_buf media_server
 
 CLEAN_SUBDIRS = $(addsuffix .clean, $(SUBDIRS))
 INSTALL_SUBDIRS = $(addsuffix .install, $(SUBDIRS))

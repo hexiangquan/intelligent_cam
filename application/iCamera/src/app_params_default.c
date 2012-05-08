@@ -60,7 +60,10 @@ const AppParams c_appParamsDef = {
 		.rtspSrvPort = RTSP_PORT,
 		.flags = CAM_RTP_FLAG_EN,
 	},
-	.imgTransType = CAM_UPLOAD_PROTO_TCP,
+	.uploadCfg = {
+		.protocol = CAM_UPLOAD_PROTO_TCP,
+		.flags = CAM_AUTO_UPLOAD_EN | CAM_AUTO_DEL_EN,
+	},
 	.tcpImgSrvInfo = {
 		.serverIP = {SERVER_IP},
 		.serverPort = TCP_SRV_PORT,

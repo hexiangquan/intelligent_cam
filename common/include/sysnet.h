@@ -1,5 +1,5 @@
 #ifndef __SYS_NET_H__
-#define __SYS_NET_H_
+#define __SYS_NET_H__
 
 /*
 *  This file contains .h files that needed by network programming
@@ -27,8 +27,6 @@
 #include <sys/sysctl.h>
 #include <sys/ioctl.h>
 #include <linux/un.h>
-
-#include <pthread.h>
 
 
 //typedef struct sockaddr  SA;

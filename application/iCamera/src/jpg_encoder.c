@@ -6,7 +6,7 @@
 #include "app_msg.h"
 
 //#define TEST_SAVE_TIME	
-#define NO_SAVE_FILE
+//#define NO_SAVE_FILE
 
 /*****************************************************************************
  Prototype    : jpg_encoder_process
@@ -97,13 +97,13 @@ Int32 jpg_encoder_save_frame(IN const ImgMsg *msg, IN const char *path)
 	/* generate dir file name */
 	snprintf(dirName, sizeof(dirName), "%s/%04u_%02u_%02u_%02u", path,
              capTime->year, capTime->month, capTime->day, capTime->hour);
-	snprintf(fileName, sizeof(fileName), "%s/%u_%u_%u.jpg", dirName, 
+	snprintf(fileName, sizeof(fileName), "%s/%02u_%02u_%03u.jpg", dirName, 
 			capTime->minute, capTime->second, capTime->ms);
 
 #ifdef NO_SAVE_FILE
 	return E_NO;
 #else
-	err = write_file(dirName, fileName, data, msg->dimension.size);
+	err = write_file(dirName, fileName, (Int8 *)msg, sizeof(ImgMsg), data, msg->dimension.size);
 #endif
 
 #ifdef TEST_SAVE_TIME

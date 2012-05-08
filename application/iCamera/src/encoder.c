@@ -335,14 +335,18 @@ static Int32 upload_update(EncoderHandle hEnc, UploadParams *params)
 	if(!hEnc->hUpload || params->protol != hEnc->uploadProto) {
 		/* create upload handle */
 		UploadAttrs uploadAttrs;
+		
+		DBG("<%s> create new upload handle");
 
 		/* delete old handle */
 		if(hEnc->hUpload)
 			upload_delete(hEnc->hUpload, hEnc->hMsg);
 
 		uploadAttrs.flags = 0;
-		if(hEnc->hPoolEnc)
+		if(hEnc->hPoolEnc) {
 			uploadAttrs.flags |= UPLOAD_FLAG_FREE_BUF; //free buffer after send when using pool
+			uploadAttrs.flags |= UPLOAD_FLAG_ANSYNC;
+		}
 		uploadAttrs.msgName = MSG_IMG_TX;
 		uploadAttrs.reConTimeout = UPLOAD_RECON_TIMEOUT;
 		uploadAttrs.savePath = hEnc->saveRootPath;

@@ -521,10 +521,10 @@ static Int32 get_img_upload_params(ParamsMngHandle hParamsMng, void *data, Int32
 	}
 
 	/* set upload protol */
-	params->protol = appCfg->imgTransType;
+	params->protol = appCfg->uploadCfg.protocol;
 
 	/* set params according to proto */
-	switch(appCfg->imgTransType) {
+	switch(appCfg->uploadCfg.protocol) {
 		case CAM_UPLOAD_PROTO_FTP: {
 			FtpUploadParams *ftpParams = (FtpUploadParams *)params->paramsBuf;
 			ftpParams->srvInfo = appCfg->ftpSrvInfo;
@@ -2341,22 +2341,22 @@ static Int32 get_detector_params(ParamsMngHandle hParamsMng, void *data, Int32 s
     Modification : Created function
 
 *****************************************************************************/
-static Int32 set_upload_proto(ParamsMngHandle hParamsMng, void *data, Int32 size)
+static Int32 set_upload_cfg(ParamsMngHandle hParamsMng, void *data, Int32 size)
 {
-	if(!data || size != sizeof(CamImgUploadProto)) 
+	if(!data || size != sizeof(CamImgUploadCfg)) 
 		return E_INVAL;
 
-	CamImgUploadProto protol = *(CamImgUploadProto *)data;
+	CamImgUploadCfg *cfg = (CamImgUploadCfg *)data;
 	AppParams *appCfg = &hParamsMng->appParams;
 
 	/* validate data */
-	if(protol >= CAM_UPLOAD_PROTO_MAX) {
+	if(cfg->protocol >= CAM_UPLOAD_PROTO_MAX) {
 		ERR("invalid upload proto type");
 		return E_INVAL;
 	}
 	
 	/* Copy data */
-	appCfg->imgTransType = protol;
+	appCfg->uploadCfg = *cfg;
 
 	return E_NO;
 }
@@ -2378,15 +2378,15 @@ static Int32 set_upload_proto(ParamsMngHandle hParamsMng, void *data, Int32 size
     Modification : Created function
 
 *****************************************************************************/
-static Int32 get_upload_proto(ParamsMngHandle hParamsMng, void *data, Int32 size)
+static Int32 get_upload_cfg(ParamsMngHandle hParamsMng, void *data, Int32 size)
 {
-	if(!data || size < sizeof(CamImgUploadProto)) 
+	if(!data || size < sizeof(CamImgUploadCfg)) 
 		return E_INVAL;
 
 	AppParams *appCfg = &hParamsMng->appParams;
 	
 	/* Copy data */
-	*(CamImgUploadProto *)data = appCfg->imgTransType;
+	*(CamImgUploadCfg *)data = appCfg->uploadCfg;
 
 	return E_NO;
 }
@@ -3024,8 +3024,8 @@ static const PmCtrlInfo g_paramsConfig[] = {
 	{.cmd = PMCMD_G_ROADINFO, .fxn = get_road_info,},
 	{.cmd = PMCMD_S_RTPPARAMS, .fxn = set_rtp_params,},
 	{.cmd = PMCMD_G_RTPPARAMS, .fxn = get_rtp_params,},
-	{.cmd = PMCMD_S_IMGTRANSPROTO, .fxn = set_upload_proto,},
-	{.cmd = PMCMD_G_IMGTRANSPROTO, .fxn = get_upload_proto,},
+	{.cmd = PMCMD_S_IMGTRANSPROTO, .fxn = set_upload_cfg,},
+	{.cmd = PMCMD_G_IMGTRANSPROTO, .fxn = get_upload_cfg,},
 	{.cmd = PMCMD_S_TCPSRVINFO, .fxn = set_tcp_srv_info,},
 	{.cmd = PMCMD_G_TCPSRVINFO, .fxn = get_tcp_srv_info,},
 	{.cmd = PMCMD_S_FTPSRVINFO, .fxn = set_ftp_srv_info,},

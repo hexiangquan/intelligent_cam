@@ -237,7 +237,7 @@ static Int32 msg_process(CommonMsg *msg, MainEnv *envp)
 static void sig_handler(int sig)
 {
 	if(sig == SIGINT || sig == SIGABRT) {
-		DBG("got INT signal");
+		DBG("got INT signal: %d", sig);
 		s_exit = TRUE;
 	}
 } 

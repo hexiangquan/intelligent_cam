@@ -128,7 +128,7 @@ static Int32 mkdir_if_need(const char *dir)
     Modification : Created function
 
 *****************************************************************************/
-Int32 write_file(const char *dirName, const char *fileName, const Int8 *data, Int32 len)
+Int32 write_file(const char *dirName, const char *fileName, const Int8 *header, Int32 hdrLen, const Int8 *data, Int32 len)
 {
 	if(!dirName || !fileName || !data)
 		return E_INVAL;
@@ -145,10 +145,19 @@ Int32 write_file(const char *dirName, const char *fileName, const Int8 *data, In
 
 	Int32 wrLen = 0;
 	Int32 ret = E_NO;
+
+	if(header && hdrLen > 0) {
+		wrLen = write(fd, header, hdrLen);
+		if(wrLen != hdrLen) {
+			ERRSTR("write header failed.");
+			ret = E_IO;
+			goto exit;
+		}
+	}
 	
 	while(len > 0) {
 	    wrLen = write(fd, data, len);
-	    if(ret < 0) {
+	    if(wrLen < 0) {
 	        ERRSTR("write <%s> err", fileName);
 			ret = E_IO;
 			break;
@@ -157,7 +166,8 @@ Int32 write_file(const char *dirName, const char *fileName, const Int8 *data, In
 			len -= wrLen;
 		}
 	}
-	
+
+exit:
     close(fd);
 
 	return ret;

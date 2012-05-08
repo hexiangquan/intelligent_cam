@@ -30,6 +30,7 @@
 #include "h264_encoder.h"
 #include "params_mng.h"
 #include "cap_init.h"
+#include "local_upload.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -72,17 +73,18 @@ typedef struct {
 
 /* Private data for this object */
 struct CtrlSrvObj{
-	ParamsMngHandle hParamsMng;		//params manage handle
-	CapHandle		hCapture;		//image capture handle
-	DataCapHandle	hDataCap;		//data capture handle
-	EncoderHandle	hJpgEncoder;	//jpeg encoder object
-	EncoderHandle	hH264Encoder;	//H.264 encoder object
-	MsgHandle		hMsg;			//msg handle for IPC
-	CtrlMsg			msgBuf;			//buf for recv msg
-	pthread_t		pid;			//pid of thread
-	pthread_mutex_t encMutex;		//mutex for encoders
-	Bool			exit;			//flag for exit
-	const char		*msgName;		//our msg name for IPC
+	ParamsMngHandle 	hParamsMng;		//params manage handle
+	CapHandle			hCapture;		//image capture handle
+	DataCapHandle		hDataCap;		//data capture handle
+	EncoderHandle		hJpgEncoder;	//jpeg encoder object
+	EncoderHandle		hH264Encoder;	//H.264 encoder object	
+	LocalUploadHandle	hLocalUpload;	//local file upload handle
+	MsgHandle			hMsg;			//msg handle for IPC
+	CtrlMsg				msgBuf;			//buf for recv msg
+	pthread_t			pid;			//pid of thread
+	pthread_mutex_t 	encMutex;		//mutex for encoders
+	Bool				exit;			//flag for exit
+	const char			*msgName;		//our msg name for IPC
 };
 
 typedef enum {
@@ -231,6 +233,40 @@ static Int32 encoder_upload_update(CtrlSrvHandle hCtrlSrv, EncoderType type)
 	return ret;
 }
 
+/*****************************************************************************
+ Prototype    : local_upload_update
+ Description  : update local file upload params
+ Input        : CtrlSrvHandle hCtrlSrv  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/5/7
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 local_upload_update(CtrlSrvHandle hCtrlSrv)
+{
+	Int32				ret;
+	UploadParams 		uploadParams;
+	CamImgUploadCfg		uploadCfg;
+
+	/* update params in local upload */
+	params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_IMGUPLOADPARAMS, 
+		&uploadParams, sizeof(uploadParams));
+
+	params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_IMGTRANSPROTO, 
+		&uploadCfg, sizeof(uploadCfg));
+	
+	ret = local_upload_cfg(hCtrlSrv->hLocalUpload, &uploadParams, uploadCfg.flags, 
+				hCtrlSrv->hMsg);
+
+	return ret;
+}
+
 
 /*****************************************************************************
  Prototype    : ctrl_server_thread
@@ -356,17 +392,21 @@ static void *ctrl_server_thread(void *arg)
 			if(!ret) {
 				/* update img encoder */
 				ret = encoder_upload_update(hCtrlSrv, ENCODER_IMG);
+				/* update local file upload params */
+				ret = local_upload_update(hCtrlSrv);
 			}
 			break;
 		case ICAMCMD_G_UPLOADPROTO:
 			ret = params_mng_control(hParamsMng, PMCMD_G_IMGTRANSPROTO, data, CTRL_MSG_BUF_LEN);
-			respLen = sizeof(CamImgUploadProto);
+			respLen = sizeof(CamImgUploadCfg);
 			break;
 		case ICAMCMD_S_IMGSRVINFO:
 			ret = params_mng_control(hParamsMng, PMCMD_S_TCPSRVINFO, data, msgHdr->dataLen);
 			if(!ret) {
 				/* update img encoder */
 				ret = encoder_upload_update(hCtrlSrv, ENCODER_IMG);
+				/* update local file upload params */
+				ret = local_upload_update(hCtrlSrv);
 			}
 			break;
 		case ICAMCMD_G_IMGSRVINFO:
@@ -378,6 +418,8 @@ static void *ctrl_server_thread(void *arg)
 			if(!ret) {
 				/* update img encoder */
 				ret = encoder_upload_update(hCtrlSrv, ENCODER_IMG);
+				/* update local file upload params */
+				ret = local_upload_update(hCtrlSrv);
 			}
 			break;
 		case ICAMCMD_G_FTPSRVINFO:
@@ -544,8 +586,12 @@ static void *ctrl_server_thread(void *arg)
 			ret = E_NO;
 			break;
 		case ICAMCMD_S_SNDDIR:
-			/* TBD */
-			ret = E_NO;
+			/* send all files in a dir */
+			ret = local_upload_send(hCtrlSrv->hLocalUpload, TRUE, data, hCtrlSrv->hMsg);
+			break;
+		case ICAMCMD_S_SNDFILE:
+			/* send single file */
+			ret = local_upload_send(hCtrlSrv->hLocalUpload, FALSE, data, hCtrlSrv->hMsg);
 			break;
 		case ICAMCMD_S_RESTORECFG:
 			ret = params_mng_control(hParamsMng, PMCMD_S_RESTOREDEFAULT, data, msgHdr->dataLen);
@@ -672,6 +718,7 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	EncoderParams 	encParams;
 	UploadParams	uploadParams;
 
+	
 	/* get img enc & upload params */
 	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_IMGENCODERPARAMS, 
 			&encParams, sizeof(encParams));
@@ -682,6 +729,25 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	/* create jpg encoder */
 	hCtrlSrv->hJpgEncoder = jpg_encoder_create(&encParams, &uploadParams, &hCtrlSrv->encMutex);
 	if(!hCtrlSrv->hJpgEncoder) {
+		goto exit;
+	}
+
+	/* get upload protol */
+	CamImgUploadCfg uploadCfg;
+	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_IMGTRANSPROTO, 
+			&uploadCfg, sizeof(uploadCfg));
+	assert(ret == E_NO);
+
+	/* create local upload handle */
+	LocalUploadAttrs localAttrs;
+	localAttrs.filePath = SD_MNT_PATH;
+	localAttrs.flags = uploadCfg.flags;
+	localAttrs.maxFileSize = IMG_MAX_WIDTH * IMG_MAX_HEIGHT * 8 / 10;
+	localAttrs.msgName = MSG_LOCAL;
+
+	/* using image upload params */
+	hCtrlSrv->hLocalUpload = local_upload_create(&localAttrs, &uploadParams);
+	if(!hCtrlSrv->hLocalUpload) {
 		goto exit;
 	}
 
@@ -696,8 +762,8 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	hCtrlSrv->hH264Encoder = h264_encoder_create(&encParams, &uploadParams, &hCtrlSrv->encMutex);
 	if(!hCtrlSrv->hH264Encoder) {
 		goto exit;
-	}
-
+	}	
+	
 	return hCtrlSrv;
 
 exit:
@@ -761,6 +827,13 @@ Int32 ctrl_server_run(CtrlSrvHandle hCtrlSrv)
 	}
 #endif
 
+	/* run local upload */
+	err = local_upload_run(hCtrlSrv->hLocalUpload);
+	if(err) {
+		ERR("local upload running failed...");
+		return err;
+	}
+
 	return E_NO;
 }
 
@@ -801,6 +874,10 @@ Int32 ctrl_server_delete(CtrlSrvHandle hCtrlSrv, MsgHandle hCurMsg)
 	/* free msg handle */
 	if(hCtrlSrv->hMsg)
 		msg_delete(hCtrlSrv->hMsg);
+
+	/* local upload exit */
+	if(hCtrlSrv->hLocalUpload)
+		local_upload_delete(hCtrlSrv->hLocalUpload, hCurMsg);
 	
 	/* call encoders exit */
 	if(hCtrlSrv->hJpgEncoder)

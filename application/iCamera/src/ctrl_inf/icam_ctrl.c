@@ -714,8 +714,8 @@ Int32 icam_set_rtp_params(ICamCtrlHandle hCtrl, const CamRtpParams *params)
 }
 
 /*****************************************************************************
- Prototype    : icam_get_upload_protol
- Description  : get image upload protol
+ Prototype    : icam_get_upload_cfg
+ Description  : get image upload cfg
  Input        : ICamCtrlHandle hCtrl         
                 CamImgUploadProto *buf  
  Output       : None
@@ -729,11 +729,11 @@ Int32 icam_set_rtp_params(ICamCtrlHandle hCtrl, const CamRtpParams *params)
     Modification : Created function
 
 *****************************************************************************/
-Int32 icam_get_upload_proto(ICamCtrlHandle hCtrl, CamImgUploadProto *buf)
+Int32 icam_get_upload_cfg(ICamCtrlHandle hCtrl, CamImgUploadCfg *buf)
 {
 	struct {
 		MsgHeader 		hdr;
-		CamImgUploadProto	protol;
+		CamImgUploadCfg	cfg;
 	}msgBuf;
 
 	Int32 ret;
@@ -745,15 +745,15 @@ Int32 icam_get_upload_proto(ICamCtrlHandle hCtrl, CamImgUploadProto *buf)
 	if(ret)
 		return ret;
 
-	*buf = msgBuf.protol;
+	*buf = msgBuf.cfg;
 
 	/* result of this cmd */
 	return msgBuf.hdr.param[0];
 }
 
 /*****************************************************************************
- Prototype    : icam_set_upload_proto
- Description  : set image upload proto
+ Prototype    : icam_set_upload_cfg
+ Description  : set image upload cfg
  Input        : ICamCtrlHandle hCtrl          
                 CamImgUploadProto proto  
  Output       : None
@@ -767,11 +767,11 @@ Int32 icam_get_upload_proto(ICamCtrlHandle hCtrl, CamImgUploadProto *buf)
     Modification : Created function
 
 *****************************************************************************/
-Int32 icam_set_upload_proto(ICamCtrlHandle hCtrl, CamImgUploadProto proto)
+Int32 icam_set_upload_cfg(ICamCtrlHandle hCtrl, CamImgUploadCfg *cfg)
 {
 	struct {
 		MsgHeader 			hdr;
-		CamImgUploadProto	proto;
+		CamImgUploadCfg		cfg;
 	}msgBuf;
 
 	Int32 ret;
@@ -779,7 +779,7 @@ Int32 icam_set_upload_proto(ICamCtrlHandle hCtrl, CamImgUploadProto proto)
 	if(!hCtrl)
 		return E_INVAL;
 
-	msgBuf.proto = proto;
+	msgBuf.cfg = *cfg;
 	ret = icam_send_cmd(hCtrl, ICAMCMD_S_UPLOADPROTO, &msgBuf, sizeof(msgBuf), sizeof(msgBuf));
 	if(ret)
 		return ret;

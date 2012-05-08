@@ -17,6 +17,7 @@
 #define MSG_VID_ENC		MSG_ROOT"/msgVidEnc"
 #define MSG_IMG_TX		MSG_ROOT"/msgImgTx"
 #define MSG_CTRL		MSG_ROOT"/iCamCtrl"
+#define MSG_LOCAL		MSG_ROOT"/msgLocal"
 
 
 /* enable crc check sum of data between threads */
@@ -32,7 +33,7 @@
 #define IMG_ENC_POOL_BUF_NUM	2
 #define VID_ENC_POOL_BUF_NUM	0
 
-#define SD_MNT_PATH				"/media/mmc"
+#define SD_MNT_PATH				"/media/mmcblk0p1"
 
 
 /* Cmd of this application */
@@ -52,6 +53,8 @@ typedef enum _AppCmd {
 	APPCMD_SET_AE_PARAMS,		//set auto exposure params
 	APPCMD_SET_AWB_PARAMS,		//set auto white balance params
 	APPCMD_SET_CAP_INPUT,		//update cap input info
+	APPCMD_SEND_DIR,			//send all file in a dir
+	APPCMD_SEND_FILE,			//send specified file
 	APPCMD_MAX
 }AppCmd;
 

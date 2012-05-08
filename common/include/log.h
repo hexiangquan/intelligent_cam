@@ -80,7 +80,6 @@ extern "C"{
 #endif
 #endif /* __cplusplus */
 
-
 LogHandle log_create(LogLevel_t level, int flag, const char * pathName, int maxFileSize);
 
 int log_delete(LogHandle hLog);
@@ -120,10 +119,9 @@ void log_run(LogHandle hLog, int flag, const char * fmt,...);
 
 #ifdef __cplusplus
 #if __cplusplus
-}
+		}
 #endif
 #endif /* __cplusplus */
-
 
 #endif
 
