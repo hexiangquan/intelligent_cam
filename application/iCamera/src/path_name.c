@@ -248,14 +248,14 @@ PathNameHandle path_name_create(const Int8 *pattern, const Int8 *text)
 *****************************************************************************/
 Int32 path_name_generate(PathNameHandle hPathName, const ImgMsg *imgBuf, PathNameInfo *info)
 {
-	Int8 			strBuf[128];
-	Int8 			prePattern[PATHNAME_MAX_LINE_SIZE];
-	Int8 			fullName[PATHNAME_MAX_LINE_SIZE];
-	Uint32 			i, patternLen, index;
-	Uint16 			capCnt = 1;
-	//CaptureInfo     *capInfo = (CaptureInfo *)(imgBuf->capInfo);
-	//Uint16 			redLightTime;
-	const CamDateTime *capTime = &imgBuf->timeStamp;
+	Int8 				strBuf[128];
+	Int8 				prePattern[PATHNAME_MAX_LINE_SIZE];
+	Int8 				fullName[PATHNAME_MAX_LINE_SIZE];
+	Uint32 				i, patternLen, index;
+	Uint16 				capCnt = 1;
+	const CaptureInfo	*capInfo = &imgBuf->capInfo;
+	Uint16 				redLightTime;
+	const CamDateTime 	*capTime = &imgBuf->timeStamp;
 
 	if(!hPathName || !imgBuf || !info)
 		return E_INVAL;
@@ -287,74 +287,55 @@ Int32 path_name_generate(PathNameHandle hPathName, const ImgMsg *imgBuf, PathNam
 	for(i = 0; i < capCnt; i++) {
 		memcpy(fullName, prePattern, patternLen);
 
-#if 0
+#if 1
 		/* light, speed, disobey type */
-		if(pCapInfo->stTriggerInfo[i].ucFrameId == FRAME_CHECKPOST_1ST || 
-			pCapInfo->stTriggerInfo[i].ucFrameId == FRAME_CHECKPOST_2ND)
-		{
+		if(capInfo->triggerInfo[i].flags & TRIG_INFO_RED_LIGHT) {
+			/* red light */
+			sprintf(strBuf, "%s", "ºì");
+			replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?L", strBuf);
+			sprintf(strBuf, "%05d", capInfo->triggerInfo[i].speed);
+			replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "??N", strBuf);
+			sprintf(strBuf, "%s", "µç¾¯´³ºìµÆ");
+		} else {
 			/* green light */
 			sprintf(strBuf, "%s", "ÂÌ");
 			replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?L", strBuf);
-			sprintf(strBuf, "%03d", pCapInfo->stTriggerInfo[i].ucSpeed % 1000);
+			sprintf(strBuf, "%03d", capInfo->triggerInfo[i].speed % 1000);
 			replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?SN", strBuf);
-			if(pCapInfo->stTriggerInfo[i].usFlag & TRIG_INFO_OVERSPEED)
+			if(capInfo->triggerInfo[i].flags & TRIG_INFO_OVERSPEED)
 				sprintf(strBuf, "%s", "¿¨¿Ú³¬ËÙ");
 			else
 				sprintf(strBuf, "%s", "¿¨¿ÚÎ´³¬ËÙ");
 		}
-		else
-		{
-			// red light
-			sprintf(strBuf, "%s", "ºì");
-			replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?L", strBuf);
-			sprintf(strBuf, "%05d", pCapInfo->stTriggerInfo[i].ucSpeed);
-			replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "??N", strBuf);
-			sprintf(strBuf, "%s", "µç¾¯´³ºìµÆ");
-		}
-		if(pCapInfo->stTriggerInfo[i].ucFrameId == FRAME_RETROGRADE_1ST || pCapInfo->stTriggerInfo[i].ucFrameId == FRAME_RETROGRADE_2ND ||
-		pCapInfo->stTriggerInfo[i].ucFrameId == FRAME_RETROGRADE_3RD)
+		
+		if(capInfo->triggerInfo[i].flags & TRIG_INFO_RETROGRADE)
 			sprintf(strBuf, "%s", "ÄæÐÐ");
+		
 		replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?DT4567890", strBuf);
 
-
-		// redlight time
-		usRedLightTime = pCapInfo->stTriggerInfo[i].usRedlightTime;
+		/* redlight time */
+		redLightTime = capInfo->triggerInfo[i].redlightTime;
 		//printf("%u\n", nRedLightTime);
-		//nRedLightTime %= 1000;
-		sprintf(strBuf, "%03d", (usRedLightTime /100) % 1000);
+		
+		sprintf(strBuf, "%03d", (redLightTime /100) % 1000);
 		replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?TT", strBuf);
 		
-		// way number
-		sprintf(strBuf, "%d",  pCapInfo->stTriggerInfo[i].ucWayNum % 10);
+		/* way number */
+		sprintf(strBuf, "%d",  capInfo->triggerInfo[i].wayNum % 10);
 		replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "<", strBuf);
 
-		// frame number
-		// need change case number to enumeration string, to be modified!
-		switch(pCapInfo->stTriggerInfo[i].ucFrameId)
-		{
-		case FRAME_EPOLICE_2ND:
-		case FRAME_CHECKPOST_2ND:
-			strBuf[0] = 'B';
+		/* frame number
+		  * need change case number to enumeration string, to be modified!
+		  */
+		if(capInfo->triggerInfo[i].flags & TRIG_INFO_RETROGRADE) {
+			strBuf[0] = 'R';
+			strBuf[1] = 'A' + capInfo->triggerInfo[i].frameId - FRAME_TRIG_BASE;
+			strBuf[2] = '\0';
+		} else {
+			strBuf[0] = 'A' + capInfo->triggerInfo[i].frameId - FRAME_TRIG_BASE;
 			strBuf[1] = '\0';
-			break;
-		case FRAME_EPOLICE_3RD:
-			strBuf[0] = 'C';
-			strBuf[1] = '\0';
-			break;
-		case FRAME_RETROGRADE_1ST:
-			strcpy(strBuf, "RA");
-			break;
-		case FRAME_RETROGRADE_2ND:
-			strcpy(strBuf, "RB");
-			break;
-		case FRAME_RETROGRADE_3RD:
-			strcpy(strBuf, "RC");
-			break;
-		default:
-			strBuf[0] = 'A';
-			strBuf[1] = '\0';
-			break;
 		}
+		
 		replace_string(fullName, PATHNAME_MAX_LINE_SIZE, ">", strBuf);
 #endif
 		
@@ -363,6 +344,7 @@ Int32 path_name_generate(PathNameHandle hPathName, const ImgMsg *imgBuf, PathNam
 			if(fullName[index] == '/')
 				break;
 		}
+		
 		if((int)index > 0)
 			memcpy(&hPathName->pathBuf[i][0], fullName, (int)index);
 		else
