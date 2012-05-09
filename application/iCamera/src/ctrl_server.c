@@ -705,7 +705,8 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_CONVTERPARAMS, 
 			&dataCapAttrs.convParams, sizeof(dataCapAttrs.convParams));
 	assert(ret == E_NO);
-	
+
+	DBG("creating data capture...");
 	hCtrlSrv->hDataCap = data_capture_create(&dataCapAttrs);
 	if(!hCtrlSrv->hDataCap) {
 		ERR("create data capture failed");
@@ -727,6 +728,7 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	assert(ret == E_NO);
 
 	/* create jpg encoder */
+	DBG("creating img encoder...");
 	hCtrlSrv->hJpgEncoder = jpg_encoder_create(&encParams, &uploadParams, &hCtrlSrv->encMutex);
 	if(!hCtrlSrv->hJpgEncoder) {
 		goto exit;
@@ -746,6 +748,7 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	localAttrs.msgName = MSG_LOCAL;
 
 	/* using image upload params */
+	DBG("creating local upload...");
 	hCtrlSrv->hLocalUpload = local_upload_create(&localAttrs, &uploadParams);
 	if(!hCtrlSrv->hLocalUpload) {
 		goto exit;
@@ -759,6 +762,7 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	assert(ret == E_NO);
 
 	/* create video encoder */
+	DBG("creating video encoder...");
 	hCtrlSrv->hH264Encoder = h264_encoder_create(&encParams, &uploadParams, &hCtrlSrv->encMutex);
 	if(!hCtrlSrv->hH264Encoder) {
 		goto exit;

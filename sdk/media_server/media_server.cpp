@@ -79,7 +79,14 @@ struct MediaSrvObj {
 
 
 /* we are using C interfaces */
-//extern "C" {
+extern "C" {
+
+static void media_srv_sig_handler(int sig)
+{
+	/* do nothing */
+	return;
+} 
+
 
 /*****************************************************************************
  Prototype    : media_srv_create
@@ -122,6 +129,9 @@ MediaSrvHandle media_srv_create(Uint16 rtspSrvPort)
 		ERR("Failed to create RTSP server: %s", hMediaSrv->env->getResultMsg());
 		goto exit;
 	}
+
+	/* catch signals */
+	signal(SIGUSR2, media_srv_sig_handler);
 	
 	/* all done */
 	return hMediaSrv;
@@ -199,7 +209,7 @@ Int32 media_srv_delete(MediaSrvHandle hSrv)
 	if(hSrv->pid > 0) {
 		/* wait thread exit */
 		hSrv->exit = 1;
-		pthread_kill(hSrv->pid, SIGUSR1);
+		pthread_kill(hSrv->pid, SIGUSR2);
 		//DBG("wait thread exit: %d...", hSrv->exit);
 		pthread_join(hSrv->pid, NULL);
 	}
@@ -653,5 +663,5 @@ Int32 media_stream_in(MediaSubSessionHandle hSubSession, MediaFrame *frame, Bool
 		return hSubSession->inputDev->audioWrite(frame);
 }
 
-//} /* end of extern "C" */
+} /* end of extern "C" */
 
