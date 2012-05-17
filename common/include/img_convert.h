@@ -41,9 +41,20 @@
 #define CONV_CHANB_MAX_OUT_WIDTH	1088		/* Maxium output width for channel B */
 #define CONV_MIN_EE_TAB_SIZE		2048		/* min EE table size in bytes */
 
+#define CONV_IN_WIDTH_ALIGN			32			/* Input width must align to this value */
+#define CONV_LARGE_IN_WIDTH_ALIGN	(CONV_IN_WIDTH_ALIGN * 2)
+#define CONV_OUT_WIDTH_ALIGN		16			/* Output width must align to this value */
+#define CONV_LARGE_OUT_WIDTH_ALIGN	(CONV_OUT_WIDTH_ALIGN * 2)
+
 /* Default device name */
 #define RESIZER_DEVICE   			"/dev/davinci_resizer"
 #define PREVIEWER_DEVICE 			"/dev/davinci_previewer"
+
+/* Enable debug info */
+#ifdef _DEBUG
+#define CONV_DBG
+#endif
+
 
 /*----------------------------------------------*
  * external variables                           *
@@ -70,6 +81,9 @@ typedef struct _ConvOutAttrs {
 	Uint16			width;			/* Output width, should be aligned to 16 */
 	Uint16			height; 		/* Output height, should be aligned to 2 */
 	ChromaFormat	pixFmt; 		/* Output color space format, ONLY support FMT_YUV420SP & FMT_YUV422ILE */
+    Uint8 			hFlip;			/* Horizontal flip enable */
+    Uint8 			vFlip;			/* Vertical flip enable */
+    Uint16			lineLength; 	/* Calc by driver, Line length of a frame, should be zero */
 }ConvOutAttrs;
 
 /* Dynamic params for this module */

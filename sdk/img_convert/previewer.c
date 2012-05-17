@@ -140,16 +140,17 @@ Int32 previewer_ss_config(int fd, PreviewAttrs *attrs)
 	prev_ss_config.bypass = IPIPE_BYPASS_OFF;
 	prev_ss_config.input.image_width = attrs->inputWidth;
 	prev_ss_config.input.image_height = attrs->inputHeight;
-	prev_ss_config.input.line_length = 0;
+	prev_ss_config.input.line_length = attrs->inputPitch;
+    prev_ss_config.input.hst = attrs->inputHStart;
+    prev_ss_config.input.vst = attrs->inputVStart;
 	prev_ss_config.input.ppln = attrs->inputWidth + 8;
 	prev_ss_config.input.lpfr = attrs->inputHeight + 10;
 	prev_ss_config.input.pix_fmt = pix_format_convert(attrs->inputFmt);
 	prev_ss_config.input.gain = attrs->digiGain;
 	prev_ss_config.input.avg_filter_en = (attrs->ctrlFlags & CONV_FLAG_AVG_EN) ? 1 : 0;
 	
-	if(attrs->inputWidth > IPIPE_MAX_INPUT_WIDTH)
-		prev_ss_config.input.frame_div_mode_en = 1;
-		
+        prev_ss_config.input.frame_div_mode_en = 0;
+
 	if(prev_ss_config.input.pix_fmt == IPIPE_BAYER) {
 		prev_ss_config.input.data_shift = IPIPEIF_5_1_BITS11_0;
 	}

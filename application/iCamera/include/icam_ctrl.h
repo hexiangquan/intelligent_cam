@@ -81,6 +81,8 @@ typedef enum {
 	/* using struct CamDateTime for params */
 	ICAMCMD_S_DATETIME,
 	ICAMCMD_G_DATETIME,
+	/* using Int32 for reply */
+	ICAMCMD_G_TEMP,
 	/*using struct CamNetworkInfo for params */
 	ICAMCMD_S_NETWORKINFO,
 	ICAMCMD_G_NETWORKINFO,

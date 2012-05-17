@@ -6,7 +6,7 @@
 #include "app_msg.h"
 
 //#define TEST_SAVE_TIME	
-//#define NO_SAVE_FILE
+#define NO_SAVE_FILE
 
 /*****************************************************************************
  Prototype    : jpg_encoder_process

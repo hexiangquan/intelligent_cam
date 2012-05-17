@@ -45,6 +45,7 @@ typedef struct _ImgConvObj {
 	ImgConvDynParams	dynParams;
 	pthread_mutex_t		mutex;
 	RszAttrs 			rszAttrs;
+	Bool				largeFrame;
 }ImgConvObj, *ImgConvHandle;
 
 /*----------------------------------------------*
@@ -88,6 +89,9 @@ static void convert_previewer_attrs(ImgConvDynParams *dynParams, PreviewAttrs *p
 	prevAttrs->inputFmt = dynParams->inputFmt;
 	prevAttrs->inputWidth = dynParams->inputWidth;
 	prevAttrs->inputHeight = dynParams->inputHeight;
+    prevAttrs->inputPitch = prevAttrs->inputWidth;
+    prevAttrs->inputHStart = 0;
+    prevAttrs->inputVStart = 0;
 	prevAttrs->setRgbColorPallet = FALSE;
 	prevAttrs->ctrlFlags = dynParams->ctrlFlags;
 	prevAttrs->digiGain = dynParams->digiGain;
@@ -97,6 +101,34 @@ static void convert_previewer_attrs(ImgConvDynParams *dynParams, PreviewAttrs *p
 	prevAttrs->eeTabSize = dynParams->eeTabSize;
 }
 
+/*****************************************************************************
+ Prototype    : convert_rsz_attrs
+ Description  : convert dyn params to resizer attrs
+ Input        : ImgConvDynParams *dynParams  
+                RszAttrs *rszAttrs           
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/5/15
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static void convert_rsz_attrs(ImgConvDynParams *dynParams, RszAttrs *rszAttrs)
+{
+	rszAttrs->inPitch = dynParams->inputWidth;
+	rszAttrs->inHStart = 0;
+    rszAttrs->inVStart = 1;
+	rszAttrs->inFmt = dynParams->inputFmt;
+	rszAttrs->inWidth = dynParams->inputWidth;
+	rszAttrs->inHeight = dynParams->inputHeight;
+	rszAttrs->isChained = TRUE;
+	rszAttrs->outAttrs[0] = dynParams->outAttrs[0];
+	rszAttrs->outAttrs[1] = dynParams->outAttrs[1];
+}
 
 /*****************************************************************************
  Prototype    : img_convert_set_dyn_params
@@ -122,26 +154,33 @@ static Int32 img_convert_set_dyn_params(ImgConvHandle hConv, ImgConvDynParams *d
 	if(hConv->fdRsz <= 0)
 		return E_MODE;
 
-	if(dynParams->inputFmt != FMT_BAYER_RGBG && 
+	if( dynParams->inputFmt != FMT_BAYER_RGBG && 
 		dynParams->inputFmt != FMT_YUV_422ILE && 
 		dynParams->inputFmt != FMT_YUV_420SP) {
 		ERR("unsupported input pixel format");
 		return E_UNSUPT;
 	}
 
-	Int32 ret;
-	RszAttrs rszAttrs;
-	
-	rszAttrs.inFmt = dynParams->inputFmt;
-	rszAttrs.inWidth = dynParams->inputWidth;
-	rszAttrs.inHeight = dynParams->inputHeight;
-	rszAttrs.isChained = TRUE;
-	rszAttrs.outAttrs[0] = dynParams->outAttrs[0];
-	rszAttrs.outAttrs[1] = dynParams->outAttrs[1];
-
-	if(!ALIGNED(dynParams->outAttrs[0].width, 16) ) {
-		ERR("Out0 width must be multiply of 16");
-		return E_INVAL;
+	/* validate width alignment for input and output */
+	if( dynParams->inputWidth > IPIPE_MAX_OUTPUT1_WIDTH_NORMAL || 
+		dynParams->outAttrs[0].width > IPIPE_MAX_OUTPUT1_WIDTH_NORMAL ) {
+		if( !ALIGNED(dynParams->inputWidth, CONV_LARGE_IN_WIDTH_ALIGN) || 
+			!ALIGNED(dynParams->outAttrs[0].width, CONV_LARGE_OUT_WIDTH_ALIGN) ) {
+			ERR("for large frame, input width must aligned to %d, out width must aligned to %d", 
+				CONV_LARGE_IN_WIDTH_ALIGN, CONV_LARGE_OUT_WIDTH_ALIGN);
+			return E_INVAL;
+		}
+		
+		hConv->largeFrame = TRUE;
+	} else {
+		if( !ALIGNED(dynParams->inputWidth, CONV_IN_WIDTH_ALIGN) || 
+			!ALIGNED(dynParams->outAttrs[0].width, CONV_OUT_WIDTH_ALIGN) ) {
+			ERR("for normal frame, input width must aligned to %d, out width must aligned to %d", 
+				CONV_IN_WIDTH_ALIGN, CONV_OUT_WIDTH_ALIGN);
+			return E_INVAL;
+		}
+		
+		hConv->largeFrame = FALSE;
 	}
 
 	if(dynParams->outAttrs[1].enbale && 
@@ -150,6 +189,10 @@ static Int32 img_convert_set_dyn_params(ImgConvHandle hConv, ImgConvDynParams *d
 		return E_INVAL;
 	}
 
+	Int32 		ret;
+	RszAttrs 	rszAttrs;
+
+	convert_rsz_attrs(dynParams, &rszAttrs);
 	ret = resize_ss_config(hConv->fdRsz, &rszAttrs);
 	if(ret)
 		return ret;
@@ -189,8 +232,9 @@ static Int32 img_convert_set_out_attrs(ImgConvHandle hConv, ImgConvInArgs *args)
 	RszAttrs 	*rszAttrs = &hConv->rszAttrs;
 	Int32		ret;
 
-	if(memcmp(rszAttrs->outAttrs, args->outAttrs, sizeof(rszAttrs->outAttrs)) == 0) 
+	if(memcmp(rszAttrs->outAttrs, args->outAttrs, sizeof(rszAttrs->outAttrs)) == 0) {
 		return E_NO; //same params, need not config
+	}
 
 	if(!ALIGNED(args->outAttrs[0].width, 16) ) {
 		ERR("Out0 width must be multiply of 16");
@@ -345,6 +389,112 @@ static Int32 img_convert_exit(Ptr handle)
 }
 
 /*****************************************************************************
+ Prototype    : img_convert_process2
+ Description  : run process twice for large images
+ Input        : Ptr algHandle   
+                AlgBuf *inBuf   
+                Ptr inArgsPtr   
+                AlgBuf *outBuf  
+                Ptr outArgsPtr  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/5/7
+    Author       : Zhang
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 img_convert_process2(Ptr algHandle, AlgBuf *inBuf, Ptr inArgsPtr, AlgBuf *outBuf, Ptr outArgsPtr)
+{
+	ImgConvHandle 		hConv = (ImgConvHandle)algHandle; 
+	ImgConvInArgs		*inArgs = (ImgConvInArgs *)inArgsPtr;
+    Int32 				ret;
+    RszAttrs 			rszAttrs;
+    PreviewAttrs 		prevAttrs;
+    ImgConvDynParams	*dynParams = &hConv->dynParams;
+    AlgBuf 				src;
+    AlgBuf				dst;
+	Uint32 				lineLength;
+
+	if(!hConv || !inBuf || !outBuf || !inArgs || inArgs->size != sizeof(ImgConvInArgs))
+		return E_INVAL;
+	
+	if(FMT_YUV_422ILE == inArgs->outAttrs[0].pixFmt) {
+		if(inArgs->outAttrs[0].width&0x1f) 
+			ERR("output width not 32 aligned");
+	} else {
+		if(inArgs->outAttrs[0].width&0x3f) 
+			ERR("output width not 64 aligned");
+	}
+
+#ifdef CONV_DBG
+	DBG("img conv process2 %dx%d -> %dx%d", dynParams->inputWidth, dynParams->inputHeight,
+		inArgs->outAttrs[0].width, inArgs->outAttrs[0].height);
+#endif
+	
+	pthread_mutex_lock(&hConv->mutex);
+
+	/* skip half of line for convert twice */
+	if(FMT_YUV_422ILE == inArgs->outAttrs[0].pixFmt) {
+		lineLength = ROUND_UP(dynParams->outAttrs[0].width * 2, 32);
+	} else {
+		lineLength = ROUND_UP(dynParams->outAttrs[0].width, 32);
+	}
+
+	convert_rsz_attrs(dynParams, &rszAttrs);
+	rszAttrs.inWidth = dynParams->inputWidth >> 1;
+	rszAttrs.inVStart = 0;
+	rszAttrs.outAttrs[0].lineLength = lineLength;
+	rszAttrs.outAttrs[0].width /= 2;
+
+	convert_previewer_attrs(&hConv->dynParams, &prevAttrs);
+	prevAttrs.inputPitch = dynParams->inputWidth;
+	prevAttrs.inputHStart = 0;
+	prevAttrs.inputVStart = 0;
+	prevAttrs.inputWidth = dynParams->inputWidth >> 1;
+
+	/* update params for single shot mode */
+    ret = resize_ss_config(hConv->fdRsz, &rszAttrs);
+	ret = previewer_ss_config(hConv->fdPrev, &prevAttrs);
+	memcpy(&src, inBuf, sizeof(src));
+	memcpy(&dst, outBuf, sizeof(dst));
+
+	/* skip */
+	if(rszAttrs.outAttrs[0].hFlip) {
+		src.buf += dynParams->inputWidth/2;
+	}
+
+	/* convert for the left half of the image */	
+	ret = previewer_convert(hConv->fdPrev, &src, &dst);
+	if(ret) {
+		goto exit;
+	}
+
+	memcpy(&src, inBuf, sizeof(src));
+	memcpy(&dst, outBuf, sizeof(dst));
+	if(!rszAttrs.outAttrs[0].hFlip) {
+		src.buf += dynParams->inputWidth/2;
+	}
+
+	/* start from next half frame */
+	dst.buf += lineLength/2;
+	//ret = resize_ss_config(hConv->fdRsz, &rszAttrs);
+ 
+	//ret = previewer_ss_config(hConv->fdPrev, &prevAttrs);
+
+	/* convert the right half of the image */
+	ret = previewer_convert(hConv->fdPrev, &src, &dst);
+
+exit:
+	
+	pthread_mutex_unlock(&hConv->mutex);
+	return ret;
+}
+
+/*****************************************************************************
  Prototype    : img_convert_process
  Description  : run process
  Input        : Ptr algHandle   
@@ -378,6 +528,13 @@ static Int32 img_convert_process(Ptr algHandle, AlgBuf *inBuf, Ptr inArgsPtr, Al
 */
 	Int32 ret;
 
+	if( hConv->largeFrame ||
+		inArgs->outAttrs[0].width > IPIPE_MAX_OUTPUT1_WIDTH_NORMAL) {
+		ret = img_convert_process2(algHandle, inBuf, inArgsPtr, outBuf, outArgsPtr);
+		return ret;
+	}
+
+	/* only convert once for normal frame */
 	pthread_mutex_lock(&hConv->mutex);
 	ret = img_convert_set_out_attrs(hConv, inArgs);
 	if(ret) {

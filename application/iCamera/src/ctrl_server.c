@@ -31,6 +31,8 @@
 #include "params_mng.h"
 #include "cap_init.h"
 #include "local_upload.h"
+#include "ext_io.h"
+#include <sys/ioctl.h>
 
 /*----------------------------------------------*
  * external variables                           *
@@ -60,6 +62,7 @@
  * macros                                       *
  *----------------------------------------------*/
 #define CTRL_MSG_BUF_LEN		(2 * 1024 * 1024)
+#define EXTIO_DEV				"/dev/extio"
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -296,8 +299,14 @@ static void *ctrl_server_thread(void *arg)
 	Int32		respLen;
 	Bool		needResp = TRUE;
 	ParamsMngHandle	hParamsMng = hCtrlSrv->hParamsMng;
+	Int32		fdExtIO;
 
 	DBG("ctrl thread start...");
+
+	fdExtIO = open(EXTIO_DEV, O_RDWR);
+	if(fdExtIO < 0) {
+		ERRSTR("open ext io dev failed");
+	}
 
 	/* start main loop */
 	while(!hCtrlSrv->exit) {		
@@ -329,6 +338,12 @@ static void *ctrl_server_thread(void *arg)
 		case ICAMCMD_G_WORKSTATUS:
 			ret = params_mng_control(hParamsMng, PMCMD_G_WORKSTATUS, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamWorkStatus); 
+			break;
+		case ICAMCMD_G_TEMP:
+			ret = ioctl(fdExtIO, EXTIO_G_TMP, data);
+			if(ret < 0)
+				ret = E_IO;
+			respLen = sizeof(Int32); 
 			break;
 		case ICAMCMD_G_INPUTINFO:
 			ret = params_mng_control(hParamsMng, PMCMD_G_CAPINFO, data, CTRL_MSG_BUF_LEN);

@@ -40,6 +40,9 @@ typedef struct _RszAttrs {
 	Bool			isChained;
 	Uint16			inWidth;
 	Uint16			inHeight;
+    Uint16 			inPitch;
+    Uint16 			inHStart;
+    Uint16 			inVStart;
 	ChromaFormat	inFmt;
 	ConvOutAttrs 	outAttrs[CONV_MAX_OUT_CHAN];
 }RszAttrs;

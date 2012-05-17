@@ -757,6 +757,9 @@ static Int32 get_video_out_attrs(ParamsMngHandle hParamsMng, void *data, Int32 s
 
 	outAttrs->enbale = TRUE;
 	outAttrs->pixFmt = FMT_YUV_420SP;
+	outAttrs->hFlip = 0;
+	outAttrs->vFlip = 0;
+	outAttrs->lineLength = 0;
 
 	return E_NO;
 }
@@ -910,6 +913,8 @@ static Int32 get_stream2_out_attrs(ParamsMngHandle hParamsMng, void *data, Int32
 
 	ConvOutAttrs *outAttrs = (ConvOutAttrs *)data;
 	AppParams *appCfg = &hParamsMng->appParams;
+
+	bzero(outAttrs, sizeof(*outAttrs));
 
 	if(appCfg->workMode.format == CAM_FMT_JPEG_H264) {
 		outAttrs->enbale = TRUE;

@@ -34,7 +34,7 @@ SDK_LIB_DIR=$(PRJ_DIR)/common/lib
 SDK_INC_DIR=$(PRJ_DIR)/common/include
 
 # Target file system path
-TARGET_FILESYS_DIR=/home/sun/work/targetfs
+TARGET_FILESYS_DIR=/home/sun/work/targetfs/base-fs
 
 # Target Exec dir
 TARGET_EXEC_DIR=$(TARGET_FILESYS_DIR)/home/root 

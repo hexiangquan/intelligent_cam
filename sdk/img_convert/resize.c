@@ -150,6 +150,9 @@ Int32 resize_ss_config(int fd, RszAttrs *attrs)
     /* input params are set at the resizer */
     rsz_ss_config.input.image_width  = attrs->inWidth;
     rsz_ss_config.input.image_height = attrs->inHeight;
+    rsz_ss_config.input.line_length = attrs->inPitch;
+    rsz_ss_config.input.hst = attrs->inHStart;
+    rsz_ss_config.input.vst = attrs->inVStart;
     rsz_ss_config.input.ppln = rsz_ss_config.input.image_width + 8;
     rsz_ss_config.input.lpfr = rsz_ss_config.input.image_height + 10;
     //rsz_ss_config.input.pix_fmt = pix_format_convert(attrs->inFmt);
@@ -157,11 +160,17 @@ Int32 resize_ss_config(int fd, RszAttrs *attrs)
     rsz_ss_config.output1.enable = 1;
     rsz_ss_config.output1.width = attrs->outAttrs[0].width;
     rsz_ss_config.output1.height = attrs->outAttrs[0].height;
+	rsz_ss_config.output1.h_flip = attrs->outAttrs[0].hFlip;
+	rsz_ss_config.output1.v_flip = attrs->outAttrs[0].vFlip;
+	rsz_ss_config.output1.line_length = attrs->outAttrs[0].lineLength;
     rsz_ss_config.output2.enable = 0;
 	if(attrs->outAttrs[1].enbale) {
 		rsz_ss_config.output2.enable = 1;
 		rsz_ss_config.output2.width = attrs->outAttrs[1].width;
 		rsz_ss_config.output2.height = attrs->outAttrs[1].height;
+		rsz_ss_config.output2.h_flip = attrs->outAttrs[1].hFlip;
+		rsz_ss_config.output2.v_flip = attrs->outAttrs[1].vFlip;
+		rsz_ss_config.output2.line_length= attrs->outAttrs[1].lineLength;
 		rsz_ss_config.output2.pix_fmt = pix_format_convert(attrs->outAttrs[1].pixFmt);
 	}
 

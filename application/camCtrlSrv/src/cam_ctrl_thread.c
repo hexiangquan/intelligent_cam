@@ -87,6 +87,9 @@ const static CmdInfo s_cmdInfo[] = {
 	/* get firmware version */
 	{.tcpCmd = TC_GET_VERINFO, .camCmd = ICAMCMD_G_VERSION, 
 	 .flags = 0, .requLen = 0, .respLen = sizeof(CamVersionInfo),},
+	/* get temperature */
+	{.tcpCmd = TC_GET_TEMPERATURE, .camCmd = ICAMCMD_G_TEMP, 
+	 .flags = 0, .requLen = 0, .respLen = sizeof(Int32),}, 
 	/* get system time */
 	{.tcpCmd = TC_GET_TIME, .camCmd = ICAMCMD_G_DATETIME, 
 	 .flags = 0, .requLen = 0, .respLen = sizeof(CamDateTime),},
@@ -404,6 +407,7 @@ static Int32 thread_init(CamCtrlThrParams *params)
 
 reply_cmd:
 	cmdHdr.dataLen = 0;
+	cmdHdr.checkSum = 0;
 	tcp_cmd_reply(sock, &cmdHdr, NULL, result);
 	return ret;
 }
@@ -478,6 +482,7 @@ static Int32 cam_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Int8
 
 	/* we only need to set reply data len */
 	cmdHdr->dataLen = msgHdr->dataLen;
+	cmdHdr->checkSum = 0;
 	return ret;
 }
 
@@ -658,7 +663,7 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 	/* If opt is failed, return no additive data */
 	if(ret) 
 		cmdHdr->dataLen = 0;
-
+	cmdHdr->checkSum = 0;
 	return ret;
 }
 

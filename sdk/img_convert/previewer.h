@@ -38,6 +38,9 @@ typedef struct _PreviewAttrs{
 	Bool				setRgbColorPallet;
 	Uint16				inputWidth;
 	Uint16				inputHeight;
+    Uint16   			inputPitch;
+    Uint16   			inputHStart;
+    Uint16  			inputVStart;
 	Uint32				ctrlFlags;
 	ChromaFormat		inputFmt;
 	Uint16				digiGain;
