@@ -42,4 +42,8 @@ TARGET_EXEC_DIR=$(TARGET_FILESYS_DIR)/home/root
 # Target share lib dir
 TARGET_LDLIB_DIR=$(TARGET_FILESYS_DIR)/usr/lib
 
+# XDC link file
+XDC_LFILE=$(SDK_LIB_DIR)/linker.cmd
 
+# Using static lib
+STATIC = 1

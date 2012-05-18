@@ -92,5 +92,9 @@ ALG_XDC_CFG=$(PRJ_DIR)/sdk/alg/alg_config
 ALG_XDC_CFLAGS=$(ALG_XDC_CFG)/compiler.opt
 
 # Output linker file
-ALG_XDC_LFILE=$(ALG_XDC_CFG)/linker.cmd
+ALG_XDC_LFILE=$(SDK_LIB_DIR)/linker.cmd
 
+# Alg lib
+ALG_LIB=$(SDK_LIB_DIR)/libalg.a
+
+STATIC = 1

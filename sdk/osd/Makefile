@@ -122,7 +122,7 @@ $(LIB_OBJ):	$(OBJ_DIR)/%.o: %.c $(HEADERS)
 	$(COMPILE) -o $@ $<
 
 $(EXEC): $(EXEC_OBJ)
-	$(LINK) -o $@ $^ $(LD_LIBS)
+	$(LINK) -o $@ $^ $(LD_LIBS) $(XDC_LFILE)
 
 $(EXEC_OBJ): $(OBJ_DIR)/%.o: %.c $(HEADERS)
 	$(COMPILE) -o $@ $<

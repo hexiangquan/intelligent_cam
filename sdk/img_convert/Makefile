@@ -77,17 +77,18 @@ endif
 # Comment this out if you want to see full compiler and linker output.
 #override VERBOSE = @
 
+# File for XDC link
+XDC_LFILE ?= $(ALG_XDC_LFILE)
+XDC_CFLAGS ?= $(ALG_XDC_CFLAGS)
+
 # Link libs and flags
-LD_LIBS += -l$(LIB_NAME) -lpthread -lasound -lalg -lcapture -ljpgenc -lbuf -lm -lmsg
+LD_LIBS += -l$(LIB_NAME) -lpthread -lasound -lalg -lcapture -ljpgenc -lbuf -lm -lmsg $(XDC_LFILE)
 LD_FLAGS += -L$(LINUXLIBS_INSTALL_DIR)/lib -L$(LIB_PATH) -L$(SDK_LIB_DIR)
 
 # Complier, archive and link commands
 COMPILE = $(VERBOSE) $(CSTOOL_PREFIX)gcc $(CPP_FLAGS) $(C_FLAGS) $(CPP_FLAGS) -c
 LINK = $(VERBOSE) $(CSTOOL_PREFIX)gcc $(LD_FLAGS)
 AR = $(VERBOSE) $(CSTOOL_PREFIX)ar
-
-XDC_LFILE ?= $(ALG_XDC_LFILE)
-XDC_CFLAGS ?= $(ALG_XDC_CFLAGS)
 
 .PHONY: clean install lib test rebuild 
 

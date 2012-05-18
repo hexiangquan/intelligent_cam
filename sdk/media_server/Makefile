@@ -8,7 +8,7 @@ LIB_HEADER = media_server.h
 #wis-streamer
 #PLATFORM=PC
 TEST_FILE = 420.h264
-STATIC=0
+STATIC ?= 0
 
 ifeq ($(PLATFORM), dm368)
 CROSS_COMPILE =	$(CSTOOL_PREFIX)
@@ -20,6 +20,7 @@ endif
 CC = $(CROSS_COMPILE)gcc
 CPLUSPLUS = $(CROSS_COMPILE)c++
 PUBLIC_INCLUDE_DIR = $(ROOTDIR)/../common/include
+AR = $(CROSS_COMPILE)ar
 
 INCLUDES = -I . \
 	-I$(LIVE_DIR)/BasicUsageEnvironment/include \
@@ -30,11 +31,17 @@ INCLUDES = -I . \
 
 CFLAGS = $(INCLUDES) -D_LINUX -g -Wall -O3
 
-LIBS = \
+LD_FLAGS = \
 	-L$(LIVE_DIR)/BasicUsageEnvironment -lBasicUsageEnvironment \
 	-L$(LIVE_DIR)/UsageEnvironment -lUsageEnvironment \
 	-L$(LIVE_DIR)/groupsock -lgroupsock \
-	-L$(LIVE_DIR)/liveMedia -lliveMedia 
+	-L$(LIVE_DIR)/liveMedia -lliveMedia
+
+LD_LIBS = \
+	$(LIVE_DIR)/BasicUsageEnvironment/libBasicUsageEnvironment.a \
+	$(LIVE_DIR)/UsageEnvironment/libUsageEnvironment.a \
+	$(LIVE_DIR)/groupsock/libgroupsock.a \
+	$(LIVE_DIR)/liveMedia/libliveMedia.a
 
 #wis-streamer.o
 LIB_OBJS =  Err.o ICamInput.o \
@@ -50,21 +57,21 @@ EXEC_OBJS = media_server_test.o
 
 ifeq ($(STATIC), 1)
 LIB=lib$(LIB_NAME).a
-LIB_INSTALL_DIR = .
+LIB_INSTALL_DIR = $(SDK_LIB_DIR)
 else
 LIB=lib$(LIB_NAME).so
 CFLAGS+=-fPIC
 LIB_INSTALL_DIR = $(TARGET_LDLIB_DIR)
 endif
 
-all: $(LIB)	$(EXEC)
+all: $(LIB)	$(EXEC) install
 
 ifeq ($(STATIC), 1)
 $(LIB): $(LIB_OBJS)
-	$(AR) -rcs $@ $^ $(LIBS)
+	$(AR) -rcs $@ $^ $(LD_LIBS) 
 else
 $(LIB): $(LIB_OBJS)
-	$(CC) -shared -o $@ $^ $(LIBS)
+	$(CC) -shared -o $@ $^ $(LD_FLAGS)
 endif
 
 EXEC_LIBS = -L. -l$(LIB_NAME) \

@@ -3,7 +3,7 @@
 
 include ../Rules.make
 
-STATIC=0
+STATIC ?= 0
 #PLATFORM=PC
 
 LIB_PATH = lib
@@ -17,7 +17,7 @@ LIB_INSTALL_DIR := $(SDK_LIB_DIR)
 
 EXEC = bufTest
 SRC = buffer_test.o
-LDLIBS := 
+LDLIBS :=
 
 ifeq ($(PLATFORM), dm368)
 CROSS_COMPILE ?= $(CSTOOL_PREFIX)
@@ -28,6 +28,7 @@ EXEC_INSTALL_PATH ?= .
 endif
 
 CC = $(CROSS_COMPILE)gcc
+AR = $(CROSS_COMPILE)ar
 
 ifeq ($(STATIC), 1)
 LIB=$(LIB_PATH)/lib$(LIB_NAME).a

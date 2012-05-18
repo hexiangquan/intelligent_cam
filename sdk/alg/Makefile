@@ -162,6 +162,7 @@ install:
 	-cp -p $(LIB) $(SDK_LIB_DIR)
 	-cp -p $(LIB_HEADER) $(SDK_INC_DIR)
 	-cp -p $(EXEC) $(EXEC_INSTALL_PATH)
+	-cp -p $(XDC_LFILE) $(SDK_LIB_DIR)
 
 clean:
 	@echo Removing generated files..

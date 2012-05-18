@@ -64,7 +64,7 @@ INC_DIR := -I. -I$(SDK_INC_DIR) -I$(SDK_LIB_INC_DIR)
 
 C_FLAGS += -Wall -DDM365 -O2 $(INC_DIR)
 CPP_FLAGS ?= 
-AR_FLAGS += -rcs 
+AR_FLAGS += -rcs
 
 ifeq ($(STATIC), 1)
 LIB=$(LIB_PATH)/lib$(LIB_NAME).a
@@ -107,6 +107,8 @@ $(LIB): $(LIB_OBJ)
 	@echo Linking $@ from $^..
 	@mkdir -p $(LIB_PATH)
 	$(AR) $(AR_FLAGS) $@ $^ $(XDC_LFILE)
+#  	$(XDC_LFILE)
+#   
 else
 $(LIB): $(LIB_OBJ)
 	@echo
@@ -121,7 +123,7 @@ $(LIB_OBJ):	$(OBJ_DIR)/%.o: %.c $(HEADERS)
 	$(COMPILE) $(shell cat $(XDC_CFLAGS)) -o $@ $<
 
 $(EXEC): $(EXEC_OBJ)
-	$(LINK) -o $@ $^ $(LD_LIBS)
+	$(LINK) -o $@ $^ $(LD_LIBS) $(XDC_LFILE)
 
 $(EXEC_OBJ): $(OBJ_DIR)/%.o: %.c $(HEADERS)
 	$(COMPILE) $(shell cat $(XDC_CFLAGS)) -o $@ $<

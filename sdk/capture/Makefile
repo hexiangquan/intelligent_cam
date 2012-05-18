@@ -3,7 +3,7 @@
 
 include ../Rules.make
 
-STATIC=0
+STATIC ?= 0
 #PLATFORM=PC
 
 LIB_PATH = lib
@@ -27,6 +27,11 @@ EXEC_INSTALL_PATH ?= .
 endif
 
 CC = $(CROSS_COMPILE)gcc
+AR = $(CROSS_COMPILE)ar
+
+CFLAGS += -Wall -I. -g
+LDFLAGS := -L$(LIB_PATH) -L$(SDK_LIB_DIR)
+LDFLAGS += -lpthread -l$(LIB_NAME) -lbuf -lcmem
 
 ifeq ($(STATIC), 1)
 LIB=$(LIB_PATH)/lib$(LIB_NAME).a
@@ -35,10 +40,6 @@ LIB=$(LIB_PATH)/lib$(LIB_NAME).so
 CFLAGS+=-fPIC
 LIB_INSTALL_DIR = $(TARGET_LDLIB_DIR)
 endif
-
-CFLAGS += -Wall -I. -g
-LDFLAGS := -L$(LIB_PATH) -L$(SDK_LIB_DIR)
-LDFLAGS += -lpthread -l$(LIB_NAME) -lbuf
 
 CFLAGS += $(INC_DIR)
 
