@@ -99,13 +99,19 @@ typedef enum _AlgCmds {
 	ALG_CMD_USER_BASE = 128,		/* Base value for alg defined cmd */
 }AlgCmds;
 
+#ifdef __cplusplus
+#if __cplusplus
+extern "C"{
+#endif
+#endif /* __cplusplus */
+
 /**
  *  @brief     Init common resources  used
  *			
  *  @remarks   This function Must be called before any other API in this module
  *
  */
-Int32 alg_init();
+extern Int32 alg_init();
 
 /**
  *  @brief     Free common resources  used
@@ -113,7 +119,7 @@ Int32 alg_init();
  *  @remarks   This function Must be called after all alg deleted
  *
  */
-void alg_exit();
+extern void alg_exit();
 
 
 /**
@@ -128,7 +134,7 @@ void alg_exit();
  *  @remarks   Once this function is called, the alg can no longer run
  *
  */
-AlgHandle alg_create(const AlgFxns *fxns, Ptr initParams, Ptr dynParams);
+extern AlgHandle alg_create(const AlgFxns *fxns, Ptr initParams, Ptr dynParams);
 
 /**
  *  @brief      Delete a top level alg handle
@@ -226,6 +232,12 @@ static inline Int32 alg_set_dynamic_params(AlgHandle alg, Ptr dynParams)
 {
 	return alg_control(alg, ALG_CMD_SET_DYN_PARAMS, dynParams);
 }
+
+#ifdef __cplusplus
+#if __cplusplus
+}
+#endif
+#endif /* __cplusplus */
 
 #endif
 

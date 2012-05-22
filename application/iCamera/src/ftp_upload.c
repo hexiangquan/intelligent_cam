@@ -406,3 +406,8 @@ const UploadFxns FTP_UPLOAD_FXNS = {
 	.saveFrame = NULL,
 };
 
+Int32 ftp_upload_test(const char *username, cons char *passwd, const char *srvip, Uint16 port)
+{
+	return E_NO;
+}
+

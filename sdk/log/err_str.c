@@ -33,7 +33,7 @@ const char *str_err(int err)
 	case E_MODE:
 		return "Wrong mode";
 	case E_NOTEXIST:
-		return "file not exist";
+		return "Not exist";
 	case E_INVUSER:
 		return "Invalid user";
 	case E_INVPASSWD:

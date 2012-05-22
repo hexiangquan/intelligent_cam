@@ -54,6 +54,25 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
+#define PATH_NAME_EN_ONLY	//only use english name
+
+#ifdef PATH_NAME_EN_ONLY
+#define STR_RED_LIGHT		"Red"
+#define STR_GREEN_LIGHT		"Green"
+#define STR_RETROGRADE		"Retrograde"
+#define STR_EPOLICE			"EPolice"
+#define STR_CHECK_POST		"Check_Post"
+#define STR_OVERSPEED		"Over_Speed"
+#define STR_LIGHT			"light"
+#else
+#define STR_RED_LIGHT		"ºì"
+#define STR_GREEN_LIGHT		"ÂÌ"
+#define STR_RETROGRADE		"ÄæÐÐ"
+#define STR_EPOLICE			"µç¾¯´³ºìµÆ"
+#define STR_CHECK_POST		"¿¨¿ÚÎ´³¬ËÙ"
+#define STR_OVERSPEED		"¿¨¿Ú³¬ËÙ"
+#define STR_LIGHT			"µÆ"
+#endif
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -252,7 +271,7 @@ Int32 path_name_generate(PathNameHandle hPathName, const ImgMsg *imgBuf, PathNam
 	Int8 				prePattern[PATHNAME_MAX_LINE_SIZE];
 	Int8 				fullName[PATHNAME_MAX_LINE_SIZE];
 	Uint32 				i, patternLen, index;
-	Uint16 				capCnt = 1;
+	Int32 				capCnt = imgBuf->capInfo.capCnt;
 	const CaptureInfo	*capInfo = &imgBuf->capInfo;
 	Uint16 				redLightTime;
 	const CamDateTime 	*capTime = &imgBuf->timeStamp;
@@ -285,44 +304,49 @@ Int32 path_name_generate(PathNameHandle hPathName, const ImgMsg *imgBuf, PathNam
 	//printf("%s\n", prePattern);
 	
 	for(i = 0; i < capCnt; i++) {
-		memcpy(fullName, prePattern, patternLen);
+		strcpy(fullName, prePattern);
 
 #if 1
+		/* group id */
+		sprintf(strBuf, "%05d", capInfo->triggerInfo[i].groupId);
+		replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "??N", strBuf);
+			
 		/* light, speed, disobey type */
 		if(capInfo->triggerInfo[i].flags & TRIG_INFO_RED_LIGHT) {
 			/* red light */
-			sprintf(strBuf, "%s", "ºì");
+			strcpy(strBuf, STR_RED_LIGHT);
 			replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?L", strBuf);
-			sprintf(strBuf, "%05d", capInfo->triggerInfo[i].speed);
-			replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "??N", strBuf);
-			sprintf(strBuf, "%s", "µç¾¯´³ºìµÆ");
+		
+			strcpy(strBuf, STR_EPOLICE);
 		} else {
 			/* green light */
-			sprintf(strBuf, "%s", "ÂÌ");
+			strcpy(strBuf, STR_GREEN_LIGHT);
 			replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?L", strBuf);
-			sprintf(strBuf, "%03d", capInfo->triggerInfo[i].speed % 1000);
-			replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?SN", strBuf);
+			
 			if(capInfo->triggerInfo[i].flags & TRIG_INFO_OVERSPEED)
-				sprintf(strBuf, "%s", "¿¨¿Ú³¬ËÙ");
+				strcpy(strBuf, STR_OVERSPEED);
 			else
-				sprintf(strBuf, "%s", "¿¨¿ÚÎ´³¬ËÙ");
+				strcpy(strBuf, STR_CHECK_POST);
 		}
 		
 		if(capInfo->triggerInfo[i].flags & TRIG_INFO_RETROGRADE)
-			sprintf(strBuf, "%s", "ÄæÐÐ");
-		
-		replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?DT4567890", strBuf);
+			strcpy(strBuf, STR_RETROGRADE);
 
-		/* redlight time */
-		redLightTime = capInfo->triggerInfo[i].redlightTime;
-		//printf("%u\n", nRedLightTime);
-		
-		sprintf(strBuf, "%03d", (redLightTime /100) % 1000);
-		replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?TT", strBuf);
+		/* type of capture */
+		replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?dt4567890", strBuf);
 		
 		/* way number */
 		sprintf(strBuf, "%d",  capInfo->triggerInfo[i].wayNum % 10);
 		replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "<", strBuf);
+
+		/* speed */
+		sprintf(strBuf, "%03d", capInfo->triggerInfo[i].speed);
+		replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?P", strBuf);
+
+		/* redlight time */
+		redLightTime = capInfo->triggerInfo[i].redlightTime;			
+		sprintf(strBuf, "%03d", (redLightTime /100) % 1000);
+		replace_string(fullName, PATHNAME_MAX_LINE_SIZE, "?TT", strBuf);
 
 		/* frame number
 		  * need change case number to enumeration string, to be modified!
@@ -398,19 +422,21 @@ Int32 path_name_config(PathNameHandle hPathName, const Int8 *pattern, const Int8
 	if(!len || len > PATHNAME_MAX_LINE_SIZE) {
 		strcpy(hPathName->pathNamePattern, PATHNAME_PATTERN_DEFAULT);
 		WARN("path_name_config, input string length is %d, using default pattern.", len);
+	} else {
+		strcpy(hPathName->pathNamePattern, pattern);
 	}
 	
 	// replace tag <IP> to IP string
 	get_local_ip(buf, sizeof(buf));
 	replace_string(hPathName->pathNamePattern, PATHNAME_MAX_LINE_SIZE, "<IP>", buf);
-	DBG("local IP:%s", buf);
+	DBG("local IP: %s", buf);
 
 	// replace tag <OSD> to text string
 	strcpy(buf, text);
 	replace_string(hPathName->pathNamePattern, PATHNAME_MAX_LINE_SIZE, "<OSD>", buf);
 
 	// replace tag <L> to "?LµÆ", which means redlight or greenlight 
-	replace_string(hPathName->pathNamePattern, PATHNAME_MAX_LINE_SIZE, "<L>", "?LµÆ");
+	replace_string(hPathName->pathNamePattern, PATHNAME_MAX_LINE_SIZE, "<L>", "?L"STR_LIGHT);
 
 	// replace tag <T> to "?TT", which means redlight time
 	replace_string(hPathName->pathNamePattern, PATHNAME_MAX_LINE_SIZE, "<T>", "?TT");
@@ -433,8 +459,11 @@ Int32 path_name_config(PathNameHandle hPathName, const Int8 *pattern, const Int8
 	// replace tag <FN> to "?FN", which means frame number "A" or "B" or "C", etc
 	replace_string(hPathName->pathNamePattern, PATHNAME_MAX_LINE_SIZE, "<FN>", "?FN");
 
-	// replace tag <SN> to "?SN", which means speed(EP Mode) or frame group number(CP)
+	// replace tag <SN> to "?SN", which means frame group number
 	replace_string(hPathName->pathNamePattern, PATHNAME_MAX_LINE_SIZE, "<SN>", "??N");
+	
+	// replace tag <P> to "?P", which means speed
+	replace_string(hPathName->pathNamePattern, PATHNAME_MAX_LINE_SIZE, "<P>", "?P");
 
 	// remove all "<" and ">"
 	replace_string(hPathName->pathNamePattern, PATHNAME_MAX_LINE_SIZE, "<", "");
@@ -471,6 +500,165 @@ Int32 path_name_delete(PathNameHandle hPathName)
 		return E_INVAL;
 
 	free(hPathName);
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : path_name_test
+ Description  : test path name generate
+ Input        : None
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/5/22
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 path_name_test()
+{
+	PathNameHandle hPathName;
+	char pattern[128] = PATHNAME_PATTERN_DEFAULT;
+	Int32 err;
+
+	bzero(pattern, sizeof(pattern));
+	strncpy(pattern, PATHNAME_PATTERN_DEFAULT, sizeof(pattern));
+	DBG("pattern: %s", pattern);
+	
+	hPathName = path_name_create(pattern, "test");
+	assert(hPathName);
+
+	/* generate file name */
+	ImgMsg img;
+	CaptureInfo *capInfo = &img.capInfo;
+
+	bzero(&img, sizeof(img));
+
+	/* get time */
+	gettimeofday(&img.timeCode, NULL);
+	cam_get_time(&img.timeStamp);
+	DBG("time: %d/%d/%d %d:%d:%d", img.timeStamp.year, img.timeStamp.month,
+		img.timeStamp.day, img.timeStamp.hour, img.timeStamp.minute,
+		img.timeStamp.second);
+
+	/* set cap info */
+	capInfo->capCnt = 1;
+	capInfo->flags = 0;
+	capInfo->limitSpeed = 80;
+
+	/* set single way trig info */
+	TriggerInfo *trigInfo = &capInfo->triggerInfo[0];
+	trigInfo->frameId = FRAME_TRIG_BASE + 2;
+	trigInfo->groupId = 1;
+	trigInfo->redlightTime = 200;
+	trigInfo->speed = 0;
+	trigInfo->wayNum = 2;
+	trigInfo->flags = TRIG_INFO_RED_LIGHT;
+
+	capInfo->triggerInfo[1] = capInfo->triggerInfo[2] = *trigInfo;
+
+	PathNameInfo nameInfo;
+
+	/* calc time cost */
+	struct timeval tmStart,tmEnd; 
+	float   timeUse;
+
+	gettimeofday(&tmStart,NULL);
+	bzero(&nameInfo, sizeof(nameInfo));
+	err = path_name_generate(hPathName, &img, &nameInfo);
+	gettimeofday(&tmEnd,NULL);
+	
+	assert(err == E_NO);
+	assert(nameInfo.fileNum == capInfo->capCnt);
+
+	timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+	
+	DBG("generated file path: %s, name: %s, cost: %.2fus", 
+		nameInfo.path[0], nameInfo.fileName[0], timeUse);
+
+
+	/* change pattern */
+	strcpy(pattern, "<OSD>/<Y><M><D>/<DT>-<L>/<H><m><S><s>-<WN>-<SN>-<FN>-<T>");
+	err = path_name_config(hPathName, pattern, "road");
+	assert(err == E_NO);
+
+	/* generate again */
+	cam_get_time(&img.timeStamp);
+	
+	gettimeofday(&tmStart,NULL);
+	bzero(&nameInfo, sizeof(nameInfo));
+	err = path_name_generate(hPathName, &img, &nameInfo);
+	gettimeofday(&tmEnd,NULL);
+	
+	assert(err == E_NO);
+	assert(nameInfo.fileNum == capInfo->capCnt);
+
+	timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+	
+	DBG("generated file path: %s, name: %s, cost: %.2fus", 
+		nameInfo.path[0], nameInfo.fileName[0], timeUse);
+
+	/* check post file name */
+	trigInfo = &capInfo->triggerInfo[1];
+	capInfo->capCnt = 2;
+	
+	trigInfo->flags = 0;
+	trigInfo->speed = 50;
+	trigInfo->groupId = 2345;
+	trigInfo->wayNum = 1;
+	trigInfo->frameId = FRAME_TRIG_BASE;
+	cam_get_time(&img.timeStamp);
+	
+	strcpy(pattern, "<IP>-<OSD>/<Y><M><D>/<DT>/<H><m><S><s>-<SN>-<FN>-<P>");
+	err = path_name_config(hPathName, pattern, "road");
+	assert(err == E_NO);
+
+	gettimeofday(&tmStart,NULL);
+	bzero(&nameInfo, sizeof(nameInfo));
+	err = path_name_generate(hPathName, &img, &nameInfo);
+	gettimeofday(&tmEnd,NULL);
+	
+	assert(err == E_NO);
+	assert(nameInfo.fileNum == capInfo->capCnt);
+
+	timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+	
+	DBG("generated file path: %s, name: %s, cost: %.2fus", 
+		nameInfo.path[1], nameInfo.fileName[1], timeUse);
+
+	/* retrograde test */
+	trigInfo = &capInfo->triggerInfo[2];
+	capInfo->capCnt = 3;
+	
+	trigInfo->flags = TRIG_INFO_RETROGRADE;
+	trigInfo->frameId = FRAME_TRIG_BASE + 1;
+	trigInfo->groupId = 99;
+	
+	strcpy(pattern, "<OSD>/<Y><M><D>/<DT>/<H><m><S><s>-<WN>-<SN>-<FN>");
+	err = path_name_config(hPathName, pattern, "road");
+	assert(err == E_NO);
+
+	gettimeofday(&tmStart,NULL);
+	bzero(&nameInfo, sizeof(nameInfo));
+	err = path_name_generate(hPathName, &img, &nameInfo);
+	gettimeofday(&tmEnd,NULL);
+	
+	assert(err == E_NO);
+	assert(nameInfo.fileNum == capInfo->capCnt);
+
+	timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+	
+	DBG("generated file path: %s, name: %s, cost: %.2fus", 
+		nameInfo.path[2], nameInfo.fileName[2], timeUse);
+
+	err = path_name_delete(hPathName);
+	assert(err == E_NO);
+
+	DBG("%s done", __func__);
 
 	return E_NO;
 }

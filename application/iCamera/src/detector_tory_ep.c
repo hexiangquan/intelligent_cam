@@ -158,7 +158,7 @@ static void tory_ep_cap_pre_parse(Uint16 redLightCapFlags, Uint8 epCapTable[], U
     Modification : Created function
 
 *****************************************************************************/
-void tory_retrograde_cap_pre_parse(Uint16 reCapFlags, Uint8 reCapTable[])
+void tory_retrograde_cap_pre_parse(Uint16 reCapFlags, Uint8 reCapTable[], Uint8 *lastFrameId)
 {
 	/* Clear table */
 	memset(reCapTable, 0xFF, CAP_TABLE_SIZE);
@@ -170,35 +170,42 @@ void tory_retrograde_cap_pre_parse(Uint16 reCapFlags, Uint8 reCapTable[])
 	/* Only cap at loop1 pos edge */
 	case DETECTOR_FLAG_LOOP1_POS_CAP:
 		reCapTable[2] = FRAME_TRIG_BASE;
+		*lastFrameId = 0x02;
 		break;
 	/* Only cap at loop2 pos edge */
 	case DETECTOR_FLAG_LOOP2_POS_CAP:
 		reCapTable[1] = FRAME_TRIG_BASE;
+		*lastFrameId = 0x01;
 		break;
 	/* Cap at loop2 pos edge and loop1 pos edge */
 	case DETECTOR_FLAG_LOOP2_POS_CAP|DETECTOR_FLAG_LOOP1_POS_CAP:
 		reCapTable[1] = FRAME_TRIG_BASE;
 		reCapTable[2] = FRAME_TRIG_BASE + 1;
+		*lastFrameId = 0x02;
 		break;
 	/* Cap at loop2 neg edge */
 	case DETECTOR_FLAG_LOOP2_NEG_CAP:
 		reCapTable[3] = FRAME_TRIG_BASE;
+		*lastFrameId = 0x03;
 		break;
 	/* Cap at loop2 neg edge and loop1 pos edge */
 	case DETECTOR_FLAG_LOOP2_NEG_CAP|DETECTOR_FLAG_LOOP1_POS_CAP:
 		reCapTable[2] = FRAME_TRIG_BASE;
 		reCapTable[3] = FRAME_TRIG_BASE + 1;
+		*lastFrameId = 0x03;
 		break;
 	/* Cap at loop2 neg edge and loop2 pos edge */
 	case DETECTOR_FLAG_LOOP2_NEG_CAP|DETECTOR_FLAG_LOOP2_POS_CAP:
 		reCapTable[1] = FRAME_TRIG_BASE;
 		reCapTable[3] = FRAME_TRIG_BASE + 1;
+		*lastFrameId = 0x03;
 		break;
 	/* Cap at loop2 pos edge, loop1 pos edge and loop2 neg edge */
 	case DETECTOR_FLAG_LOOP2_NEG_CAP|DETECTOR_FLAG_LOOP2_POS_CAP|DETECTOR_FLAG_LOOP1_POS_CAP:
 		reCapTable[1] = FRAME_TRIG_BASE;
 		reCapTable[2] = FRAME_TRIG_BASE + 1;
 		reCapTable[3] = FRAME_TRIG_BASE + 2;
+		*lastFrameId = 0x03;
 		break;
 	default:
 		break;
@@ -228,7 +235,7 @@ static void tory_ep_pre_parse(DetectorUart *dev, const CamDetectorParam *params)
 		return;
 	
 	tory_ep_cap_pre_parse(params->redLightCapFlag, dev->epCapTable, &dev->lastFrameCode[TRIG_EP]);
-	tory_retrograde_cap_pre_parse(params->retrogradeCapFlag, dev->reCapTable);
+	tory_retrograde_cap_pre_parse(params->retrogradeCapFlag, dev->reCapTable, &dev->lastFrameCode[TRIG_RE]);
 }
 
 
@@ -296,6 +303,7 @@ static Int32 ep_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uin
 	/* Set frame Id and flag */
 	info->frameId = dev->epCapTable[rxBuf[2]];
 	info->flags = 0;
+	info->speed = 0;
 
 	/* Way Number */
 	info->wayNum = wayNum;
@@ -312,9 +320,10 @@ static Int32 ep_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uin
 	info->groupId = dev->groupId[wayNum - 1];
 
 	/* Check if delay cap is set */
-	if((params->redLightCapFlag & DETECTOR_FLAG_DELAY_CAP) &&
-		rxBuf[2] == dev->lastFrameCode[TRIG_EP]) {
-		info->flags |= TRIG_INFO_DELAY_CAP;
+	if(rxBuf[2] == dev->lastFrameCode[TRIG_EP]) {
+		info->flags |= TRIG_INFO_LAST_FRAME;
+		if(params->redLightCapFlag & DETECTOR_FLAG_DELAY_CAP)
+			info->flags |= TRIG_INFO_DELAY_CAP;
 	}
 	
 	return E_NO;
@@ -356,6 +365,7 @@ static Int32 retrograde_cap_parse(DetectorUart *dev, const CamDetectorParam *par
 	/* Set frame Id and flag */
 	info->frameId = dev->reCapTable[rxBuf[2]];
 	info->flags = 0;
+	info->speed = 0;
 
 	info->wayNum = wayNum;
 
@@ -366,6 +376,10 @@ static Int32 retrograde_cap_parse(DetectorUart *dev, const CamDetectorParam *par
 	if(info->frameId == FRAME_TRIG_BASE)
 		dev->groupId[wayNum - 1]++;
 	info->groupId = dev->groupId[wayNum - 1];
+
+	/* Check if it is last frame of the group */
+	if(rxBuf[2] == dev->lastFrameCode[TRIG_RE])
+		info->flags |= TRIG_INFO_LAST_FRAME;
 	
 	return E_NO;
 }
@@ -404,7 +418,8 @@ static Int32 cp_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uin
 	
 	/* Set frame Id and flag */
 	info->frameId = FRAME_TRIG_BASE;
-	info->flags = 0;
+	info->flags = TRIG_INFO_LAST_FRAME;
+	info->redlightTime = 0;
 
 	/* Way Number */
 	info->wayNum = wayNum;
@@ -414,7 +429,7 @@ static Int32 cp_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uin
 	info->groupId = dev->groupId[wayNum - 1];
 
 	/* Calc speed */
-	info->speed = detector_calc_speed(params, wayNum, (rxBuf[5]<<8)|rxBuf[6]);
+	info->speed = detector_calc_speed(params, wayNum, (rxBuf[3]<<8)|rxBuf[4]);
 	if(info->speed > params->limitSpeed)
 		info->flags |= TRIG_INFO_OVERSPEED;
 
@@ -505,5 +520,145 @@ const DetectorUartFxns tory_ep_opts = {
 	.singleTrigParse = tory_ep_parse,
 	.exit = NULL,
 };
+
+/*****************************************************************************
+ Prototype    : tory_ep_test
+ Description  : test tory ep detector parse
+ Input        : None
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/5/22
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 tory_ep_test()
+{
+	CamDetectorParam params;
+	Int32 err;
+
+	bzero(&params, sizeof(params));
+	params.detecotorId = DETECTOR_TORY_EP;
+	params.capDelayTime = 0;
+	params.redLightCapFlag = DETECTOR_FLAG_LOOP1_POS_CAP | DETECTOR_FLAG_LOOP1_NEG_CAP | DETECTOR_FLAG_LOOP2_NEG_CAP;
+	params.greenLightCapFlag = DETECTOR_FLAG_LOOP1_NEG_CAP;
+	params.retrogradeCapFlag = DETECTOR_FLAG_LOOP1_POS_CAP | DETECTOR_FLAG_LOOP2_POS_CAP | DETECTOR_FLAG_LOOP2_NEG_CAP;
+	params.loopDist[0] = 500;
+	params.loopDist[1] = 450;
+	params.loopDist[2] = 300;
+	params.loopDist[3] = 250;
+	params.limitSpeed = 80;
+	params.calcSpeed = 88;
+	params.speedModifyRatio[0] = 100;
+	params.speedModifyRatio[1] = 110;
+	params.speedModifyRatio[2] = 100;
+	params.speedModifyRatio[3] = 90;
+	
+	/* test parse fxns */
+	const DetectorUartFxns *fxns = &tory_ep_opts;
+	DetectorUart uartDev;
+
+	bzero(&uartDev, sizeof(uartDev));
+	uartDev.fd = 0;
+	uartDev.baudRate = UART_B9600;
+	uartDev.opts = fxns;
+	uartDev.timeout = 50;
+	
+	err = fxns->init(&uartDev, DETECTOR_TORY_EP);
+	assert(err == E_NO);
+
+	fxns->capPreParse(&uartDev, &params);
+
+	Uint8 data[8] = {0x0F, };
+	err = fxns->startCodeSync(&uartDev, data[0]);
+	assert(err == TRUE);
+
+	int i, j;
+	TriggerInfo trigInfo;
+	
+	/* test red light capture */
+	data[1] = 0x01;
+	for(j = 0; j < 3; j++) {
+		data[1] += 0x10;
+		for(i = 0; i < 3; i++) {
+			/* mock detector trigger data */		
+			data[2] = 0x01 + i;
+			data[3] = 0x00;
+			data[4] = 200 + i * 10;
+
+			err = fxns->singleTrigParse(&uartDev, &params, data, &trigInfo);
+			if(err)
+				DBG("single trig parse ret: %s", str_err(err));
+			assert(err == E_NO);
+
+			assert(trigInfo.frameId == FRAME_TRIG_BASE + i);
+			assert(trigInfo.flags & TRIG_INFO_RED_LIGHT);
+
+			DBG("parse trig info:");
+			DBG("  way num: %d, group id: %d, frame id: %d", 
+				(int)trigInfo.wayNum, (int)trigInfo.groupId, (int)trigInfo.frameId);
+			DBG("  flags: 0x%X, redlight time: %d, speed: %d Km/h", 
+				(unsigned)trigInfo.flags, (int)trigInfo.redlightTime, (int)trigInfo.speed);
+		}
+	}
+
+	/* test check post parse */
+	data[1] = 0x21;
+	data[2] = 0x00;
+	data[3] = 0x00;
+	data[4] = 100;
+
+	err = fxns->singleTrigParse(&uartDev, &params, data, &trigInfo);
+	if(err)
+		DBG("single trig parse ret: %s", str_err(err));
+	assert(err == E_NO);
+	assert(trigInfo.frameId == FRAME_TRIG_BASE);
+	assert((trigInfo.flags & TRIG_INFO_RED_LIGHT) == 0);
+	assert(trigInfo.redlightTime == 0);
+
+	DBG("parse trig info:");
+	DBG("  way num: %d, group id: %d, frame id: %d", 
+		(int)trigInfo.wayNum, (int)trigInfo.groupId, (int)trigInfo.frameId);
+	DBG("  flags: 0x%X, redlight time: %d, speed: %d Km/h", 
+		(unsigned)trigInfo.flags, (int)trigInfo.redlightTime, (int)trigInfo.speed);
+
+	/* test retrograde */
+	data[1] = 0x31;
+	data[2] = 0x01;
+	data[3] = data[4] = 0;
+	
+	for(i = 0; i < 3; i++) {
+		/* mock detector trigger data */		
+		data[2] = 0x01 + i;
+		data[3] = 0x00;
+		data[4] = 0;
+
+		bzero(&trigInfo, sizeof(trigInfo));
+		err = fxns->singleTrigParse(&uartDev, &params, data, &trigInfo);
+		if(err)
+			DBG("single trig parse ret: %s", str_err(err));
+		assert(err == E_NO);
+
+		//assert(trigInfo.frameId == FRAME_TRIG_BASE + i);
+		assert(trigInfo.flags & TRIG_INFO_RETROGRADE);
+
+		DBG("parse trig info:");
+		DBG("  way num: %d, group id: %d, frame id: %d", 
+			(int)trigInfo.wayNum, (int)trigInfo.groupId, (int)trigInfo.frameId);
+		DBG("  flags: 0x%X, redlight time: %d, speed: %d Km/h", 
+			(unsigned)trigInfo.flags, (int)trigInfo.redlightTime, (int)trigInfo.speed);
+	}
+	
+	if(fxns->exit)
+		fxns->exit(&uartDev);
+	
+	DBG("%s done", __func__);
+
+	return err;
+}
 
 

@@ -64,7 +64,7 @@
 #define PROGRAM_NAME			"iCamera"
 #define CONFIG_FILE				"./cam.cfg"
 
-#define CAM_MAX_THREAD_NUM		8
+#define MAIN_FLAG_TEST_EN		(1 << 0)
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -76,8 +76,8 @@ typedef struct {
 	const char 		*savePath;
 	Bool			exit;
 	Bool			reboot;
-	pthread_t		pid[CAM_MAX_THREAD_NUM];
 	CtrlSrvHandle	hCtrlSrv;
+	Int32			flags;
 }MainEnv;
 
 static Bool s_exit = FALSE;
@@ -347,8 +347,10 @@ static void usage(void)
     INFO(" -h get help");
 	INFO(" -f input file name, default: %s", CONFIG_FILE);
 	INFO(" -p local file save path, default: %s", FILE_SAVE_PATH);
+	INFO(" -t self-test enable, 1-detector test, 2-path name test, 4-ftp upload test");
     INFO(" use default params: ./%s", PROGRAM_NAME);
-    INFO(" use specific params: ./%s -f ./cfg/myCfg", PROGRAM_NAME);
+    INFO(" use specific config file: ./%s -f ./cfg/myCfg", PROGRAM_NAME);
+	INFO(" do detector and path name test: ./%s -t 3", PROGRAM_NAME);
 }
 
 /*****************************************************************************
@@ -369,10 +371,10 @@ static void usage(void)
 *****************************************************************************/
 Int32 main(Int32 argc, char **argv)
 {
-	Int32 c;
-    const char *options = "f:p:h";
-	MainEnv env;
-	int ret;
+	Int32 		c;
+    const char 	*options = "f:p:t:h";
+	MainEnv 	env;
+	int 		ret, testFlags = 0;
 
 	/* Init params */
 	memset(&env, 0, sizeof(env));
@@ -390,6 +392,9 @@ Int32 main(Int32 argc, char **argv)
 		case 'p':
 			env.savePath = optarg;
 			break;
+		case 't':
+			testFlags = atoi(optarg);
+			break;
 		case 'h':
 		default:
 			usage();
@@ -397,7 +402,11 @@ Int32 main(Int32 argc, char **argv)
 		}
 	}
 
-	ret = main_loop(&env);
+	/* do self test if enabled */
+	if(testFlags)
+		ret = self_test(testFlags);
+	else
+		ret = main_loop(&env);
 
 	INFO("%s exit, status: %d...\n", PROGRAM_NAME, ret);
 

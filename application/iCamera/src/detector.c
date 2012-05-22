@@ -363,6 +363,93 @@ Int32 detector_calc_speed(const CamDetectorParam *params, Int32 wayNum, Uint32 t
 			speed = speed * params->speedModifyRatio[wayNum - 1] / 100;
 	}
 
-	return (Uint8)speed;
+	return speed;
+}
+
+extern Int32 tory_cp_test();
+extern Int32 tory_ep_test();
+extern Int32 tory_ep2_test();
+
+
+/*****************************************************************************
+ Prototype    : detector_test
+ Description  : test detector module
+ Input        : None
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/5/21
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 detector_test()
+{
+	CamDetectorParam params;
+	Int32 err;
+
+	bzero(&params, sizeof(params));
+	params.detecotorId = DETECTOR_TORY_EP;
+	params.capDelayTime = 0;
+	params.redLightCapFlag = DETECTOR_FLAG_LOOP1_POS_CAP | DETECTOR_FLAG_LOOP1_NEG_CAP | DETECTOR_FLAG_LOOP2_NEG_CAP;
+	params.greenLightCapFlag = DETECTOR_FLAG_LOOP1_NEG_CAP;
+	params.retrogradeCapFlag = DETECTOR_FLAG_LOOP1_POS_CAP | DETECTOR_FLAG_LOOP2_POS_CAP | DETECTOR_FLAG_LOOP2_NEG_CAP;
+	params.loopDist[0] = 500;
+	params.loopDist[1] = 450;
+	params.loopDist[2] = 300;
+	params.loopDist[3] = 250;
+	params.limitSpeed = 80;
+	params.calcSpeed = 88;
+	params.speedModifyRatio[0] = 100;
+	params.speedModifyRatio[1] = 110;
+	params.speedModifyRatio[2] = 100;
+	params.speedModifyRatio[3] = 90;
+	
+	/* create detector */
+	DetectorHandle hDetector = detector_create(&params);
+	assert(hDetector);
+
+	/* test control */
+	err = detector_control(hDetector, DETECTOR_CMD_START, NULL, 0);
+	assert(err == E_NO);
+
+	Int32 fd;
+	err = detector_control(hDetector, DETECTOR_CMD_GET_FD, &fd, sizeof(fd));
+	assert(err == E_NO);
+	assert(fd > 0);
+
+	params.calcSpeed = 90;
+	err = detector_control(hDetector, DETECTOR_CMD_SET_PARAMS, &params, sizeof(params));
+	assert(err == E_NO);
+
+	Int32 timeout = 5000;
+	err = detector_control(hDetector, DETECTOR_CMD_SET_TIMEOUT, &timeout, sizeof(timeout));
+	assert(err == E_NO);
+
+	DBG("\nStart testing tory ep detector...");
+	err = tory_ep_test();
+	assert(err == E_NO);
+
+	DBG("\nStart testing tory ep2 detector...");
+	err = tory_ep2_test();
+	assert(err == E_NO);
+
+	DBG("\nStart testing tory cp detector...");
+	err = tory_cp_test();
+	assert(err == E_NO);
+
+	err = detector_control(hDetector, DETECTOR_CMD_STOP, NULL, 0);
+	assert(err == E_NO);
+
+	err = detector_delete(hDetector);
+	assert(err == E_NO);
+
+	DBG("%s done", __func__);
+
+	return E_NO;
+	
 }
 

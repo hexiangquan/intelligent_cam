@@ -51,11 +51,24 @@
  *----------------------------------------------*/
 
 /* buffer size */
-#define PATHNAME_MAX_LINE_SIZE		500
+#define PATHNAME_MAX_LINE_SIZE		128
 #define PATHNAME_MAX_CNT_NUM		4
 
 /* default path name pattern */
 #define PATHNAME_PATTERN_DEFAULT	"<IP>/<Y><M>/<D>/<Y><M><D><H><m><S><s>"
+
+/* meanings of pattern: 
+ * <IP> -- our ip address string
+ * <OSD> -- text such as road name, etc.
+ * <Y>, <M>, <D>, <H>, <m>, <S>, <s> -- time: year, month, day, hour, minitue, second, millisecond
+ * <DT> -- type of frame, such as epolice, check post, retrograde, etc.
+ * <SN> -- group id
+ * <FN> -- frame number within a group, generate as A, B, C, etc.
+ * <WN> -- way number
+ * <L> -- redlight or green light string
+ * <P> -- speed, km/h
+ * <T> -- redlight time, unit: second
+ */
 
 /*----------------------------------------------*
  * routines' implementations                    *

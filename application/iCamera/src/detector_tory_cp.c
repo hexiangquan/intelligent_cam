@@ -25,7 +25,7 @@
 *****************************************************************************/
 static Int32 tory_cp_init(DetectorUart *dev, Uint16 detectorId)
 {
-	if(!dev || detectorId != DETECTOR_TORY_EP) {
+	if(!dev || detectorId != DETECTOR_TORY_CP) {
 		return  E_INVAL;
 	}
 
@@ -97,13 +97,15 @@ static Int32 retrograde_cap_parse(DetectorUart *dev, const CamDetectorParam *par
 	/* Set frame Id and flag */
 	info->frameId = FRAME_TRIG_BASE;
 	info->flags = 0;
+	info->speed = 0;
+	info->redlightTime = 0;
 
 	/* Way Number */
 	wayNum = (rxBuf[1] & 0x0F) + 1;
 	info->wayNum = wayNum;
 
 	/* Set retrograde flag */
-	info->flags |= TRIG_INFO_RETROGRADE;
+	info->flags |= TRIG_INFO_RETROGRADE | TRIG_INFO_LAST_FRAME;
 	
 	/* Group Num */
 	dev->groupId[wayNum - 1]++;
@@ -142,8 +144,9 @@ static Int32 cp_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uin
 	
 	/* Set frame Id and flag */
 	info->frameId = FRAME_TRIG_BASE;
-	info->flags = 0;
+	info->flags = TRIG_INFO_LAST_FRAME; // only one frame
 	info->speed = 0;
+	info->redlightTime = 0;
 
 	/* Way Number */
 	wayNum = (rxBuf[1] & 0x0F) + 1;
@@ -162,8 +165,7 @@ static Int32 cp_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uin
 	if(info->speed > params->limitSpeed) {
 		/* Set overspeed flag */
 		info->flags |= TRIG_INFO_OVERSPEED;
-	}
-	else if(!(params->greenLightCapFlag & DETECTOR_FLAG_OVERSPEED_CAP))
+	} else if(params->greenLightCapFlag & DETECTOR_FLAG_OVERSPEED_CAP)
 		return E_NOTEXIST;	//Capture only when overspeed
 
 	return E_NO;
@@ -217,5 +219,133 @@ const DetectorUartFxns tory_cp_opts = {
 	.exit = NULL,
 };
 
+
+/*****************************************************************************
+ Prototype    : tory_cp_test
+ Description  : test tory cp detector
+ Input        : None
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/5/22
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 tory_cp_test()
+{
+	CamDetectorParam params;
+	Int32 err;
+
+	bzero(&params, sizeof(params));
+	params.detecotorId = DETECTOR_TORY_CP;
+	params.capDelayTime = 0;
+	params.redLightCapFlag = 
+		DETECTOR_FLAG_LOOP1_POS_CAP | DETECTOR_FLAG_LOOP2_POS_CAP | DETECTOR_FLAG_LOOP1_NEG_CAP | DETECTOR_FLAG_LOOP2_NEG_CAP;
+	params.greenLightCapFlag = DETECTOR_FLAG_LOOP1_NEG_CAP;
+	params.retrogradeCapFlag = DETECTOR_FLAG_LOOP1_POS_CAP | DETECTOR_FLAG_LOOP2_POS_CAP | DETECTOR_FLAG_LOOP2_NEG_CAP;
+	params.loopDist[0] = 500;
+	params.loopDist[1] = 450;
+	params.loopDist[2] = 300;
+	params.loopDist[3] = 250;
+	params.limitSpeed = 80;
+	params.calcSpeed = 88;
+	params.speedModifyRatio[0] = 100;
+	params.speedModifyRatio[1] = 110;
+	params.speedModifyRatio[2] = 100;
+	params.speedModifyRatio[3] = 90;
+	
+	/* test parse fxns */
+	const DetectorUartFxns *fxns = &tory_cp_opts;
+	DetectorUart uartDev;
+
+	bzero(&uartDev, sizeof(uartDev));
+	uartDev.fd = 0;
+	uartDev.baudRate = UART_B9600;
+	uartDev.opts = fxns;
+	uartDev.timeout = 50;
+	
+	err = fxns->init(&uartDev, DETECTOR_TORY_CP);
+	assert(err == E_NO);
+
+	if(fxns->capPreParse)
+		fxns->capPreParse(&uartDev, &params);
+
+	Uint8 data[8] = {0x0F, };
+	err = fxns->startCodeSync(&uartDev, data[0]);
+	assert(err == TRUE);
+
+	TriggerInfo trigInfo;	
+	
+	/* test check post parse */
+	data[0] = 0x0F;	//start code
+	data[1] = 0x20;	// way num
+	data[2] = 50;   //speed
+
+	err = fxns->singleTrigParse(&uartDev, &params, data, &trigInfo);
+	if(err)
+		DBG("single trig parse ret: %s", str_err(err));
+	assert(err == E_NO);
+	assert(trigInfo.frameId == FRAME_TRIG_BASE);
+	assert((trigInfo.flags & TRIG_INFO_RED_LIGHT) == 0);
+	assert(trigInfo.redlightTime == 0);
+
+	DBG("%s parse trig info:", __func__);
+	DBG("  way num: %d, group id: %d, frame id: %d", 
+		(int)trigInfo.wayNum, (int)trigInfo.groupId, (int)trigInfo.frameId);
+	DBG("  flags: 0x%X, redlight time: %d, speed: %d Km/h", 
+		(unsigned)trigInfo.flags, (int)trigInfo.redlightTime, (int)trigInfo.speed);
+
+	/* test over speed */
+	data[2] = 100;
+	err = fxns->singleTrigParse(&uartDev, &params, data, &trigInfo);
+	if(err)
+		DBG("single trig parse ret: %s", str_err(err));
+	assert(err == E_NO);
+	assert(trigInfo.frameId == FRAME_TRIG_BASE);
+	assert((trigInfo.flags & TRIG_INFO_RED_LIGHT) == 0);
+	assert((trigInfo.flags & TRIG_INFO_OVERSPEED));
+	assert(trigInfo.redlightTime == 0);
+
+	DBG("%s parse trig info:", __func__);
+	DBG("  way num: %d, group id: %d, frame id: %d", 
+		(int)trigInfo.wayNum, (int)trigInfo.groupId, (int)trigInfo.frameId);
+	DBG("  flags: 0x%X, redlight time: %d, speed: %d Km/h", 
+		(unsigned)trigInfo.flags, (int)trigInfo.redlightTime, (int)trigInfo.speed);
+	
+	/* test retrograde */
+	data[0] = 0x0F;
+	data[1] = 0x31;
+	data[2] = 0x41;	
+
+	//bzero(&trigInfo, sizeof(trigInfo));
+	err = fxns->singleTrigParse(&uartDev, &params, data, &trigInfo);
+	if(err)
+		DBG("single trig parse ret: %s", str_err(err));
+	assert(err == E_NO);
+
+	//assert(trigInfo.frameId == FRAME_TRIG_BASE + i);
+	assert(trigInfo.flags & TRIG_INFO_RETROGRADE);
+
+	DBG("%s parse trig info:", __func__);
+	DBG("  way num: %d, group id: %d, frame id: %d", 
+		(int)trigInfo.wayNum, (int)trigInfo.groupId, (int)trigInfo.frameId);
+	DBG("  flags: 0x%X, redlight time: %d, speed: %d Km/h", 
+		(unsigned)trigInfo.flags, (int)trigInfo.redlightTime, (int)trigInfo.speed);
+
+	data[2] = 0x55;
+	err = fxns->singleTrigParse(&uartDev, &params, data, &trigInfo);
+	assert(err != E_NO);
+	
+	if(fxns->exit)
+		fxns->exit(&uartDev);
+	
+	DBG("%s done", __func__);
+
+	return E_NO;
+}
 
 

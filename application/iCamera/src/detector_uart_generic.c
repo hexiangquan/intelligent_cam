@@ -148,7 +148,7 @@ static Int32 detector_uart_open(DetectorHandle hDetector)
 	DETECTOR_SET_PRIVATE(hDetector, dev);
 	memset(dev->lastFrameCode, FRAME_TRIG_BASE, sizeof(dev->lastFrameCode));
 
-	/* init detector */
+	/* probe and init detector */
 	i = 0;
 	while(uartDetectorFxns[i] != NULL) {
 		if(uartDetectorFxns[i]->init) {
@@ -190,6 +190,9 @@ static Int32 detector_uart_open(DetectorHandle hDetector)
 	/* pre parse params */
 	if(dev->opts->capPreParse)
 		dev->opts->capPreParse(dev, params);
+
+	/* set dev fd */
+	hDetector->fd = dev->fd;
 	
 	return E_NO;
 
