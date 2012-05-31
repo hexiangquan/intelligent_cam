@@ -105,19 +105,22 @@ static Int32 local_upload_update(LocalUploadHandle hLocalUpload, UploadParams *p
 		/* delete old handle */
 		if(hLocalUpload->hUpload)
 			upload_delete(hLocalUpload->hUpload, hMsg);
+
+		usleep(10000);
 		
 		/* create upload handle for sending */
 		uploadAttrs.savePath = hLocalUpload->path;
 		uploadAttrs.flags = UPLOAD_FLAG_NOT_SAVE;
 		uploadAttrs.reConTimeout = 30;
 		uploadAttrs.msgName = hLocalUpload->msgName;
-		
+
 		hLocalUpload->hUpload = upload_create(&uploadAttrs,  params);
 		if(!hLocalUpload->hUpload) {
 			ERR("create upload handle failed");
 			return E_INVAL;
 		}
-		
+		hLocalUpload->uploadProto = params->protol;
+		usleep(10000);				
 	}else {
 		/* update params */
 		ret = upload_update_params(hLocalUpload->hUpload, params);
@@ -343,7 +346,8 @@ static Int32 local_dir_send(LocalUploadHandle hLocalUpload, const char *dirName,
 		err = E_NOTEXIST;
 		goto exit;
 	}
-	
+
+	//DBG("read dir: %s", dirName);
 	for (dirent = readdir(dir); dirent; ) {
 		if ('.' != dirent->d_name[0]) {
 			if (DT_DIR == dirent->d_type) {
@@ -368,6 +372,7 @@ static Int32 local_dir_send(LocalUploadHandle hLocalUpload, const char *dirName,
 		dirent = readdir(dir);
 	}
 
+
 	if(!err) {
 		/* delete this dir if it is not the top dir */
 		if( strcmp(dirName, hLocalUpload->path) &&
@@ -377,10 +382,10 @@ static Int32 local_dir_send(LocalUploadHandle hLocalUpload, const char *dirName,
 	}
 
 exit:
-	
+
 	if (dir)
 		closedir(dir);
-	
+
 	return err;
 }
 
@@ -406,7 +411,6 @@ static void *local_upload_thread(void *arg)
 	
 	LocalUploadHandle 	hLocalUpload = arg;
 	Int32				err;
-	UploadHandle		hUpload = hLocalUpload->hUpload;
 	MsgHandle			hMsg = msg_create(hLocalUpload->msgName, NULL, 0);
 	Int32				delayTime;
 	CommonMsg			msgBuf;
@@ -419,7 +423,7 @@ static void *local_upload_thread(void *arg)
 			err = local_dir_send(hLocalUpload, hLocalUpload->path, hMsg);
 			if(!err) {
 				/* all file send success, disconnect server and wait longer time */
-				upload_disconnect(hUpload);
+				upload_disconnect(hLocalUpload->hUpload);
 				delayTime = 60;
 			}
 		}
@@ -433,9 +437,9 @@ static void *local_upload_thread(void *arg)
 				hLocalUpload->exit = TRUE;
 				break;
 			case APPCMD_SET_UPLOAD_PARAMS:
-				if(msgBuf.header.dataLen == sizeof(UploadParams))
+				if(msgBuf.header.dataLen == sizeof(UploadParams)) {
 					local_upload_update(hLocalUpload, (UploadParams *)msgBuf.buf, hMsg);
-				else
+				} else
 					ERR("invalid len for local upload update");
 				break;
 			case APPCMD_SEND_DIR:
@@ -583,5 +587,93 @@ Int32 local_upload_send(LocalUploadHandle hLocalUpload, Bool isDir, const char *
 	return msg_send(hCurMsg, hLocalUpload->msgName, (MsgHeader *)&msg, 0);
 }
 
+
+#include "ftp_upload.h"
+#include "tcp_upload.h"
+
+/*****************************************************************************
+ Prototype    : local_upload_test
+ Description  : Test this module
+ Input        : const char *pathName  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/5/29
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 local_upload_test(const char *pathName)
+{
+	LocalUploadHandle 	hLocal;
+	LocalUploadAttrs	attrs;
+	UploadParams		params;
+	FtpUploadParams		ftpUpload;
+	ImgTcpUploadParams	tcpUpload;
+
+	assert(pathName);
+	attrs.filePath = pathName;
+	attrs.flags = LOCAL_FLAG_AUTO_UPLOAD_EN;
+	attrs.maxFileSize = 2 * 1024 * 1024; 
+	attrs.msgName = "/tmp/localUpload";
+
+	params.protol = CAM_UPLOAD_PROTO_FTP;
+	bzero(&ftpUpload, sizeof(ftpUpload));
+	strcpy(ftpUpload.roadInfo.roadName, "Test_Road");
+	strcpy(ftpUpload.srvInfo.serverIP, "192.168.0.15");
+	strcpy(ftpUpload.srvInfo.userName, "test");
+	strcpy(ftpUpload.srvInfo.password, "123456");
+	ftpUpload.srvInfo.serverPort = 21;
+	ftpUpload.size = sizeof(ftpUpload);
+
+	bzero(&tcpUpload, sizeof(tcpUpload));
+	tcpUpload.size = sizeof(tcpUpload);
+	strcpy(tcpUpload.srvInfo.serverIP, "192.168.0.15");
+	tcpUpload.srvInfo.serverPort = 9300;
+
+	bzero(params.paramsBuf, sizeof(params.paramsBuf));
+	memcpy(params.paramsBuf, &ftpUpload, sizeof(ftpUpload));
+	hLocal = local_upload_create(&attrs, &params);
+	assert(hLocal);
+
+	Int32 err;
+	MsgHandle hMsg = msg_create("/tmp/localUploadTest", NULL, 0);
+
+	assert(hMsg);
+
+	err = local_upload_run(hLocal);
+	assert(err == E_NO);
+	sleep(1);
+	
+	int i = 0;
+
+	while(i++ < 100) {
+		//sleep(i + 1);
+		#if 1
+		bzero(params.paramsBuf, sizeof(params.paramsBuf));
+		if(params.protol == CAM_UPLOAD_PROTO_FTP) {
+			// change to tcp
+			params.protol = CAM_UPLOAD_PROTO_TCP;
+			memcpy(params.paramsBuf, &tcpUpload, sizeof(tcpUpload));
+		} else {
+			params.protol = CAM_UPLOAD_PROTO_FTP;
+			memcpy(params.paramsBuf, &ftpUpload, sizeof(ftpUpload));
+		}
+		#endif
+		
+		err = local_upload_cfg(hLocal, &params, attrs.flags, hMsg);
+		//err = local_upload_update(hLocal, &params, hMsg);
+		assert(err == E_NO);
+		
+	}
+	
+	err = local_upload_delete(hLocal, hMsg);
+	assert(err == E_NO);
+
+	return E_NO;
+}
 
 

@@ -317,7 +317,7 @@ static void *ctrl_server_thread(void *arg)
 			continue;
 		}
 
-		DBG("got msg: 0x%X", msgHdr->cmd);
+		//DBG("got msg: 0x%X", msgHdr->cmd);
 		/* process msg */
 		needResp = TRUE;
 		respLen = 0;
@@ -631,7 +631,7 @@ static void *ctrl_server_thread(void *arg)
 			else
 				msgHdr->dataLen = respLen;
 
-			DBG("reply cmd len: %d, ret: %d", msgHdr->dataLen, (int)msgHdr->param[0]);
+			//DBG("reply cmd len: %d, ret: %d", msgHdr->dataLen, (int)msgHdr->param[0]);
 			msgHdr->type = MSG_TYPE_RESP;
 			/* send back response */
 			ret = msg_send(hCtrlSrv->hMsg, NULL, (MsgHeader *)&hCtrlSrv->msgBuf, 0);
@@ -763,11 +763,11 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	localAttrs.msgName = MSG_LOCAL;
 
 	/* using image upload params */
-	DBG("creating local upload...");
-	hCtrlSrv->hLocalUpload = local_upload_create(&localAttrs, &uploadParams);
-	if(!hCtrlSrv->hLocalUpload) {
-		goto exit;
-	}
+	//DBG("creating local upload...");
+	//hCtrlSrv->hLocalUpload = local_upload_create(&localAttrs, &uploadParams);
+	//if(!hCtrlSrv->hLocalUpload) {
+		//goto exit;
+	//}
 
 	/* get vid enc & upload params */
 	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_VIDENCODERPARAMS, 
@@ -847,10 +847,12 @@ Int32 ctrl_server_run(CtrlSrvHandle hCtrlSrv)
 #endif
 
 	/* run local upload */
-	err = local_upload_run(hCtrlSrv->hLocalUpload);
-	if(err) {
-		ERR("local upload running failed...");
-		return err;
+	if(hCtrlSrv->hLocalUpload) {
+		err = local_upload_run(hCtrlSrv->hLocalUpload);
+		if(err) {
+			ERR("local upload running failed...");
+			return err;
+		}
 	}
 
 	return E_NO;

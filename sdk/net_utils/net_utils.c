@@ -59,7 +59,7 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
-#ifndef _NET_DBG
+#ifdef _NET_DBG
 #define _D(fmt, args...)	DBG(fmt, ##args)
 #define _W(fmt, args...)	INFO(fmt, ##args)
 #else
@@ -167,8 +167,7 @@ ssize_t sendn(int sockfd, const void *buf, size_t nbytes, int flags)
 		if((sent = send(sockfd, buf, left, flags)) < 0) {
 			_ES("sendn, send data error");
 			return E_TRANS;
-		}
-		else if(sent > left) {
+		} else if(sent > left) {
 			_E("sendn, Send Data Error, send size > left.");
 			return E_TRANS;
 		}

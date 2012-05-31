@@ -27,6 +27,7 @@ TARGET = $(MOD_NAME).ko
 PWD := $(shell pwd)
 
 obj-m += $(MOD_NAME).o
+#$(MOD_NAME)-objs := img_ctrl.o
 
 EXTRA_CFLAGS +=	-DUSE_UDEV=$(USE_UDEV)
 EXEC_DIR ?= $(TARGET_MOD_DIR)/drivers/dsp
@@ -36,7 +37,7 @@ MAKE_ENV = ARCH=arm CROSS_COMPILE=$(CSTOOL_PREFIX)
 # For module test
 EXEC = imgCtrlTest
 SRC = $(MOD_NAME)_test.c
-HEADERS := $(PWD)/../include/$(MOD_NAME).h
+HEADERS := $(PWD)/../include/img_ctrl.h
 CC = $(CSTOOL_PREFIX)gcc
 EXEC_INSTALL_PATH ?= $(TARGET_EXEC_DIR)
 

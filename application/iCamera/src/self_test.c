@@ -13,6 +13,12 @@ extern Int32 detector_test();
 /* test path name */
 extern Int32 path_name_test();
 
+/* test ftp upload */
+extern Int32 ftp_upload_test(const char *username, const char *passwd, const char *srvip, Uint16 port);
+
+/* test local upload */
+extern Int32 local_upload_test(const char *pathName);
+
 /*****************************************************************************
  Prototype    : self_test
  Description  : self test module
@@ -43,6 +49,12 @@ Int32 self_test(Int32 flags)
 
 	if(flags & SELF_TEST_PATHNAME)
 		err = path_name_test();
+
+	if(flags & SELF_TEST_FTPUPLOAD)
+		err = ftp_upload_test("test", "123456", "192.168.0.15", 21);
+
+	if(flags & SELF_TEST_LOCALSND)
+		err = local_upload_test("/media/mmcblk0p1");
 
 	INFO("self test pass...\n");
 

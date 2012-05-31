@@ -61,7 +61,7 @@ const AppParams c_appParamsDef = {
 		.flags = CAM_RTP_FLAG_EN,
 	},
 	.uploadCfg = {
-		.protocol = CAM_UPLOAD_PROTO_TCP,
+		.protocol = CAM_UPLOAD_PROTO_FTP,
 		.flags = CAM_AUTO_UPLOAD_EN | CAM_AUTO_DEL_EN,
 	},
 	.tcpImgSrvInfo = {
@@ -75,7 +75,7 @@ const AppParams c_appParamsDef = {
 		.flag = 0,
 		.userName = {FTP_USER_NAME},
 		.password = {FTP_PASS_WORD},
-		.rootDir = {"/"},
+		.rootDir = {'/0'},
 		.pathNamePattern = {0},
 	},
 	.ntpSrvInfo = {

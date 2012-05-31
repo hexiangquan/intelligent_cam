@@ -51,6 +51,7 @@
 #define SELF_TEST_DETECTOR		(1 << 0)
 #define SELF_TEST_PATHNAME		(1 << 1)
 #define SELF_TEST_FTPUPLOAD		(1 << 2)
+#define SELF_TEST_LOCALSND		(1 << 3)
 
 /*----------------------------------------------*
  * routines' implementations                    *

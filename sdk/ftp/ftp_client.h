@@ -60,14 +60,14 @@
 
 /* FTP connection mode */
 #define	FTP_ACTIVE_MODE				0			//active mode
-#define	FTP_PASSIVE_MODE				1			//passive mode
+#define	FTP_PASSIVE_MODE			1			//passive mode
 
 /* Value of current connect status */
 #define	FTP_STAT_UNCONNECTED 		0		//unconnected server
-#define	FTP_STAT_IDLE					1		//connected server and login, without data transfer
+#define	FTP_STAT_IDLE				1		//connected server and login, without data transfer
 #define	FTP_STAT_TRANSFER			2		//connected and tranfering data
 
-#define FTP_DEBUG_EN
+//#define FTP_DEBUG_EN
 
 /*----------------------------------------------*
  * routines' implementations                    *

@@ -380,7 +380,7 @@ Int32 path_name_generate(PathNameHandle hPathName, const ImgMsg *imgBuf, PathNam
 
 		sprintf(hPathName->fileNameBuf[i], "%s.jpg", &fullName[index+1]);	
 
-		DBG("Generate file name: %s", fullName);
+		//DBG("Generate file name: %s", fullName);
 		info->fileName[i] = hPathName->fileNameBuf[i];
 		
 	}

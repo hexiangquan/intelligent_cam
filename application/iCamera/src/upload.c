@@ -261,6 +261,9 @@ UploadHandle upload_create(UploadAttrs *attrs, UploadParams *params)
 
 	hUpload->lastSnd = time(NULL);
 
+	/* wait a while for thread to start */	
+	//usleep(100000);
+
 	return hUpload;
 
 err_quit:
@@ -600,7 +603,8 @@ Int32 upload_update_params(UploadHandle hUpload, UploadParams *params)
 		return E_INVAL;
 
 	if(hUpload->protol != params->protol) {
-		ERR("can not change protol at run time");
+		ERR("can not change protol %d -> %d at run time",
+			(int)hUpload->protol, (int)params->protol);
 		return E_MODE;
 	}
 

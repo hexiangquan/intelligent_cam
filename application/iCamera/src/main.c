@@ -347,7 +347,7 @@ static void usage(void)
     INFO(" -h get help");
 	INFO(" -f input file name, default: %s", CONFIG_FILE);
 	INFO(" -p local file save path, default: %s", FILE_SAVE_PATH);
-	INFO(" -t self-test enable, 1-detector test, 2-path name test, 4-ftp upload test");
+	INFO(" -t self-test enable, 1-detector test, 2-path name test, 4-ftp upload test, 8-local send test");
     INFO(" use default params: ./%s", PROGRAM_NAME);
     INFO(" use specific config file: ./%s -f ./cfg/myCfg", PROGRAM_NAME);
 	INFO(" do detector and path name test: ./%s -t 3", PROGRAM_NAME);

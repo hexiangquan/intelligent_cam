@@ -361,6 +361,7 @@ static Int32 upload_update(EncoderHandle hEnc, UploadParams *params)
 		hEnc->uploadProto = params->protol;
 	}else {
 		/* update params */
+		assert(params->protol == hEnc->uploadProto);
 		ret = upload_update_params(hEnc->hUpload, params);
 	}
 

@@ -47,8 +47,9 @@
 #define EXTIO_S_RTC			_IOW(EXTIO_MAGIC_NO, 5, struct hdcam_rtc_time *)
 #define EXTIO_G_RTC			_IOR(EXTIO_MAGIC_NO, 6, struct hdcam_rtc_time *)
 #define EXTIO_G_TMP			_IOR(EXTIO_MAGIC_NO, 7, int *)
-#define EXTIO_S_REG			_IOW(EXTIO_MAGIC_NO, 8, struct hdcam_reg *)
-#define EXTIO_G_REG			_IOWR(EXTIO_MAGIC_NO, 9, struct hdcam_reg *)
+#define EXTIO_S_FIRMWARE	_IOW(EXTIO_MAGIC_NO, 8, struct hdcam_firmware *)
+#define EXTIO_S_REG			_IOW(EXTIO_MAGIC_NO, 9, struct hdcam_reg *)
+#define EXTIO_G_REG			_IOWR(EXTIO_MAGIC_NO, 10, struct hdcam_reg *)
 #pragma  pack()
 
 /* 
@@ -93,5 +94,13 @@ struct hdcam_reg {
 	__u16	data;
 };
 
+/*
+ * Firmware load 
+ */
+struct hdcam_firmware {
+	__u32	magic;		//magic num
+	__u8	*data;		//data
+	__u32	len;		//len of data in bytes
+};
 #endif /* end of #ifdef _EXT_IO_H_ */
 

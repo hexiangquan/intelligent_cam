@@ -218,6 +218,11 @@ static Int32 data_capture_config(DataCapHandle hDataCap)
 	/* Restart capture */
 	if(hDataCap->status & CAPTHR_STAT_CAP_STARTED)
 		capture_start(hDataCap->hCap);
+
+	/* Set default capture info */
+	CaptureInfo *capInfo = &hDataCap->defCapInfo;
+	bzero(capInfo, sizeof(*capInfo));
+	capInfo->capCnt = 1;
 	
 	hDataCap->exit = FALSE;
 	return E_NO;
@@ -407,8 +412,10 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 		//DBG("<%d> cap run ok...", capFrame.index);
 
 #ifdef CAP_TRIG_TEST
-	if((capFrame.index % 4) == 0)
+	if((capFrame.index % 4) == 0) {
 		hDataCap->encImg = TRUE;
+		hDataCap->capInfo = hDataCap->defCapInfo;
+	}
 #endif
 
 	return err;

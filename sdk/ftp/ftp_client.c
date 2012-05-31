@@ -542,6 +542,7 @@ static Int32 ftp_send_make_dir_cmd(FtpHandle hFtp, const Int8 *dirName)
 	Int32 err;
 	
 	Int32 len = sprintf(hFtp->cmdBuf, "MKD %s\r\n", dirName); 
+	DBG("send cmd: %s", hFtp->cmdBuf);
 	err = ftp_send_cmd(hFtp, hFtp->cmdBuf, len);
 	if(err)
 		return err;
@@ -978,7 +979,9 @@ static Int32 ftp_get_file_size(FtpHandle hFtp, const char *ftpPathName)
 	if (strncmp(hFtp->cmdBuf, "213 ", 3) == 0) {
 		ret = atoi(hFtp->cmdBuf + 4);
 	} else {
+		#ifdef FTP_DEBUG_EN
 		ERR("SIZE cmd was denied.");
+		#endif
 		ret = E_REFUSED;
 	}
 
@@ -1044,9 +1047,11 @@ transfer:
 		/* Upload was refused, Check if we need to overwrite same file */
 		err = ftp_get_file_size(hFtp, ftpPathName);
 		
-		if (err) {
+		if (!err) {
 			/* We don't have right to overwrite this file */
+			#ifdef FTP_DEBUG_EN
 			ERR("same file name already exits or size cmd error.");
+			#endif
 			err = E_REFUSED;
 			goto err_quit;
 		} else {
@@ -1054,7 +1059,9 @@ transfer:
 				err = E_INVPATH;
 			else
 				err = E_REFUSED;
+			#ifdef FTP_DEBUG_EN
 			ERR("upload is denied, path name invalid?");
+			#endif
 			goto err_quit;
 		}
 	}

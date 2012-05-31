@@ -406,8 +406,190 @@ const UploadFxns FTP_UPLOAD_FXNS = {
 	.saveFrame = NULL,
 };
 
-Int32 ftp_upload_test(const char *username, cons char *passwd, const char *srvip, Uint16 port)
+/*****************************************************************************
+ Prototype    : ftp_upload_test
+ Description  : test ftp upload
+ Input        : const char *username  
+                const char *passwd    
+                const char *srvip     
+                Uint16 port           
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/5/23
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 ftp_upload_test(const char *username, const char *passwd, const char *srvip, Uint16 port)
 {
+	FtpUploadParams 	params;
+	void				*hFtpUpload;
+	Int32				err;
+
+	/* init params */
+	bzero(&params, sizeof(params));
+	params.size = sizeof(params);
+	strncpy(params.srvInfo.serverIP, srvip, sizeof(params.srvInfo.serverIP));
+	params.srvInfo.serverPort = port;
+	strncpy(params.srvInfo.userName, username, sizeof(params.srvInfo.userName));
+	strncpy(params.srvInfo.password, passwd, sizeof(params.srvInfo.password));
+	//strcpy(params.srvInfo.rootDir, "/");
+	strncpy(params.srvInfo.pathNamePattern, "<OSD>/<Y><M><D>/<DT>/<H><m><S><s>-<WN>-<SN>-<FN>", 
+		sizeof(params.srvInfo.pathNamePattern));
+	strncpy(params.roadInfo.roadName, "Test_Road", sizeof(params.roadInfo.roadName));
+	params.roadInfo.devSN = 2012;
+	params.roadInfo.roadNum = 5;
+	params.roadInfo.directionNum = 1;
+	
+	int i;
+
+	for(i = 0; i < 100; i++) {
+		//params.srvInfo.pathNamePattern[0] = 0;
+		hFtpUpload = ftp_upload_create(&params);
+		assert(hFtpUpload);
+		err = ftp_delete(hFtpUpload);
+		assert(err == E_NO);
+	}
+
+	/* create ftp upload */
+	hFtpUpload = ftp_upload_create(&params);
+	assert(hFtpUpload);
+
+	/* connect the server */
+	err = ftp_upload_connect(hFtpUpload, 15);
+	if(err) {
+		ERR("connect failed");
+		goto exit;
+	} else
+		DBG("connect ftp server %s ok", srvip);
+
+	/* send file */
+	ImgMsg img;
+	CaptureInfo *capInfo = &img.capInfo;
+	bzero(&img, sizeof(img));
+	img.dimension.colorSpace = FMT_JPG;
+	img.dimension.width = img.dimension.bytesPerLine = 1600;
+	img.dimension.height = 1200;
+	img.dimension.size = 500 * 1024; // Bytes
+
+	BufHandle hBuf = buffer_alloc(2 * 1024 * 1024, NULL);
+	assert(hBuf);
+
+	memset(buffer_get_user_addr(hBuf), 0x55, buffer_get_size(hBuf));
+	img.hBuf = hBuf;
+
+	TriggerInfo *trigInfo = &capInfo->triggerInfo[0];
+	capInfo->capCnt = 1;
+	capInfo->limitSpeed = 80;
+	trigInfo->frameId = FRAME_TRIG_BASE + 2;
+	trigInfo->groupId = 1;
+	trigInfo->redlightTime = 200;
+	trigInfo->speed = 0;
+	trigInfo->wayNum = 2;
+	trigInfo->flags = TRIG_INFO_RED_LIGHT;
+
+	capInfo->triggerInfo[1] = capInfo->triggerInfo[2] = *trigInfo;
+
+	err = ftp_upload_send_heartbeat(hFtpUpload);
+	assert(err == E_NO);
+
+	for(i = 0; i < 100; i++) {
+
+		/* get current time */	
+		cam_get_time(&img.timeStamp);
+
+		/* calc time cost */
+		struct timeval tmStart,tmEnd; 
+		float   timeUse;
+
+		capInfo->capCnt = 1;
+		trigInfo = &capInfo->triggerInfo[0];
+		trigInfo->frameId = FRAME_TRIG_BASE;
+		trigInfo->groupId++;
+		if((i % 3) == 0) {
+			trigInfo->wayNum++;
+		}
+		gettimeofday(&tmStart,NULL);
+		err = ftp_upload_send(hFtpUpload, &img);
+		gettimeofday(&tmEnd,NULL);
+		
+		assert(err == E_NO);
+
+		timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+		DBG("<%d-1> upload ftp file size: %d KB cost: %.2f ms", i,  
+			img.dimension.size/1000, timeUse/1000);	
+
+		usleep(100000);
+
+		/* upload image which has two cap info */
+		capInfo->capCnt = 2;
+		trigInfo->frameId++;
+		trigInfo = &capInfo->triggerInfo[1];
+		trigInfo->groupId = 23 + i;
+		trigInfo->redlightTime = 0;
+		trigInfo->wayNum = (i % 3) + 1;
+		trigInfo->flags = TRIG_INFO_OVERSPEED | TRIG_INFO_LAST_FRAME;
+		trigInfo->speed = 102;
+		trigInfo->frameId = FRAME_TRIG_BASE;
+
+		/* get current time */	
+		cam_get_time(&img.timeStamp);
+
+		/* send this frame */
+		gettimeofday(&tmStart,NULL);
+		err = ftp_upload_send(hFtpUpload, &img);
+		gettimeofday(&tmEnd,NULL);
+		
+		assert(err == E_NO);
+
+		timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+		DBG("upload ftp file size: %d KB cost: %.2f ms", 
+			img.dimension.size/1000, timeUse/1000);
+
+		usleep(300000);
+
+		/* upload image which has two cap info */
+		capInfo->capCnt = 3;
+		capInfo->triggerInfo[0].frameId++;
+		trigInfo->wayNum++;
+		trigInfo = &capInfo->triggerInfo[2];
+		trigInfo->groupId = 77 + i;
+		trigInfo->redlightTime = 0;
+		trigInfo->wayNum = (i + 1) % 3 + 1;
+		trigInfo->flags = TRIG_INFO_RETROGRADE | TRIG_INFO_LAST_FRAME;
+		trigInfo->speed = 102;
+
+		/* get current time */	
+		cam_get_time(&img.timeStamp);
+
+		/* send this frame */
+		gettimeofday(&tmStart,NULL);
+		err = ftp_upload_send(hFtpUpload, &img);
+		gettimeofday(&tmEnd,NULL);
+		
+		assert(err == E_NO);
+
+		timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+		DBG("upload ftp file size: %d KB cost: %.2f ms", 
+			img.dimension.size/1000, timeUse/1000);	
+
+		sleep(1);
+
+	}
+	
+	if(err == E_NO) {
+		err = ftp_upload_disconnect(hFtpUpload);
+		assert(err == E_NO);
+	}
+
+exit:
+	err = ftp_upload_delete(hFtpUpload);
+	assert(err == E_NO);
+
 	return E_NO;
 }
 
