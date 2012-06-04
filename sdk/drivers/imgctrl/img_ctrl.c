@@ -117,8 +117,8 @@ static int region_validate(struct img_ctrl_dev *dev, struct hdcam_region *region
 	u16 width, height;
 
 	/* check point positions */
-	if( region->endX > region->startX || 
-		region->endY > region->startY ) {
+	if( region->endX < region->startX || 
+		region->endY < region->startY ) {
 		_ERR("end position must bigger than start position.");
 		return -EINVAL;
 	}

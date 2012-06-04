@@ -162,7 +162,7 @@ static Int32 detector_uart_open(DetectorHandle hDetector)
 	}
 	
 	if(status) {
-		ERR("init detector failed");
+		ERR("init detector <%d> failed, %s", params->detecotorId, str_err(status));
 		goto free_buf;
 	}
 
@@ -236,6 +236,9 @@ static Int32 detector_uart_close(DetectorHandle hDetector)
 
 	/* set private data as our dev info */
 	DETECTOR_SET_PRIVATE(hDetector, NULL);
+
+	/* set to invalid fd */
+	hDetector->fd = -1;
 	
 	return E_NO;
 }

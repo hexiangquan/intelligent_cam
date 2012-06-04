@@ -6,6 +6,16 @@
 /*
   * image encode params, if width or height set to 0, use capture resolution
   */
+enum eImgEncodeResolution
+{
+	IMG_RES_ORIGNAL = 0,		//Using original resolution, do not resize
+	IMG_RES_1920X1080 = 1,
+	IMG_RES_1600X1200 = 2,
+	IMG_RES_1280X720 = 3,
+	IMG_RES_2560X2048 = 4,
+	IMG_RES_MAX,
+};
+
 typedef struct {
 	Uint16	width;	
 	Uint16	height;
@@ -43,13 +53,14 @@ enum eCamH264Resolution
 };
 
 #define CAM_H264_MAX_BIT_RATE	6000	//max bit rate
+#define CAM_H264_MIN_BIT_RATE	200		//min bit rate
 
 typedef struct {
 	Uint8	resolution;			//H.264 video resolution, see eH264 Resolution
 	Uint8	frameRate;			//Encode frame rate, 1~30fps
 	Uint8	rateControl;		//Rate control type£¬see eH264RateControl
 	Uint8	forceIFrame;		//When set to non zero, force every frame to be I frame
-	Uint16	bitRate;			//Target bit rate, Uint: Kbpss
+	Uint16	bitRate;			//Target bit rate, Uint: Kbpss, 200~6000
 	Uint16	IPRatio;			//I frame and P frame interval, default: 30
 	Uint8	QPInit;				//Init QP value, 0~51
 	Uint8	QPMax;				//Max QP value, QPMin~51

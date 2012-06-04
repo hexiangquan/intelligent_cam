@@ -117,9 +117,10 @@ static Int32 data_capture_get_fds(DataCapHandle hDataCap)
 	hDataCap->fdMax = MAX(hDataCap->fdMsg, hDataCap->fdCap);
 	/* get detector fd */
 	ret = detector_control(hDataCap->hDetector, DETECTOR_CMD_GET_FD, &hDataCap->fdDetect, sizeof(Int32));
-	if(ret == E_NO);
-		hDataCap->fdMax = MAX(hDataCap->fdMax, hDataCap->fdDetect) + 1;
+	if(ret == E_NO && hDataCap->fdDetect > 0)
+		hDataCap->fdMax = MAX(hDataCap->fdMax, hDataCap->fdDetect);
 
+	hDataCap->fdMax += 1;
 	return ret;
 }
 
@@ -248,12 +249,15 @@ static Int32 detector_config(DataCapHandle hDataCap)
 	CamDetectorParam 	*detectorParams = &hDataCap->detectorParams;
 	Int32				ret;
 
+	/* reset fd of detector */
+	hDataCap->fdDetect = -1;
+	
 	if(!hDataCap->hDetector) {
 		/* create */
 		hDataCap->hDetector = detector_create(detectorParams);
 		if(!hDataCap->hDetector) {
 			ERR("create new detector failed");
-			return E_IO;
+			ret = E_IO;
 		}
 		/* init default capture info */
 		CaptureInfo *capInfo = &hDataCap->defCapInfo;
@@ -266,13 +270,14 @@ static Int32 detector_config(DataCapHandle hDataCap)
 		/* cfg detector */
 		ret = detector_control(hDataCap->hDetector, DETECTOR_CMD_SET_PARAMS, 
 				detectorParams, sizeof(CamDetectorParam));
-		if(!ret) {
+		if(ret) {
 			ERR("set detector params failed");
-			return ret;
 		}
 	}
+	
+	data_capture_get_fds(hDataCap);
 
-	return E_NO;
+	return ret;
 }
 
 /*****************************************************************************
@@ -552,12 +557,14 @@ static void *data_capture_thread(void *arg)
 		FD_ZERO(&rdSet);
 		FD_SET(hDataCap->fdCap, &rdSet);
 		FD_SET(hDataCap->fdMsg, &rdSet);
-		FD_SET(hDataCap->fdDetect, &rdSet);
+		if(hDataCap->fdDetect > 0)
+			FD_SET(hDataCap->fdDetect, &rdSet);
 		
 		ret = select(hDataCap->fdMax, &rdSet, NULL, NULL, NULL);
 		if(ret < 0 && errno != EINTR) {
 			ERRSTR("select err");
-			break;
+			usleep(1000);
+			continue;
 		}
 
 		/* no data ready */
@@ -565,7 +572,8 @@ static void *data_capture_thread(void *arg)
 			continue;
 
 		/* check which is ready */
-		if(FD_ISSET(hDataCap->fdDetect, &rdSet)){
+		if( hDataCap->fdDetect >0 &&
+			FD_ISSET(hDataCap->fdDetect, &rdSet) ){
 			/* trigger capture */
 			detector_trigger(hDataCap);
 		}

@@ -75,7 +75,7 @@ const AppParams c_appParamsDef = {
 		.flag = 0,
 		.userName = {FTP_USER_NAME},
 		.password = {FTP_PASS_WORD},
-		.rootDir = {'/0'},
+		.rootDir = {0,},
 		.pathNamePattern = {0},
 	},
 	.ntpSrvInfo = {

@@ -95,6 +95,11 @@ static Int32 detector_close(DetectorHandle hDetector)
 	if(!ret)
 		hDetector->status &= ~DETECTOR_STAT_OPENED;
 
+	if(hDetector->fd > 0) {
+		close(hDetector->fd);
+		hDetector->fd = -1;
+	}
+
 	return ret;
 }
 
@@ -162,6 +167,10 @@ static Int32 detector_set_params(DetectorHandle hDetector, const CamDetectorPara
 		
 		/* diff detector Id, change fxns */
 		switch(params->detecotorId) {
+		case DETECTOR_IO:
+		case DETECTOR_VIDEO_TRIG:
+			ret = E_UNSUPT;
+			break;
 		default:
 			hDetector->fxns = &DETECTOR_UART_FXNS;
 			break;
@@ -169,7 +178,8 @@ static Int32 detector_set_params(DetectorHandle hDetector, const CamDetectorPara
 
 		hDetector->params = *params;
 		/* open detector */
-		ret = detector_open(hDetector);
+		if(!ret)
+			ret = detector_open(hDetector);
 	}else {
 		/* same id, just update params */
 		if(hDetector->fxns && hDetector->fxns->control)

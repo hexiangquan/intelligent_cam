@@ -562,9 +562,6 @@ static void *ctrl_server_thread(void *arg)
 			break;
 		case ICAMCMD_S_AEPARAMS:
 			ret = params_mng_control(hParamsMng, PMCMD_S_AEPARAMS, data, msgHdr->dataLen);
-			if(!ret) {
-				/* set params to driver */
-			}
 			break;
 		case ICAMCMD_G_AEPARAMS:
 			ret = params_mng_control(hParamsMng, PMCMD_G_AEPARAMS, data, CTRL_MSG_BUF_LEN);
@@ -572,9 +569,6 @@ static void *ctrl_server_thread(void *arg)
 			break;
 		case ICAMCMD_S_AWBPARAMS:
 			ret = params_mng_control(hParamsMng, PMCMD_S_AWBPARAMS, data, msgHdr->dataLen);
-			if(!ret) {
-				/* set params to driver */
-			}
 			break;
 		case ICAMCMD_G_AWBPARAMS:
 			ret = params_mng_control(hParamsMng, PMCMD_G_AWBPARAMS, data, CTRL_MSG_BUF_LEN);
@@ -854,6 +848,11 @@ Int32 ctrl_server_run(CtrlSrvHandle hCtrlSrv)
 			return err;
 		}
 	}
+
+	/* set current status to working */
+	CamWorkStatus workStatus = WORK_STATUS_RUNNING;
+	params_mng_control(hCtrlSrv->hParamsMng, PMCMD_S_WORKSTATUS, 
+		&workStatus, sizeof(workStatus));
 
 	return E_NO;
 }

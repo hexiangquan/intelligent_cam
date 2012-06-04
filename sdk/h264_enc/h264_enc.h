@@ -179,6 +179,9 @@ enum H264EncCmd {
 	H264ENC_CMD_SET_DYN_PARAMS = ALG_CMD_SET_DYN_PARAMS,
 };
 
+/* Minimum target bit rate */
+#define H264ENC_MIN_BITRATE		(200000)	// 200 kbps
+
 /*----------------------------------------------*
  * routines' implementations                    *
  *----------------------------------------------*/

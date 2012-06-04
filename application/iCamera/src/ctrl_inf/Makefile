@@ -77,7 +77,7 @@ endif
 #override VERBOSE = @
 
 # Link libs and flags
-LD_LIBS += -l$(LIB_NAME) -lpthread -lmsg
+LD_LIBS += -l$(LIB_NAME) -lpthread -lmsg -llog
 LD_FLAGS += -L$(LIB_PATH) -L$(SDK_LIB_DIR)
 
 # Complier, archive and link commands

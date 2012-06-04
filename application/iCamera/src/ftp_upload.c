@@ -168,13 +168,14 @@ static Int32 ftp_upload_connect(void *handle, Uint32 timeout)
 	}
 	
 	/* Change working dir */
-	if(hUpload->rootPath[0] != '\0') {
+	if(hUpload->rootPath[0] != 0 && hUpload->rootPath[0] != ' ') {
 		err = ftp_change_working_dir(hUpload->hFtp, hUpload->rootPath);
 		if(err == E_REFUSED) {
 			/* if dir not exist, try to make one */
 			if((err = ftp_make_dir(hUpload->hFtp, hUpload->rootPath)) == E_NO)
 				err = ftp_change_working_dir(hUpload->hFtp, hUpload->rootPath);
 		}
+		DBG("ftp change working dir to %s", hUpload->rootPath);
 	}
 
 	if(err) {
@@ -355,9 +356,10 @@ static Int32 ftp_upload_set_params(void *handle, const void *params)
 	}
 
 	/* copy root dir */
-	if(strlen(ftpParams->srvInfo.rootDir) < CAM_FTP_MAX_ROOT_DIR_LEN)
+	if(strlen(ftpParams->srvInfo.rootDir) < CAM_FTP_MAX_ROOT_DIR_LEN) {
 		strcpy(hUpload->rootPath, ftpParams->srvInfo.rootDir);
-	else {
+		DBG("ftp current root dir: %s", hUpload->rootPath);
+	} else {
 		WARN("FtpUpload_set_params, root dir is too long: %d", strlen(ftpParams->srvInfo.rootDir));
 	}
 

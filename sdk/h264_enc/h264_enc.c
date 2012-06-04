@@ -156,6 +156,18 @@ static Int32 h264_enc_set_dyn_params(H264EncAlgHandle hH264Enc, H264EncDynParams
 	pH264EncDynParams->maxBitrateCVBR							= dynParams->maxBitrateCVBR;
 	pH264EncDynParams->maxHighCmpxIntCVBR						= dynParams->maxHighCmpxIntCVBR;
 	pH264EncDynParams->resetHDVICPeveryFrame					= 2;
+
+	if(pH264EncDynParams->videncDynamicParams.targetBitRate < H264ENC_MIN_BITRATE) {
+		WARN("warning: target bitrate <%d> too low, set to min value: %d", 
+			 pH264EncDynParams->videncDynamicParams.targetBitRate, H264ENC_MIN_BITRATE);
+		pH264EncDynParams->videncDynamicParams.targetBitRate = H264ENC_MIN_BITRATE;
+	}
+
+	if(pH264EncDynParams->maxBitrateCVBR < H264ENC_MIN_BITRATE) {
+		WARN("warning: CVBR max bitrate <%d> too low, set to min value: %d", 
+			 pH264EncDynParams->maxBitrateCVBR, H264ENC_MIN_BITRATE);
+		pH264EncDynParams->maxBitrateCVBR = H264ENC_MIN_BITRATE;
+	}
 	
 	Int32 status;
 

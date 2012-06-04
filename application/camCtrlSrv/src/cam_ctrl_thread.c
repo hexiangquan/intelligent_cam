@@ -474,7 +474,9 @@ static Int32 cam_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Int8
 	/* call cam ctrl */
 	Int32 ret = icam_ctrl_run(hCamCtrl, msgHdr, bufLen);
 
-	if(cmdInfo->respLen > 0 && cmdInfo->respLen != msgHdr->dataLen) {
+	if(ret) {
+		ERR("cmd 0x%04X process err: %d", (__u32)cmdHdr->cmd, ret);
+	} else if(cmdInfo->respLen > 0 && cmdInfo->respLen != msgHdr->dataLen) {
 		ERR("invalid resp len %d for cmd: 0x%04X, need: %d", 
 			msgHdr->dataLen, (__u32)cmdHdr->cmd, cmdInfo->respLen);
 		return E_TRANS;

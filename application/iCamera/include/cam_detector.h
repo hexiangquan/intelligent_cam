@@ -26,7 +26,7 @@ typedef struct {
 
 enum VehicleDetectorId
 {
-	DETECTOR_IO = 1,			//IO trigger
+	DETECTOR_IO = 0,			//IO trigger
 	DETECTOR_TORY_EP,			//Tory epolice detector
 	DETECTOR_TORY_CP,			//Tory checkpost detector
 	DETECTOR_TORY_EP_V2,		//Tory new epolice detector

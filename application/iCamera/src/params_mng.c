@@ -674,9 +674,14 @@ static Int32 set_h264_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 		return E_INVAL;
 	}
 
-	if(params->bitRate > CAM_H264_MAX_BIT_RATE) {
-		WARN("bit rate too big, set to max value: %d", CAM_H264_MAX_BIT_RATE);
-		params->bitRate= CAM_H264_MAX_BIT_RATE;
+	if( params->bitRate < CAM_H264_MIN_BIT_RATE) {
+		WARN("h264 encode bit rate: %d too low, adjust to min value: %d", 
+			 (int)params->bitRate, CAM_H264_MIN_BIT_RATE);
+		params->bitRate = CAM_H264_MIN_BIT_RATE;
+	} else if (params->bitRate > CAM_H264_MAX_BIT_RATE) {
+		WARN("h264 encode bit rate: %d too high, adjust to max value: %d", 
+			 (int)params->bitRate, CAM_H264_MAX_BIT_RATE);
+		params->bitRate = CAM_H264_MAX_BIT_RATE;
 	}
 
 	hParamsMng->appParams.h264EncParams = *params;
@@ -2449,6 +2454,8 @@ static Int32 set_ae_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 		cfg.targetValue = params->targetValue;
 		cfg.minShutterTime = params->minShutterTime;
 		cfg.maxShutterTime = params->maxShutterTime;
+		cfg.minGainValue = params->minGainValue;
+		cfg.maxGainValue = params->maxGainValue;
 		cfg.minAperture = params->minAperture;
 		cfg.maxAperture = params->maxAperture;
 		for(i = 0; i < HDCAM_AB_MAX_ROI; i++) {
@@ -2519,9 +2526,9 @@ static Int32 set_awb_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 	AppParams *appCfg = &hParamsMng->appParams;
 
 	/* validate data */
-	if( params->minValueR >= params->maxValueR || 
-		params->minValueG >= params->maxValueG ||
-		params->minValueB >= params->maxValueB ) {
+	if( params->minValueR > params->maxValueR || 
+		params->minValueG > params->maxValueG ||
+		params->minValueB > params->maxValueB ) {
 		ERR("invalid awb params");
 		return E_INVAL;
 	}

@@ -2388,13 +2388,15 @@ Int32 icam_ctrl_run(IN ICamCtrlHandle hCtrl, INOUT MsgHeader *data, IN Uint32 bu
 
 	/* wait response */
 	err = msg_recv(hCtrl->hMsg, data, bufLen, 0);
-	if(err < 0)
+	if(err < 0) {
+		ERR("recv msg err: %s", str_err(err));
 		return err;
+	}
 
 	/* validate data */
-	if(data->type != MSG_TYPE_RESP || cmd!= data->cmd)
+	if(data->type != MSG_TYPE_RESP || cmd != data->cmd)
 		return E_TRANS;
 
-	return E_NO;
+	return data->param[0];
 }
 

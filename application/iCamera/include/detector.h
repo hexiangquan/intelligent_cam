@@ -108,7 +108,7 @@ struct DetectorObj {
 	(hDetector->private = (void *)data)
 
 #define DETECTOR_SET_FD(hDetector, fd) \
-	(hDetector->fd = fd)
+	((hDetector->fd) = (fd))
 
 
 #ifdef __cplusplus
