@@ -336,7 +336,7 @@ static Int32 upload_update(EncoderHandle hEnc, UploadParams *params)
 		/* create upload handle */
 		UploadAttrs uploadAttrs;
 		
-		DBG("<%s> create new upload handle", hEnc->name);
+		//DBG("<%s> create new upload handle", hEnc->name);
 
 		/* delete old handle */
 		if(hEnc->hUpload)

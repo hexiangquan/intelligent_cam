@@ -33,6 +33,8 @@
 #include <signal.h>
 #include "ctrl_server.h"
 #include "icam_ctrl.h"
+#include "fpga_load.h"
+#include "self_test.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -63,6 +65,7 @@
  *----------------------------------------------*/
 #define PROGRAM_NAME			"iCamera"
 #define CONFIG_FILE				"./cam.cfg"
+#define FPGA_ROM_FILE			"./fpga.rbf"
 
 #define MAIN_FLAG_TEST_EN		(1 << 0)
 
@@ -74,6 +77,7 @@
 typedef struct {
 	const char 		*cfgFileName;
 	const char 		*savePath;
+	const char		*fpgaRomFile;
 	Bool			exit;
 	Bool			reboot;
 	CtrlSrvHandle	hCtrlSrv;
@@ -109,6 +113,9 @@ static Int32 app_init(MainEnv *envp)
 		ERR("module init failed!");
 		return ret;
 	}
+
+	/* load fpga rom */
+	ret = fpga_firmware_load(envp->fpgaRomFile);
 	
 	/* create ctrl server */
 	CtrlSrvAttrs ctrlSrvAttrs;
@@ -345,7 +352,8 @@ static void usage(void)
     INFO("./%s [options]", PROGRAM_NAME);
     INFO("Options:");
     INFO(" -h get help");
-	INFO(" -f input file name, default: %s", CONFIG_FILE);
+	INFO(" -f config file name, default: %s", CONFIG_FILE);
+	INFO(" -r FPGA rom file name, default: %s", FPGA_ROM_FILE);
 	INFO(" -p local file save path, default: %s", FILE_SAVE_PATH);
 	INFO(" -t self-test enable, 1-detector test, 2-path name test, 4-ftp upload test, 8-local send test");
     INFO(" use default params: ./%s", PROGRAM_NAME);
@@ -372,7 +380,7 @@ static void usage(void)
 Int32 main(Int32 argc, char **argv)
 {
 	Int32 		c;
-    const char 	*options = "f:p:t:h";
+    const char 	*options = "f:p:r:t:h";
 	MainEnv 	env;
 	int 		ret, testFlags = 0;
 
@@ -380,6 +388,7 @@ Int32 main(Int32 argc, char **argv)
 	memset(&env, 0, sizeof(env));
 	
 	env.cfgFileName = CONFIG_FILE;
+	env.fpgaRomFile = FPGA_ROM_FILE;
 	env.savePath = FILE_SAVE_PATH;
 	env.exit = FALSE;
 	env.reboot = FALSE;
@@ -388,6 +397,9 @@ Int32 main(Int32 argc, char **argv)
 		switch (c) {
 		case 'f':
 			env.cfgFileName = optarg;
+			break;
+		case 'r':
+			env.fpgaRomFile = optarg;
 			break;
 		case 'p':
 			env.savePath = optarg;

@@ -299,7 +299,7 @@ static void *ctrl_server_thread(void *arg)
 	Int32		respLen;
 	Bool		needResp = TRUE;
 	ParamsMngHandle	hParamsMng = hCtrlSrv->hParamsMng;
-	Int32		fdExtIO;
+	Int32		fdExtIO = -1;
 
 	DBG("ctrl thread start...");
 
@@ -757,11 +757,11 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	localAttrs.msgName = MSG_LOCAL;
 
 	/* using image upload params */
-	//DBG("creating local upload...");
-	//hCtrlSrv->hLocalUpload = local_upload_create(&localAttrs, &uploadParams);
-	//if(!hCtrlSrv->hLocalUpload) {
-		//goto exit;
-	//}
+	DBG("creating local upload...");
+	hCtrlSrv->hLocalUpload = local_upload_create(&localAttrs, &uploadParams);
+	if(!hCtrlSrv->hLocalUpload) {
+		goto exit;
+	}
 
 	/* get vid enc & upload params */
 	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_VIDENCODERPARAMS, 
@@ -903,8 +903,10 @@ Int32 ctrl_server_delete(CtrlSrvHandle hCtrlSrv, MsgHandle hCurMsg)
 	if(hCtrlSrv->hJpgEncoder)
 		encoder_delete(hCtrlSrv->hJpgEncoder, hCurMsg);
 
-	if(hCtrlSrv->hH264Encoder)
+	if(hCtrlSrv->hH264Encoder) {
+		DBG("deleting h264 encoder");
 		encoder_delete(hCtrlSrv->hH264Encoder, hCurMsg);
+	}
 
 	/* exit data capture */
 	if(hCtrlSrv->hDataCap)

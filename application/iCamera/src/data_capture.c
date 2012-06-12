@@ -27,6 +27,8 @@
 #include "converter.h"
 #include "cam_time.h"
 #include "detector.h"
+#include "img_ctrl.h"
+#include <sys/ioctl.h>
 
 /*----------------------------------------------*
  * external variables                           *
@@ -61,10 +63,12 @@
 
 #define CONV_BUF_NUM				2
 
-#define CAP_TRIG_TEST
+//#define CAP_TRIG_TEST
 
 /* index for trigger capture */
 #define CAP_INDEX_NEXT_FRAME		(-1)
+
+#define IMG_CTRL_DEV				"/dev/imgctrl"
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -85,6 +89,7 @@ struct DataCapObj{
 	Bool				exit;
 	Int32				status;
 	Int32				fdMsg, fdCap, fdDetect, fdMax;
+	Int32				fdImgCtrl;
 	MsgHandle			hMsg;
 	ImgDimension		capDim;
 	pthread_t			pid;
@@ -161,19 +166,19 @@ static Int32 data_capture_config(DataCapHandle hDataCap)
 	
 	if(workMode->format == CAM_FMT_JPEG) {
 		hDataCap->dstName[0] = MSG_IMG_ENC;
-		DBG("snd stream to jpg only");
+		DBG("send stream to jpg only");
 	} else if(workMode->format == CAM_FMT_H264) {
 		hDataCap->dstName[0] = MSG_VID_ENC;
-		DBG("snd stream to h.264 only");
+		DBG("send stream to h.264 only");
 	} else if(workMode->format == CAM_FMT_JPEG_H264) {
 		hDataCap->dstName[0] = MSG_VID_ENC;
 		hDataCap->dstName[1] = MSG_IMG_ENC;
 		bufRefCnt = 1; //convert only in one format
-		DBG("snd stream to h.264 and jpeg");
+		DBG("send stream to h.264 and jpeg");
 	} else {
 		hDataCap->dstName[0] = MSG_IMG_TX;	// send directly
 		hDataCap->status &= ~CAPTHR_STAT_CONV_EN;
-		DBG("snd stream to tx only");
+		DBG("send stream to tx only");
 	}
 
 	
@@ -338,6 +343,15 @@ static Int32 data_cap_ctrl(DataCapHandle hDataCap, CamCapCtrl ctrl)
 		hDataCap->capInfo.capCnt = 1;
 		hDataCap->capInfo.flags = 0;
 		hDataCap->capInfo.triggerInfo[0].frameId = FRAME_MANUALTRIG;
+
+		int cmd = ((ctrl == CAM_CAP_TRIG) ? IMGCTRL_TRIGCAP : IMGCTRL_SPECTRIG);
+		ret = ioctl(hDataCap->fdImgCtrl, cmd, NULL);
+		if(ret < 0) {
+			ERRSTR("trig failed");
+			ret = E_IO;
+		} else {
+			DBG("trig %d success", ctrl);
+		}
 	}
 
 	return ret;
@@ -504,12 +518,22 @@ static Int32 detector_trigger(DataCapHandle hDataCap)
 	if(!ret && capInfo->capCnt && (hDataCap->status & CAPTHR_STAT_CAP_STARTED)) {
 		/* need trigger */
 		hDataCap->encImg = TRUE;
+		int cmd;
 		if(CAPTHR_STAT_TRIG & hDataCap->status) {
 			/* set trigger cmd */
 			hDataCap->capIndex = CAP_INDEX_NEXT_FRAME;
+			cmd = IMGCTRL_TRIGCAP;
 		} else {
 			/* we may set special trigger and use index of that frame */
 			hDataCap->capIndex = CAP_INDEX_NEXT_FRAME;
+			cmd = IMGCTRL_SPECTRIG;
+		}
+
+		/* send trig cmd */
+		ret = ioctl(hDataCap->fdImgCtrl, cmd, NULL);
+		if(ret < 0) {
+			ERRSTR("trig capture failed");
+			ret = E_IO;
 		}
 	}
 
@@ -551,6 +575,8 @@ static void *data_capture_thread(void *arg)
 		goto exit;
 	}
 	hDataCap->status |= CAPTHR_STAT_CAP_STARTED;
+
+	DBG("data capture thread start...");
 	
 	while(!hDataCap->exit) {
 		/* wait data ready */
@@ -674,6 +700,12 @@ DataCapHandle data_capture_create(const DataCapAttrs *attrs)
 	//if(ret)
 		//goto exit;
 
+	/* open img ctrl dev for trigger */
+	hDataCap->fdImgCtrl = open(IMG_CTRL_DEV, O_RDWR);
+	if(hDataCap->fdImgCtrl < 0) {
+		ERRSTR("open %s failed", IMG_CTRL_DEV);
+	}
+
 	return hDataCap;
 
 exit:
@@ -760,6 +792,9 @@ Int32 data_capture_delete(DataCapHandle hDataCap, MsgHandle hCurMsg)
 
 	if(hDataCap->hDetector)
 		detector_delete(hDataCap->hDetector);
+
+	if(hDataCap->fdImgCtrl > 0)
+		close(hDataCap->fdImgCtrl);
 
 	free(hDataCap);
 

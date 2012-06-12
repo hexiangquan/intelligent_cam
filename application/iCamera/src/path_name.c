@@ -429,7 +429,6 @@ Int32 path_name_config(PathNameHandle hPathName, const Int8 *pattern, const Int8
 	// replace tag <IP> to IP string
 	get_local_ip(buf, sizeof(buf));
 	replace_string(hPathName->pathNamePattern, PATHNAME_MAX_LINE_SIZE, "<IP>", buf);
-	DBG("local IP: %s", buf);
 
 	// replace tag <OSD> to text string
 	strcpy(buf, text);
