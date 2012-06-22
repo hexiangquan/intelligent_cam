@@ -50,6 +50,7 @@
 #define EXTIO_S_FIRMWARE	_IOW(EXTIO_MAGIC_NO, 8, struct hdcam_firmware *)
 #define EXTIO_S_REG			_IOW(EXTIO_MAGIC_NO, 9, struct hdcam_reg *)
 #define EXTIO_G_REG			_IOWR(EXTIO_MAGIC_NO, 10, struct hdcam_reg *)
+#define EXTIO_S_RESET		_IO(EXTIO_MAGIC_NO, 11)
 #pragma  pack()
 
 /* 
@@ -101,6 +102,7 @@ struct hdcam_firmware {
 	__u32	magic;		//magic num
 	__u8	*data;		//data
 	__u32	len;		//len of data in bytes
+	__u32	check_sum;  //crc check sum
 };
 #endif /* end of #ifdef _EXT_IO_H_ */
 

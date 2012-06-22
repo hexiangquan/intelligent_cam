@@ -5,6 +5,7 @@ include ../Rules.make
 
 STATIC ?= 0
 #PLATFORM=PC
+PROTO_VER ?= 1
 
 LIB_PATH = lib
 LIB_NAME = netproto
@@ -40,6 +41,10 @@ endif
 CFLAGS += -Wall -I. -g
 LDFLAGS := -L$(LIB_PATH) -L$(LIB_INSTALL_DIR) -L$(SDK_LIB_DIR)
 LDFLAGS += -lpthread -l$(LIB_NAME) -lnetutils
+
+ifeq ($(PROTO_VER), 0)
+CFLAGS += -DOLD_PROTOCOL
+endif
 
 CFLAGS += -I$(INC_DIR)
 

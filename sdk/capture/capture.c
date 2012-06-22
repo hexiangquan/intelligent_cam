@@ -636,8 +636,8 @@ static Int32 capture_init_buf(CapHandle hCap, CapAttrs *attrs)
 	if (ioctl(hCap->fdCap, VIDIOC_REQBUFS, &req) < 0) {
 		ERRSTR("request buf failed");
 		return E_IO;
-	} else
-		DBG("REQBUF Done");
+	} //else
+		//DBG("REQBUF Done");
 
 	if (req.count != hCap->bufNum) {
 		ERR("VIDIOC_REQBUFS failed for capture");

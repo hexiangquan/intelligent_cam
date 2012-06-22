@@ -50,9 +50,22 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
+//#define OLD_PROTOCOL			1
+
+#ifdef OLD_PROTOCOL
+#define UDP_CMD_SYNC_START		0x203E553C
+#define UDP_CMD_SYNC_END		0x3E552F3C
+#define UDP_CMD_RESP_START		0x203E753C
+#define UDP_CMD_RESP_END		0x3E752F3C
+#else
 #define UDP_CMD_SYNC_START		0x203E753C
 #define UDP_CMD_SYNC_END		0x3E752F3C
+#define UDP_CMD_RESP_START		0x203E753C
+#define UDP_CMD_RESP_END		0x3E752F3C
+#endif
+
 #define UDP_BUF_LEN				1024
+
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -109,7 +122,12 @@ Int32 udp_cmd_recv(Int32 sock, UdpCmdHeader *header, void *buf, Uint32 bufLen, s
 	*header = *(UdpCmdHeader *)(recvBuf + sizeof(Uint32));
 
 	/* recv data */
-	if(header->dataLen > 0) {
+	if( header->dataLen > 0) {
+		if(ret - sizeof(*header) < header->dataLen) {
+			ERR("recv data len: %d, not equal to len in header: %d",
+				ret - sizeof(*header), header->dataLen);
+			return E_TRANS;
+		}
 		if(!buf || bufLen < header->dataLen) {
 			ERR("buf not enough for addtive data");
 			return E_NOMEM;
@@ -156,7 +174,7 @@ Int32 udp_cmd_send(Int32 sock, UdpCmdHeader *header, void *buf, struct sockaddr_
 
 	/* set sync code and header */
 	cmd = (UdpCmd *)sendBuf;
-	cmd->syncCode = UDP_CMD_SYNC_START;
+	cmd->syncCode = UDP_CMD_RESP_START;
 	cmd->header = *header;
 	if(header->dataLen) {
 		if(header->dataLen > sizeof(sendBuf) - sizeof(UdpCmd) - sizeof(Uint32)) {
@@ -167,7 +185,7 @@ Int32 udp_cmd_send(Int32 sock, UdpCmdHeader *header, void *buf, struct sockaddr_
 	}
 	
 	len = sizeof(*cmd) + header->dataLen;
-	*(Uint32 *)(sendBuf + len) = UDP_CMD_SYNC_END;
+	*(Uint32 *)(sendBuf + len) = UDP_CMD_RESP_END;
 	len += sizeof(Uint32);
 	
 	/* send data */

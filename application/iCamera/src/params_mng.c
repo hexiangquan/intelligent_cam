@@ -97,6 +97,8 @@ struct ParamsMngObj {
 	int				fdExtIo;		//fd for ext io dev
 };
 
+/* internal fxn for init hardware */
+static Int32 params_mng_init_hw(ParamsMngHandle hParamsMng);
 
 /*****************************************************************************
  Prototype    : params_mng_create
@@ -182,6 +184,9 @@ ParamsMngHandle params_mng_create(const char *cfgFile)
 	
 	hParamsMng->fp = fp;
 	hParamsMng->cfgFile = cfgFile;
+
+	/* init hardware */
+	params_mng_init_hw(hParamsMng);
 
 	return hParamsMng;
 
@@ -2465,6 +2470,9 @@ static Int32 set_ae_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_ABCFG, &cfg) < 0) {
 			return E_IO;
 		}
+
+		DBG("set AE params done, flags: 0x%X, target: %d",
+			cfg.flags, cfg.targetValue);
 	}
 
 	return E_NO;
@@ -3154,6 +3162,44 @@ Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void 
 	pthread_mutex_unlock(&hParamsMng->mutex);
 
 	return ret;
+}
+
+/*****************************************************************************
+ Prototype    : params_mng_init_hw
+ Description  : using current params to init hardware
+ Input        : ParamsMngHandle hParamsMng  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/6
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 params_mng_init_hw(ParamsMngHandle hParamsMng)
+{
+	Int32 		err;
+	AppParams 	*appCfg = &hParamsMng->appParams;
+	
+	err = set_exposure_params(hParamsMng, &appCfg->exposureParams, sizeof(appCfg->exposureParams));
+	err |= set_rgb_gains(hParamsMng, &appCfg->rgbGains, sizeof(appCfg->rgbGains));
+	err |= set_light_regions(hParamsMng, &appCfg->correctRegs, sizeof(appCfg->correctRegs));
+	err |= set_img_adj_params(hParamsMng, &appCfg->imgAdjParams, sizeof(appCfg->imgAdjParams));
+	err |= set_io_cfg(hParamsMng, &appCfg->ioCfg, sizeof(appCfg->ioCfg));
+	err |= set_strobe_params(hParamsMng, &appCfg->strobeParams, sizeof(appCfg->strobeParams));
+	err |= set_ae_params(hParamsMng, &appCfg->aeParams, sizeof(appCfg->aeParams));
+	err |= set_awb_params(hParamsMng, &appCfg->awbParams, sizeof(appCfg->awbParams));
+	err |= set_spec_cap_params(hParamsMng, &appCfg->specCapParams, sizeof(appCfg->specCapParams));
+
+	if(err) {
+		ERR("init hardware error!");
+		return E_IO;
+	}
+
+	return E_NO;
 }
 
 

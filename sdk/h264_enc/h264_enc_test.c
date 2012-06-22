@@ -3,7 +3,7 @@
 #include "alg.h"
 #include "cmem.h"
 
-#define DYN_SET_TEST
+//#define DYN_SET_TEST
 
 #define DEF_SRC_FILE 	"colorful_toys_cif_5frms_420SP.yuv"
 #define DEF_OUT_FILE 	"colorful_toys_cif_5frms_420SP.h264"

@@ -809,7 +809,7 @@ static int fpga_version_read(struct img_ctrl_dev *dev, unsigned long usrptr)
 }
 
 
-#ifdef _DEBUG
+#ifdef _DEBUG1
 /* test fpga reg rw */
 static void fpga_test(void)
 {
@@ -974,7 +974,7 @@ static int __init dev_init(void)
 
 	_DBG(DEVICE_NAME"\tinitialized\n");
 
-#ifdef _DEBUG
+#ifdef _DEBUG1
 	fpga_test();
 #endif
 

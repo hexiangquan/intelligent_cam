@@ -6,7 +6,7 @@
 #define DOMAIN_NAME		"WORKGROUP"
 #define HOST_NAME		"hdcam"
 #define DNS_SERVER		"192.168.0.1"
-#define SERVER_IP		"192.168.0.15"
+#define SERVER_IP		"192.168.0.25"
 #define TCP_SRV_PORT	9300
 #define OSD_STRING		"HDCAM"
 #define ROAD_NAME		OSD_STRING
@@ -35,7 +35,7 @@ const AppParams c_appParamsDef = {
 	.osdParams = {
 		.imgOsd = {
 			.osdString = {OSD_STRING},
-			.flags = CAM_OSD_FLAG_EN | CAM_OSD_FLAG_TEXT_EN,
+			.flags = CAM_OSD_FLAG_EN | CAM_OSD_FLAG_TEXT_EN | CAM_OSD_FLAG_TIME_EN,
 			.color = CAM_OSD_COLOR_YELLOW,
 			.postion = CAM_OSD_POS_UP_LEFT, 
 			.size = CAM_OSD_SIZE_32x32,
@@ -61,7 +61,7 @@ const AppParams c_appParamsDef = {
 		.flags = CAM_RTP_FLAG_EN,
 	},
 	.uploadCfg = {
-		.protocol = CAM_UPLOAD_PROTO_FTP,
+		.protocol = CAM_UPLOAD_PROTO_TCP,
 		.flags = CAM_AUTO_UPLOAD_EN | CAM_AUTO_DEL_EN,
 	},
 	.tcpImgSrvInfo = {
@@ -118,7 +118,7 @@ const AppParams c_appParamsDef = {
 		.flags = 0,
 	},
 	.workMode = {
-		.format = CAM_FMT_JPEG_H264,
+		.format = CAM_FMT_JPEG,
 		.resType = CAM_RES_FULL_FRAME,
 		.capMode = CAM_CAP_MODE_CONTINUE,
 		.flags = 0,
@@ -153,7 +153,7 @@ const AppParams c_appParamsDef = {
 		.maxShutterTime = 4000,
 		.minGainValue = 10,
 		.maxGainValue = 200,
-		.roi = {{0}, {0},},
+		.roi = {{0, 0, 800, 600}, {0},},
 	},
 	.awbParams = {
 		.flags = 0,
