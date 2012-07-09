@@ -29,6 +29,7 @@
 #include "detector.h"
 #include "img_ctrl.h"
 #include <sys/ioctl.h>
+#include "rtp_upload.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -63,7 +64,7 @@
 
 #define CONV_BUF_NUM				2
 
-//#define CAP_TRIG_TEST
+#define CAP_TRIG_TEST
 
 /* index for trigger capture */
 #define CAP_INDEX_NEXT_FRAME		(-1)
@@ -357,6 +358,25 @@ static Int32 data_cap_ctrl(DataCapHandle hDataCap, CamCapCtrl ctrl)
 	return ret;
 }
 
+/*****************************************************************************
+ Prototype    : send_video_clip
+ Description  : send msg to enable video clip sending
+ Input        : DataCapHandle hDataCap  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/7/9
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static inline Int32 send_video_clip(DataCapHandle hDataCap)
+{
+	return app_hdr_msg_send(hDataCap->hMsg, MSG_VID_ENC, APPCMD_UPLOAD_CTRL, RTP_CMD_SND_VID_CLIP, 0);
+}
 
 /*****************************************************************************
  Prototype    : capture_new_img
@@ -392,7 +412,7 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 	CaptureInfo	*capInfo = &hDataCap->defCapInfo;
 	
 	if(hDataCap->encImg) {
-		/* check frame index here */
+		/* check frame index from img data */
 		Uint16 frameIndex = 0;
 		
 		if(hDataCap->capIndex < 0 || hDataCap->capIndex >= frameIndex) {
@@ -401,6 +421,9 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 			dstName = hDataCap->dstName[1];
 			hDataCap->encImg = FALSE;
 			capInfo = &hDataCap->capInfo;
+
+			/* enable video send */
+			send_video_clip(hDataCap);
 		}
 	}
 
@@ -431,7 +454,7 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 		//DBG("<%d> cap run ok...", capFrame.index);
 
 #ifdef CAP_TRIG_TEST
-	if((capFrame.index % 4) == 0) {
+	if((capFrame.index % 150) == 0) {
 		hDataCap->encImg = TRUE;
 		hDataCap->capInfo = hDataCap->defCapInfo;
 	}

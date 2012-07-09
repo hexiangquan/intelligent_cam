@@ -182,6 +182,27 @@ Int32 encoder_set_enc_params(EncoderHandle hEnc,MsgHandle hCurMsg,EncoderParams 
 *****************************************************************************/
 Int32 encoder_set_upload(EncoderHandle hEnc,MsgHandle hCurMsg, UploadParams * params);
 
+/*****************************************************************************
+ Prototype    : encoder_upload_ctrl
+ Description  : ctrl upload value
+ Input        : EncoderHandle hEnc  
+                MsgHandle hCurMsg   
+                Int32 cmd           
+                void *arg           
+                Int32 len           
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/7/9
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 encoder_upload_ctrl(EncoderHandle hEnc, MsgHandle hCurMsg, Int32 cmd, void *arg, Int32 len);
+
 
 #ifdef __cplusplus
 #if __cplusplus

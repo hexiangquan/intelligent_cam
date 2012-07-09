@@ -410,6 +410,9 @@ static Int32 msg_process(EncoderHandle hEnc, CommonMsg *msgBuf)
 		else
 			ERR("invalid len of upload params");
 		break;
+	case APPCMD_UPLOAD_CTRL:
+		ret = upload_control(hEnc->hUpload, msgHdr->param[0], msgBuf->buf);
+		break;
 	case APPCMD_EXIT:
 		hEnc->exit = TRUE;
 		break;
@@ -698,5 +701,32 @@ Int32 encoder_set_upload(EncoderHandle hEnc, MsgHandle hCurMsg, UploadParams *pa
 	}
 
 	return ret;
+}
+
+/*****************************************************************************
+ Prototype    : encoder_upload_ctrl
+ Description  : ctrl upload value
+ Input        : EncoderHandle hEnc  
+                MsgHandle hCurMsg   
+                Int32 cmd           
+                void *arg           
+                Int32 len           
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/7/9
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 encoder_upload_ctrl(EncoderHandle hEnc, MsgHandle hCurMsg, Int32 cmd, void *arg, Int32 len)
+{
+	if(!hEnc || !hEnc->hUpload)
+		return E_INVAL;
+
+	return upload_control(hEnc->hUpload, cmd, arg);
 }
 

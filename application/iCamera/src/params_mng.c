@@ -1065,11 +1065,13 @@ static Int32 get_h264_enc_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 	dynParams->height = vidOutAttrs.height;
 	dynParams->frameRate = appCfg->h264EncParams.frameRate;
 	dynParams->targetBitRate = appCfg->h264EncParams.bitRate * 1000;
-	dynParams->intraFrameInterval = appCfg->h264EncParams.IPRatio;
+	dynParams->intraFrameInterval = 0;//appCfg->h264EncParams.IPRatio;
 	dynParams->maxQP = appCfg->h264EncParams.QPMax;
 	dynParams->minQP = appCfg->h264EncParams.QPMin;
 	dynParams->initQP = appCfg->h264EncParams.QPInit;
 	dynParams->rateCtrlMode = appCfg->h264EncParams.rateControl;
+	dynParams->enablePicTimSEI = 0;
+	dynParams->idrFrameInterval = appCfg->h264EncParams.IPRatio;
 	if(appCfg->h264EncParams.forceIFrame)
 		dynParams->forceFrame = VID_I_FRAME;
 	dynParams->maxBitrateCVBR = appCfg->h264EncParams.bitRate * 2000;
@@ -2995,6 +2997,10 @@ static Int32 get_vid_upload_params(ParamsMngHandle hParamsMng, void *data, Int32
 		rtpParams->rtspPort = appCfg->rtpParams.rtspSrvPort;
 		rtpParams->fmt = FMT_H264;
 		rtpParams->size = sizeof(RtpUploadParams);
+		rtpParams->bitRate = appCfg->h264EncParams.bitRate * 1000; //back to bps
+		rtpParams->cacheTime = appCfg->h264EncParams.videoLen / 2;
+		rtpParams->keepTime = appCfg->h264EncParams.videoLen / 2;
+		rtpParams->frameRate = appCfg->h264EncParams.frameRate;
 	} else {
 		/* not send */
 		params->protol = CAM_UPLOAD_PROTO_NONE;

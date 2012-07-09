@@ -31,6 +31,7 @@ static Int32 h264_encoder_process(IN AlgHandle hEncode, IN AlgBuf *pInBuf, OUT A
 
 	inArgs.inputID = msg->index;
 	inArgs.timeStamp = 0;
+	//inArgs.timeStamp = (msg->timeCode.tv_sec * 1000 + msg->timeCode.tv_usec / 1000) * 90;
 	inArgs.size = sizeof(inArgs);
 
 	outArgs.size = sizeof(outArgs);

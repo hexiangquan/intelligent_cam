@@ -93,6 +93,7 @@ private:
 #else
 	Bool isOpened;
 	static CirBufHandle  hCirBuf;
+	Int32 errCnt;
 #endif
 };
 
@@ -230,6 +231,7 @@ VideoOpenFileSource
 	uSecsToDelay = 5000;
 	uSecsToDelayMax = 33000;
 	srcType = 0;
+	errCnt = 0;
 
 	#ifdef READ_TEST_FILE
 	fp = fopen(TEST_FILE_NAME, "rb");
@@ -237,10 +239,13 @@ VideoOpenFileSource
 		ERR("open %s failed", TEST_FILE_NAME);
 	}
 	#else
-	if(!hCirBuf)
+	if(!hCirBuf) {
+		//DBG("create new cir buf");
 		hCirBuf = circular_buf_create(VIDEO_MAX_FRAME_SIZE * 3, CIR_RD_TIME_PRD);
-	else
-		circular_buf_flush(hCirBuf);	//flush previous write data
+	} else {
+		//DBG("flush cir buffer");
+		circular_buf_flush(hCirBuf, -1);	//flush previous write data
+	}
 	isOpened = TRUE;
 	#endif
 	
@@ -383,14 +388,16 @@ int VideoOpenFileSource::readFromFile() {
 	int 		err;
 	MediaFrame 	frame;
 
-	err = circular_buf_wait_ready(hCirBuf, FALSE, sizeof(MediaFrame), CIR_WR_TIMEOUT);
-	if(err)
-		return 0;
+	err = circular_buf_wait_ready(hCirBuf, TRUE, sizeof(MediaFrame), CIR_WR_TIMEOUT);
+	if(err) {
+		return ((++errCnt > 5) ? (-1) : 0);
+	}
 	
 	/* read frame header */
 	err = circular_buf_read(hCirBuf, &frame, sizeof(MediaFrame), CIR_WR_TIMEOUT);
 	if(err || frame.reserved != CIR_MAGIC_CODE) {
 		ERR("read frame header failed.");
+		++errCnt;
 		return 0;
 	}
 
@@ -417,6 +424,7 @@ int VideoOpenFileSource::readFromFile() {
 	}
 
 	fPresentationTime = frame.timestamp;
+	errCnt = 0;
 	return err ? 0 : 1;
 #endif	
 	

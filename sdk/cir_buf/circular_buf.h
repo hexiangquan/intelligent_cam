@@ -50,7 +50,10 @@
  *----------------------------------------------*/
 
 /* all read and write len must align to this value */
-#define CIR_LEN_ALIGN		4
+#define CIR_LEN_ALIGN			4
+
+/* not change rd ptr positon after read, just copy data */
+#define CIR_FLAG_KEEP_RD_POS	(1 << 0)
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -136,7 +139,8 @@ extern Int32 circular_buf_write(CirBufHandle hCirBuf, const void *buf, Int32 len
  Input        : CirBufHandle hCirBuf  
                 void *buf             
                 Int32 len             
-                Int32 timeoutMs, same as write, Unit: Milisecond       
+                Int32 timeoutMs, same as write, Unit: Milisecond  
+                Int32 flags, bit set flags
  Output       : None
  Return Value : 
  Calls        : 
@@ -154,6 +158,7 @@ extern Int32 circular_buf_read(CirBufHandle hCirBuf, void *buf, Int32 len, Int32
  Prototype    : circular_buf_flush
  Description  : flush buffer to empty for write
  Input        : CirBufHandle hCirBuf  
+ 				Int32 len, flush size, if set to -1, flush all data
  Output       : None
  Return Value : 
  Calls        : 
@@ -165,7 +170,7 @@ extern Int32 circular_buf_read(CirBufHandle hCirBuf, void *buf, Int32 len, Int32
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 circular_buf_flush(CirBufHandle hCirBuf);
+extern Int32 circular_buf_flush(CirBufHandle hCirBuf, Int32 len);
 
 /*****************************************************************************
  Prototype    : circular_buf_get_status
@@ -206,6 +211,29 @@ Int32 circular_buf_get_status(CirBufHandle hCirBuf, Int32 *total, Int32 *wrLen, 
 
 *****************************************************************************/
 extern Int32 circular_buf_wait_ready(CirBufHandle hCirBuf, Bool isRd, Int32 size, Int32 timeoutMs);
+
+/*****************************************************************************
+ Prototype    : circular_buf_cur_ptr
+ Description  : get current data ptr for read
+ Input        : CirBufHandle hCirBuf     
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/4/27
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static inline const void *circular_buf_rd_ptr(CirBufHandle hCirBuf)
+{
+	if(!hCirBuf)
+		return NULL;
+
+	return (const void *)(hCirBuf->buf + hCirBuf->rdPos);
+}
 
 #ifdef __cplusplus
 #if __cplusplus

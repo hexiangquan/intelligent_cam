@@ -50,7 +50,7 @@ void *cir_buf_rd_thr(void *arg)
 	}
 
 
-	err = circular_buf_flush(params->hCirBuf);
+	err = circular_buf_flush(params->hCirBuf, -1);
 	DBG("flush cir buf: %d", err);
 	Int32 total, wrLen, rdLen;
 	circular_buf_get_status(params->hCirBuf, &total, &wrLen, &rdLen);

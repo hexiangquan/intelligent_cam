@@ -19,6 +19,9 @@ extern Int32 ftp_upload_test(const char *username, const char *passwd, const cha
 /* test local upload */
 extern Int32 local_upload_test(const char *pathName);
 
+/* test rtp upload */
+extern Int32 rtp_upload_test();
+
 /*****************************************************************************
  Prototype    : self_test
  Description  : self test module
@@ -55,6 +58,9 @@ Int32 self_test(Int32 flags)
 
 	if(flags & SELF_TEST_LOCALSND)
 		err = local_upload_test("/media/mmcblk0p1");
+
+	if(flags & SELF_TEST_RTPUPLOAD)
+		err = rtp_upload_test();
 
 	INFO("self test pass...\n");
 

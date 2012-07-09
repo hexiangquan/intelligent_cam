@@ -266,7 +266,7 @@ Int32 circular_buf_write(CirBufHandle hCirBuf, const void *buf, Int32 len, Int32
 *****************************************************************************/
 Int32 circular_buf_read(CirBufHandle hCirBuf, void *buf, Int32 len, Int32 timeoutMs)
 {
-	if(!hCirBuf || !buf || len > hCirBuf->bufSize) {
+	if(!hCirBuf || !buf || len > hCirBuf->bufSize || len < 0) {
 		ERR("read len %d should not bigger than buf len %d", len, hCirBuf->bufSize);
 		return E_INVAL;
 	}
@@ -312,13 +312,27 @@ Int32 circular_buf_read(CirBufHandle hCirBuf, void *buf, Int32 len, Int32 timeou
     Modification : Created function
 
 *****************************************************************************/
-Int32 circular_buf_flush(CirBufHandle hCirBuf)
+Int32 circular_buf_flush(CirBufHandle hCirBuf, Int32 len)
 {
 	if(!hCirBuf)
 		return E_INVAL;
 
-	/* set rd pos equals to write pos, so the buffer is empty */
-	hCirBuf->rdPos = hCirBuf->wrPos;
+	/* already empty, can't flush any more */
+	if(hCirBuf->rdPos == hCirBuf->wrPos) {
+		return E_MODE;
+	}
+
+	if( len < 0 || 
+		ROUND_UP(len, CIR_LEN_ALIGN) >= BUF_SIZE_RD(hCirBuf->rdPos, hCirBuf->wrPos, hCirBuf->bufSize) ) {
+		//DBG("cir buf, flush all...");
+		/* set rd pos equals to write pos, so the buffer is empty */
+		hCirBuf->rdPos = hCirBuf->wrPos;
+	} else {
+		/* just move rd ptr */
+		hCirBuf->rdPos += ROUND_UP(len, CIR_LEN_ALIGN);
+		if(hCirBuf->rdPos >= hCirBuf->bufSize)
+			hCirBuf->rdPos -= hCirBuf->bufSize;
+	}
 
 	return E_NO;
 }
@@ -357,4 +371,5 @@ Int32 circular_buf_get_status(CirBufHandle hCirBuf, Int32 *total, Int32 *wrLen, 
 
 	return E_NO;
 }
+
 

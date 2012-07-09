@@ -52,6 +52,7 @@
 #define SELF_TEST_PATHNAME		(1 << 1)
 #define SELF_TEST_FTPUPLOAD		(1 << 2)
 #define SELF_TEST_LOCALSND		(1 << 3)
+#define SELF_TEST_RTPUPLOAD		(1 << 4)
 
 /*----------------------------------------------*
  * routines' implementations                    *

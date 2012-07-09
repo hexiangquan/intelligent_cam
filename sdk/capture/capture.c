@@ -221,6 +221,145 @@ static Int32 capture_get_input_res(CapHandle hCap, CaptureStd std, struct v4l2_f
 	return capture_convert_fmt(hCap, fmt);
 }
 
+
+#if 0
+static int config_ccdc_raw(int captFd)
+{
+	struct ccdc_config_params_raw raw_params;
+	/* Change these values for testing Gain - Offsets */
+	struct ccdc_float_16 r = {0, 511};
+	struct ccdc_float_16 gr = {0, 511};
+	struct ccdc_float_16 gb = {0, 511};
+	struct ccdc_float_16 b = {0, 511};
+	struct ccdc_float_8 csc_coef_val = { 1, 0 };
+	int i;
+
+	bzero(&raw_params, sizeof(raw_params));
+
+	/* First get the parameters */
+	if (-1 == ioctl(captFd, VPFE_CMD_G_CCDC_RAW_PARAMS, &raw_params)) {
+		ERR("InitDevice:ioctl:VPFE_CMD_G_CCDC_PARAMS, %p", &raw_params);
+		return E_IO;
+	}
+
+	raw_params.compress.alg = CCDC_NO_COMPRESSION;
+	raw_params.gain_offset.gain.r_ye = r;
+	raw_params.gain_offset.gain.gr_cy = gr;
+	raw_params.gain_offset.gain.gb_g = gb;
+	raw_params.gain_offset.gain.b_mg = b;
+	raw_params.gain_offset.gain_sdram_en = 1;
+	raw_params.gain_offset.gain_ipipe_en = 1;
+	raw_params.gain_offset.offset = 0;
+	raw_params.gain_offset.offset_sdram_en = 1;
+
+	/* To test linearization, set this to 1, and update the
+	 * linearization table with correct data
+	 */
+	if (0) {
+		raw_params.linearize.en = 1;
+		raw_params.linearize.corr_shft = CCDC_1BIT_SHIFT;
+		raw_params.linearize.scale_fact.integer = 0;
+		raw_params.linearize.scale_fact.decimal = 10;
+
+		for (i = 0; i < CCDC_LINEAR_TAB_SIZE; i++)
+			raw_params.linearize.table[i] = i;
+	} else {
+		raw_params.linearize.en = 0;
+	}
+
+	/* CSC */
+	if (0) {
+		raw_params.df_csc.df_or_csc = 0;
+		raw_params.df_csc.csc.en = 1;
+		/* I am hardcoding this here. But this should
+		 * really match with that of the capture standard
+		 */
+		raw_params.df_csc.start_pix = 1;
+		raw_params.df_csc.num_pixels = 720;
+		raw_params.df_csc.start_line = 1;
+		raw_params.df_csc.num_lines = 480;
+		/* These are unit test values. For real case, use
+		 * correct values in this table
+		 */
+		raw_params.df_csc.csc.coeff[0] = csc_coef_val;
+		raw_params.df_csc.csc.coeff[1].decimal = 1;
+		raw_params.df_csc.csc.coeff[2].decimal = 2;
+		raw_params.df_csc.csc.coeff[3].decimal = 3;
+		raw_params.df_csc.csc.coeff[4].decimal = 4;
+		raw_params.df_csc.csc.coeff[5].decimal = 5;
+		raw_params.df_csc.csc.coeff[6].decimal = 6;
+		raw_params.df_csc.csc.coeff[7].decimal = 7;
+		raw_params.df_csc.csc.coeff[8].decimal = 8;
+		raw_params.df_csc.csc.coeff[9].decimal = 9;
+		raw_params.df_csc.csc.coeff[10].decimal = 10;
+		raw_params.df_csc.csc.coeff[11].decimal = 11;
+		raw_params.df_csc.csc.coeff[12].decimal = 12;
+		raw_params.df_csc.csc.coeff[13].decimal = 13;
+		raw_params.df_csc.csc.coeff[14].decimal = 14;
+		raw_params.df_csc.csc.coeff[15].decimal = 15;
+
+	} else {
+		raw_params.df_csc.df_or_csc = 0;
+		raw_params.df_csc.csc.en = 0;
+	}
+
+	/* vertical line defect correction */
+	if (0) {
+		raw_params.dfc.en = 1;
+		// correction method
+		raw_params.dfc.corr_mode = CCDC_VDFC_HORZ_INTERPOL_IF_SAT;
+		// not pixels upper than the defect corrected
+		raw_params.dfc.corr_whole_line = 1;
+		raw_params.dfc.def_level_shift = CCDC_VDFC_SHIFT_2;
+		raw_params.dfc.def_sat_level = 20;
+		raw_params.dfc.num_vdefects = 7;
+		for (i = 0; i < raw_params.dfc.num_vdefects; i++) {
+			raw_params.dfc.table[i].pos_vert = i;
+			raw_params.dfc.table[i].pos_horz = i + 1;
+			raw_params.dfc.table[i].level_at_pos = i + 5;
+			raw_params.dfc.table[i].level_up_pixels = i + 6;
+			raw_params.dfc.table[i].level_low_pixels = i + 7;
+		}
+		printf("DFC enabled\n");
+	} else {
+		raw_params.dfc.en = 0;
+	}
+
+	if (en_culling) {
+
+		printf("Culling enabled\n");
+		raw_params.culling.hcpat_odd  = 0xaa;
+		raw_params.culling.hcpat_even = 0xaa;
+		raw_params.culling.vcpat = 0x55;
+		raw_params.culling.en_lpf = 1;
+	} else {
+		raw_params.culling.hcpat_odd  = 0xFF;
+		raw_params.culling.hcpat_even = 0xFF;
+		raw_params.culling.vcpat = 0xFF;
+	}
+	raw_params.col_pat_field0.olop = CCDC_GREEN_BLUE;
+	raw_params.col_pat_field0.olep = CCDC_BLUE;
+	raw_params.col_pat_field0.elop = CCDC_RED;
+	raw_params.col_pat_field0.elep = CCDC_GREEN_RED;
+	raw_params.col_pat_field1.olop = CCDC_GREEN_BLUE;
+	raw_params.col_pat_field1.olep = CCDC_BLUE;
+	raw_params.col_pat_field1.elop = CCDC_RED;
+	raw_params.col_pat_field1.elep = CCDC_GREEN_RED;
+	raw_params.data_size = CCDC_12_BITS;
+	raw_params.data_shift = CCDC_NO_SHIFT;
+
+	printf("VPFE_CMD_S_CCDC_RAW_PARAMS, size = %d, address = %p\n", sizeof(raw_params),
+				&raw_params);
+	if (-1 == ioctl(captFd, VPFE_CMD_S_CCDC_RAW_PARAMS, &raw_params)) {
+		printf("InitDevice:ioctl:VPFE_CMD_S_CCDC_PARAMS, %p", &raw_params);
+		return -1;
+	}
+
+	return 0;
+}
+#endif
+
+
 /*****************************************************************************
  Prototype    : capture_set_data_format
  Description  : Set capture data format

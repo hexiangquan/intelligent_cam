@@ -21,6 +21,7 @@
 #include "log.h"
 #include "ext_io.h"
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 	
 #define EXT_IO_DEV	"/dev/extio"
 

@@ -163,7 +163,7 @@ static int ab_cfg_validate(struct img_ctrl_dev *dev, struct hdcam_ab_cfg *cfg)
 
 	/* validate roi */
 	for(i = 0; i < HDCAM_AB_MAX_ROI; i++) {
-		result = region_validate(dev, &cfg->roi[i]);
+		result = 0;//region_validate(dev, &cfg->roi[i]);
 		if(result)
 			break;
 	}
@@ -666,13 +666,13 @@ static int img_enhance_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
 
 	if(cfg.flags & HDCAM_ENH_FLAG_DRC_EN) {
 		/* enable dynamic range compression, reserved */
-		data |= BIT(5);
+		data |= BIT(6);
 		fpga_write(dev->fpga_base, FPGA_REG_DRC_STRENGTH, cfg.drcStrength);
 	}
 
 	if(cfg.flags & HDCAM_ENH_FLAG_BRIGHT_EN) {
 		/* set brightness */
-		data |= BIT(4);
+		data |= BIT(5);
 		fpga_write(dev->fpga_base, FPGA_REG_BRIGHTNESS, cfg.brightness);
 	}
 
@@ -930,7 +930,7 @@ static int img_ctrl_ioctl(struct inode *inode, struct file *filep,
 		result = spec_cap_cfg(dev, arg);
 		break;
 		
-#ifdef _DEBUG
+#ifdef _DEBUG1
 	/* test fpag rw */
 	case IMGCTRL_HW_TEST:
 		fpga_test();

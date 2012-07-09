@@ -102,6 +102,9 @@ typedef unsigned char	Uint8;
 #define MAX(a, b) 				((a) > (b) ? (a) : (b))
 #define MIN(a, b) 				((a) < (b) ? (a) : (b))
 
+/* Get randrom data */
+#define RAND(min, max)			((min)+(rand()%((max)-(min))))
+
 /* Chroma Format define */
 typedef enum _ChromaFormat {
 	FMT_NA = -1,			/* Chroma format not applicable. */

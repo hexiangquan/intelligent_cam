@@ -228,7 +228,7 @@ Int32 img_trans_connect(ImgTransHandle hTrans, Uint32 timeoutSec)
 		ret = connect(sock, (struct sockaddr *)addr, sizeof(*addr));
 	
 	if(ret < 0) {
-		ERRSTR("connect error.");
+		//ERRSTR("connect error.");
 		close(sock);
 		return E_CONNECT;
 	}

@@ -82,6 +82,12 @@ typedef struct _UploadFxns {
 	/* Set params, , 1st: sub object handle, 2nd: New Init params */	
 	Int32  (*setParams)(void *handle, const void *params);
 
+	/* Flush cache buffer frames , all send to net */
+	Int32  (*disableCache)(void *handle);
+
+	/* Ctrl cmds, defined by lower level */
+	Int32  (*ctrl)(void *handle, Int32 cmd, void *arg);
+
 	/* Delete param, 1st: sub object handle*/
 	Int32  (*delete)(void *handle);
 }UploadFxns;
@@ -245,6 +251,25 @@ Int32 upload_update_params(UploadHandle hUpload, UploadParams *params);
 
 *****************************************************************************/
 extern Int32 upload_run(UploadHandle hUpload, MsgHandle hCurMsg, const ImgMsg *data);
+
+/*****************************************************************************
+ Prototype    : upload_control
+ Description  : upload module ctrl
+ Input        : UploadHandle hUpload  
+                Int32 cmd             
+                void *arg             
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/7/3
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 upload_control(UploadHandle hUpload, Int32 cmd, void *arg);
 
 #ifdef __cplusplus
 #if __cplusplus

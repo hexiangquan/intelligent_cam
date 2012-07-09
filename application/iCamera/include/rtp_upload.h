@@ -48,6 +48,10 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
+#define RTP_MAX_VID_LEN			(15)	//second
+#define RTP_MIN_VID_LEN			(2)		//second
+
+#define RTP_CMD_SND_VID_CLIP	(1)		// flush cache frames and enable video send for a while, auto disable send after cahce  
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -56,8 +60,12 @@
 typedef struct {
 	Int32			size;			//size of this struct
 	Uint16			rtspPort;		//rtsp serer listen port
+	Uint16			frameRate;		//reference frame rate
 	const char		*streamName;	//name of this stream
 	ChromaFormat	fmt;			//type of this media, only support H.264 currently
+	Uint32			bitRate;		//media bitrate
+	Uint16			cacheTime;		//time of video clips, half will be cached
+	Uint16			keepTime;		//time of video sending after enable upload
 }RtpUploadParams;
 
 

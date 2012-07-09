@@ -625,6 +625,39 @@ Int32 upload_update_params(UploadHandle hUpload, UploadParams *params)
 }
 
 /*****************************************************************************
+ Prototype    : upload_control
+ Description  : upload module ctrl
+ Input        : UploadHandle hUpload  
+                Int32 cmd             
+                void *arg             
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/7/3
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 upload_control(UploadHandle hUpload, Int32 cmd, void *arg)
+{
+	if(!hUpload || !hUpload->fxns->ctrl)
+		return E_UNSUPT;
+
+	Int32 	err;
+
+	/* calling low level ctrl fxn */
+	pthread_mutex_lock(&hUpload->mutex);
+	err = hUpload->fxns->ctrl(hUpload->handle, cmd, arg);
+	pthread_mutex_unlock(&hUpload->mutex);
+	
+	return err;
+	
+}
+
+/*****************************************************************************
  Prototype    : upload_run
  Description  : run upload 
  Input        : UploadHandle hUpload  
