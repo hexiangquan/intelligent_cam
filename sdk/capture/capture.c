@@ -159,12 +159,15 @@ static Int32 capture_convert_fmt(CapHandle hCap, struct v4l2_format *fmt)
 	switch(fmt->fmt.pix.pixelformat) {
 	case V4L2_PIX_FMT_SBGGR8:
 		hCap->inputInfo.colorSpace = FMT_BAYER_RGBG;
+		hCap->inputInfo.bytesPerLine = fmt->fmt.pix.width;
 		break;
 	case V4L2_PIX_FMT_UYVY:
 		hCap->inputInfo.colorSpace = FMT_YUV_422ILE;
+		hCap->inputInfo.bytesPerLine = fmt->fmt.pix.width * 2;
 		break;
 	case V4L2_PIX_FMT_NV12:
 		hCap->inputInfo.colorSpace = FMT_YUV_420SP;
+		hCap->inputInfo.bytesPerLine = fmt->fmt.pix.width;
 		break;
 	default:
 		ERR("unsupported fmt.");

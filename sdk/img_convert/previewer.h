@@ -48,6 +48,8 @@ typedef struct _PreviewAttrs{
 	Uint8				contrast;
 	Int16				*eeTable;
 	Int32				eeTabSize;
+	Uint16				gamma;		/* 100 times of actual gamma value, e.g., set 220 for 2.2 gamma */
+	Uint16				reserved;
 }PreviewAttrs;
 /*----------------------------------------------*
  * project-wide global variables                *

@@ -3,8 +3,9 @@
 
 #include "msg.h"
 #include "buffer.h"
-#include "cam_time.h"
 #include "cam_detector.h"
+#include "cam_info.h"
+#include "cap_info_parse.h"
 
 #define MSG_MAX_LEN		1024
 
@@ -53,6 +54,7 @@ typedef enum _AppCmd {
 	APPCMD_SET_AE_PARAMS,		//set auto exposure params
 	APPCMD_SET_AWB_PARAMS,		//set auto white balance params
 	APPCMD_SET_CAP_INPUT,		//update cap input info
+	APPCMD_SET_ROAD_INFO,		//update road info
 	APPCMD_SEND_DIR,			//send all file in a dir
 	APPCMD_SEND_FILE,			//send specified file
 	APPCMD_UPLOAD_CTRL,			//upload ctrl cmds
@@ -71,9 +73,11 @@ typedef struct _ImgMsg {
 	BufHandle		hBuf;				/* Buffer handle */
 	Int32			index;				/* Frame index */
 	ImgDimension	dimension;			/* Format info of image */
-	CamDateTime		timeStamp;			/* Capture time */
+	DateTime		timeStamp;			/* Capture time */
 	struct timeval	timeCode;			/* Another time stamp */
 	Int32			frameType;			/* Frame type for video */
+	CamRoadInfo		roadInfo;			/* Road info */
+	RawCapInfo		rawInfo;			/* raw capture info from hardware */
 	CaptureInfo		capInfo;			/* capture info of this frame */
 }ImgMsg;
 

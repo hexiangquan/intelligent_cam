@@ -663,5 +663,28 @@ Int32 media_stream_in(MediaSubSessionHandle hSubSession, MediaFrame *frame, Bool
 		return hSubSession->inputDev->audioWrite(frame);
 }
 
+/*****************************************************************************
+ Prototype    : media_get_link_status
+ Description  : Check link status
+ Input        : MediaSubSessionHandle hSubSession  
+ Output       : None
+ Return Value : TRUE -- data link is established, FALSE -- not linked
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/10
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Bool media_get_link_status(MediaSubSessionHandle hSubSession)
+{
+	if(!hSubSession)
+		return FALSE;
+
+	return hSubSession->inputDev->isOpened();
+}
+
 } /* end of extern "C" */
 

@@ -707,8 +707,13 @@ static int spec_cap_cfg(struct img_ctrl_dev *dev, unsigned long usrptr)
 	
 
 	/* validate data */
-	if(cfg.globalGain > HDCAM_AB_MAX_GAIN) {
-		_ERR("gain(%d) is bigger than max %d", cfg.globalGain, HDCAM_AB_MAX_GAIN);
+	if( cfg.globalGain > HDCAM_AB_MAX_GAIN || 
+		cfg.aeMaxGain > HDCAM_AB_MAX_GAIN || 
+		cfg.aeMinGain > cfg.aeMaxGain || 
+		cfg.aeMinExpTime > cfg.aeMaxExpTime ||
+		cfg.aeTargetVal == 0) {
+		_ERR("inv data, gain(%d), max gain %d, or min val bigger than max val", 
+			cfg.globalGain, HDCAM_AB_MAX_GAIN);
 		return -EINVAL;
 	}
 
@@ -723,12 +728,28 @@ static int spec_cap_cfg(struct img_ctrl_dev *dev, unsigned long usrptr)
 	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AFE_GAIN, 
 		cfg.globalGain);
 
+	/* cfg AE regs for spec trig */
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AE_MAX_GAIN, 
+		cfg.aeMaxGain & 0xFFFF);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AE_MIN_EXP1, 
+		(cfg.aeMinExpTime >> 16) & 0xFFFF);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AE_MIN_EXP0, 
+		cfg.aeMinExpTime & 0xFFFF);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AE_MAX_EXP1, 
+		(cfg.aeMaxExpTime >> 16) & 0xFFFF);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AE_MAX_EXP0, 
+		cfg.aeMaxExpTime & 0xFFFF);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AE_TARGET_VAL,
+		cfg.aeTargetVal & 0xFF);
+
 	data = fpga_read(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL);
-	data &= ~(BIT(0) | BIT(1));
-	if(cfg.strobeCtrl & BIT(0))
-		data |= BIT(0);
-	if(cfg.strobeCtrl & BIT(1))
-		data |= BIT(1);
+
+	/* set strobe enable & AE enable bits */
+	data &= ~(0x000F | BIT(14));
+	data |= (cfg.strobeCtrl & 0x0F);
+	if(cfg.flags & HDCAM_SPEC_CAP_AE_EN)
+		data |= BIT(14);
+	
 	fpga_write(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL, 
 		data);
 
@@ -745,7 +766,7 @@ static int spec_cap_cfg(struct img_ctrl_dev *dev, unsigned long usrptr)
  * This function trigger hardware for sepcial capture
  * It returns 0 if successful, otherwise returns negative error value.
  */
-static int spec_cap_trig(struct img_ctrl_dev *dev)
+static int spec_cap_trig(struct img_ctrl_dev *dev, unsigned long usrptr)
 {
 	u16 data;
 	
@@ -759,7 +780,15 @@ static int spec_cap_trig(struct img_ctrl_dev *dev)
 	udelay(1);
 	fpga_write(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL, 
 		data);
-	
+
+	if(usrptr) {
+		data = fpga_read(dev->fpga_base, FPGA_REG_NEXT_FRAME_ID);
+		if(__put_user(data, (u16 __user *)usrptr) < 0) {
+			_ERR("copy to user space failed.");
+			return -EFAULT;
+		}
+	}
+		
 	return 0;
 }
 
@@ -882,7 +911,7 @@ static int img_ctrl_ioctl(struct inode *inode, struct file *filep,
 		
 	/* trigger a special capture */
 	case IMGCTRL_SPECTRIG:
-		result = spec_cap_trig(dev);
+		result = spec_cap_trig(dev, arg);
 		break;
 
 	/* set luminance info */
@@ -926,7 +955,7 @@ static int img_ctrl_ioctl(struct inode *inode, struct file *filep,
 		break;
 	
 	/* set special capture params */
-	case IMGCTRL_S_SEPCCAP:
+	case IMGCTRL_S_SPECCAP:
 		result = spec_cap_cfg(dev, arg);
 		break;
 		

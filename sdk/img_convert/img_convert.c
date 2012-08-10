@@ -99,6 +99,7 @@ static void convert_previewer_attrs(ImgConvDynParams *dynParams, PreviewAttrs *p
 	prevAttrs->contrast = dynParams->contrast;
 	prevAttrs->eeTable = dynParams->eeTable;
 	prevAttrs->eeTabSize = dynParams->eeTabSize;
+	prevAttrs->gamma = dynParams->gamma;
 }
 
 /*****************************************************************************

@@ -53,8 +53,8 @@
 #define IMGCTRL_S_AWBCFG	_IOW(IMGCTRL_MAGIC_NO, 6, struct hdcam_awb_cfg *)
 #define IMGCTRL_S_ENHCFG	_IOW(IMGCTRL_MAGIC_NO, 7, struct hdcam_img_enhance_cfg *)
 #define IMGCTRL_G_VER		_IOR(IMGCTRL_MAGIC_NO, 8, __u32 *)
-#define IMGCTRL_S_SEPCCAP	_IOW(IMGCTRL_MAGIC_NO, 9, struct hdcam_img_enhance_cfg *)
-#define IMGCTRL_SPECTRIG	_IO(IMGCTRL_MAGIC_NO, 10)
+#define IMGCTRL_S_SPECCAP	_IOW(IMGCTRL_MAGIC_NO, 9, struct hdcam_img_enhance_cfg *)
+#define IMGCTRL_SPECTRIG	_IOR(IMGCTRL_MAGIC_NO, 10, __u16 *)
 #define IMGCTRL_TRIGCAP		_IO(IMGCTRL_MAGIC_NO, 11)
 
 //#ifdef _DEBUG
@@ -171,8 +171,17 @@ struct hdcam_spec_cap_cfg{
 	__u32	exposureTime;	// Unit: us
 	__u16	globalGain;		// Range: 0~1023
 	__u16	strobeCtrl;		// Bit[0:1]- strobe0, strobe1, 1-enable, 1-disable
+	__u32	aeMinExpTime;	// AE for special capture, Min exposure time, us
+	__u32	aeMaxExpTime;	// AE for special capture Max exposure time, us 
+	__u16	aeMinGain;		// AE for special capture, Min global gain, 0~1023
+	__u16	aeMaxGain;		// AE for special capture, Max global gain, 0~1023
+	__u16	aeTargetVal;	// AE for special capture, target value, 0~255
+	__u16	flags;			// flags for ctrl
 	__u32	reserved[2];
 };
+
+/* bits define for flags of spec cap cfg */
+#define HDCAM_SPEC_CAP_AE_EN	(1 << 0)
 
 #endif /* end of #ifdef _IMG_CTRL_H_ */
 

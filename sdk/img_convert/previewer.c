@@ -22,6 +22,7 @@
     Modification: Created file
 
 ******************************************************************************/
+#define _ISOC99_SOURCE
 #include "common.h"
 #include "previewer.h"
 #include <linux/videodev.h>
@@ -38,6 +39,7 @@
 #include <media/davinci/imp_common.h>
 #include <termios.h>
 #include <unistd.h>
+#include <math.h>
 #include "log.h"
 
 /*----------------------------------------------*
@@ -67,7 +69,8 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
-#define YEE_LUT_MAX_SIZE 1024
+#define YEE_LUT_MAX_SIZE 	1024
+#define GAMMA_TBL_MAX_SIZE	512
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -356,6 +359,92 @@ static Int32 previewer_set_wb(int fd, struct prev_module_param *modParam, struct
 }
 
 /*****************************************************************************
+ Prototype    : gamma_lut_calc
+ Description  : calc LUT for single entry
+ Input        : double index  
+                double exp    
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/7/24
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static unsigned short gamma_lut_calc(double index, double exp)
+{
+	double lut;
+
+	index = index / 512.0;
+
+	if(index <= 0.018)
+		lut = exp * 10.0 * index;
+	else
+		lut = 1.099 * pow(index, exp) - 0.099;
+
+	lut *= 1024.0;
+
+	return round(lut);
+}
+
+
+/*****************************************************************************
+ Prototype    : gamma_table_generate
+ Description  : generate the gamma table
+ Input        : struct prev_gamma *params  
+                Uint16 gamma               
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/7/24
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 gamma_table_generate(struct prev_gamma *params, Uint16 gamma)
+{
+	static struct ipipe_gamma_entry gamma_table[GAMMA_TBL_MAX_SIZE];
+
+	if(gamma == 0) {
+		params->tbl_sel = IPIPE_GAMMA_TBL_ROM;
+		return E_NO;
+	}
+
+	/* using table in ram */
+	double exp = gamma;	
+	Int32 i;
+	Uint16 lut;
+
+	/* gamma is 100 times of actual value, need divided by 1 for calc */
+	exp = 1.0/(exp/100.0);
+	gamma_table[0].offset = 0;
+	
+	for(i = 1; i < GAMMA_TBL_MAX_SIZE; ++i) {
+		lut = gamma_lut_calc(i, exp);
+		gamma_table[i].offset = lut;
+		gamma_table[i - 1].slope = lut - gamma_table[i - 1].offset;
+	}
+
+	/* calc slope for last entry */
+	i = GAMMA_TBL_MAX_SIZE - 1;
+	gamma_table[i].slope = gamma_lut_calc(i + 1, exp) - gamma_table[i].offset;
+
+	params->tbl_sel = IPIPE_GAMMA_TBL_RAM;
+	params->tbl_size = IPIPE_GAMMA_TBL_SZ_512;
+	params->table_r = gamma_table;
+	params->table_g = gamma_table;
+	params->table_b = gamma_table;
+
+	return E_NO;
+}
+
+/*****************************************************************************
  Prototype    : previewer_set_gamma
  Description  : set gamma params
  Input        : struct prev_module_param *modParam  
@@ -372,15 +461,19 @@ static Int32 previewer_set_wb(int fd, struct prev_module_param *modParam, struct
     Modification : Created function
 
 *****************************************************************************/
-static Int32 previewer_set_gamma(struct prev_module_param *modParam, struct prev_gamma *gamma, Bool bypass)
+static Int32 previewer_set_gamma(struct prev_module_param *modParam, struct prev_gamma *params, Bool bypass, Uint16 gamma)
 {
-	bzero(gamma, sizeof(struct prev_gamma));
-	gamma->bypass_r = bypass;
-	gamma->bypass_b = bypass;
-	gamma->bypass_g = bypass;
-	gamma->tbl_sel = IPIPE_GAMMA_TBL_ROM;
-	modParam->len = sizeof (struct prev_gamma);
-	modParam->param = gamma;
+	memset(params, 0, sizeof(struct prev_gamma));
+	params->bypass_r = bypass;
+	params->bypass_b = bypass;
+	params->bypass_g = bypass;
+	params->tbl_sel = IPIPE_GAMMA_TBL_ROM;
+
+	if(!bypass)
+		gamma_table_generate(params, gamma);
+	
+	modParam->len = sizeof(struct prev_gamma);
+	modParam->param = params;
 	return E_NO;
 }
 
@@ -591,6 +684,7 @@ Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
 	struct prev_nf nf;
 	struct prev_wb wb;
 	struct prev_yee yee;
+	
 	short *yeeTab = NULL;
 	Bool bypass;
 
@@ -622,7 +716,7 @@ Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
 			break;
 		case PREV_GAMMA:
 			bypass = (attrs->ctrlFlags & CONV_FLAG_GAMMA_EN) ? 0 : 1;
-			previewer_set_gamma(&modParam, &gamma, bypass);
+			previewer_set_gamma(&modParam, &gamma, bypass, attrs->gamma);
 			break;
 		case PREV_LUM_ADJ:
 			previewer_set_lum(&modParam, &lum, attrs);

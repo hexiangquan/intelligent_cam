@@ -83,6 +83,7 @@ typedef struct {
 	Bool					disableCache;
 	Int32					maxFrameNum;		//max num of caching frames
 	Int32					numFrameCached;		//current num of caching frames
+	const char 				*savePath;
 }RtpTransObj;
 
 typedef struct {
@@ -587,6 +588,8 @@ static Int32 rtp_upload_set_params(void *handle, const void *params)
 		rtpTrans->maxFrameNum = rtpParams->frameRate * rtpParams->cacheTime;
 		pthread_mutex_unlock(&rtpTrans->mutex);	
 	}
+
+	rtpTrans->savePath = rtpParams->savePath;
 	
 	return E_NO;
 }

@@ -25,6 +25,36 @@ enum ImageType
 	IMGTYPE_H264
 };
 
+/* info append at end of JPEG image */
+#define IMG_APPEND_MAGIC	0xADD2BACE
+
+typedef struct {
+	Int8	roadName[64];		//road info
+	Uint16	roadNum;			//Road Number
+	Uint16	direction;			//Direction Number
+	Uint16	devSN;				//Divice Serial Num
+	Uint16	reserved;
+} ImgRoadInfo;
+
+
+typedef struct {
+	ImgDimension 	dimension;		// dimension info, width, height, format, etc.
+	Uint16			frameId;		// frame id, count by hardware
+	Uint8			capMode;		// capture mode of this frame, 0--continue, 1--normal trig, 2--spec trig
+	Uint8			strobeStat;		// strobe status, bit[0:3]--strobe[0:3]
+	Uint32 			exposureTime;
+	Uint16			globalGain;
+	Uint16			avgLum;
+	Uint16			rgbGains[3];	// 0--red, 1--green, 2--blue
+	Uint16			frameType;		
+	DateTime		timeStamp;	
+	ImgRoadInfo		roadInfo;		// info of road
+	Uint8			capInfo[80];	// info of trigger such as way num,  trigger id, etc.
+	Uint8			plateInfo[100];	// info of vehicle licence plate
+	Uint32			offset;			// offset to start of append info
+	Uint32			magicNum;		// magic num for info recg
+}ImgAppendInfo;
+
 
 #ifdef __cplusplus
 #if __cplusplus

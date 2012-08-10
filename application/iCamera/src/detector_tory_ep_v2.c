@@ -423,6 +423,7 @@ static Int32 tory_ep2_init(DetectorUart *dev, Uint16 detectorId)
 	dev->dataBits = UART_D8;
 	dev->parity = UART_POFF;
 	dev->stopBits = UART_S1;
+	dev->chanId = UART_CHAN_RS485;
 
 	dev->packetLen = 7;
 	dev->private = NULL;

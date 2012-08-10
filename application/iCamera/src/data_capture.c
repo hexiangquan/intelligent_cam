@@ -64,7 +64,7 @@
 
 #define CONV_BUF_NUM				2
 
-#define CAP_TRIG_TEST
+//#define CAP_TRIG_TEST
 
 /* index for trigger capture */
 #define CAP_INDEX_NEXT_FRAME		(-1)
@@ -93,6 +93,7 @@ struct DataCapObj{
 	Int32				fdImgCtrl;
 	MsgHandle			hMsg;
 	ImgDimension		capDim;
+	CamRoadInfo			roadInfo;
 	pthread_t			pid;
 	const char 			*dstName[2];
 };
@@ -152,7 +153,8 @@ static Int32 data_capture_config(DataCapHandle hDataCap)
 	Int32				ret;
 	Int32				bufRefCnt = 1;
 
-	DBG("set work mode");
+	DBG("set work mode, fmt: %d, res: %d, capMode: %d", 
+		workMode->format, workMode->resType, workMode->capMode);
 	
 	/* alloc encode for continously stream, test */
 	if(workMode->capMode == CAM_CAP_MODE_CONTINUE) {
@@ -410,10 +412,18 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 	/* choose strem channel Id */
 	Int32 		streamId = 0;
 	CaptureInfo	*capInfo = &hDataCap->defCapInfo;
-	
+
+	/* parse raw capture info */
+	cap_info_parse((Uint8 *)capFrame.dataBuf, &hDataCap->capDim, &imgMsg.rawInfo);
+	/*
+	DBG("capInfo: index: %d, cap mode: %d, avg Y: %u", 
+		imgMsg.rawInfo.index, imgMsg.rawInfo.capMode, imgMsg.rawInfo.avgLum);
+	DBG("  strobe: 0x%X, exposure: %u, global gain: %u", 
+		imgMsg.rawInfo.strobeStat, imgMsg.rawInfo.exposure, imgMsg.rawInfo.globalGain);
+	*/
 	if(hDataCap->encImg) {
 		/* check frame index from img data */
-		Uint16 frameIndex = 0;
+		Uint16 frameIndex = imgMsg.rawInfo.index;
 		
 		if(hDataCap->capIndex < 0 || hDataCap->capIndex >= frameIndex) {
 			if(hDataCap->dstName[1])
@@ -431,6 +441,7 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 	//DBG("<%d> conv one frame", capFrame->index);
 	imgMsg.dimension = hDataCap->capDim;
 	imgMsg.timeCode = capFrame.timeStamp;
+	imgMsg.roadInfo = hDataCap->roadInfo;
 	cam_convert_time(&capFrame.timeStamp, &imgMsg.timeStamp);
 	err = converter_run(hDataCap->hConverter, &capFrame, streamId, &imgMsg);
 
@@ -491,10 +502,6 @@ static Int32 msg_process(DataCapHandle hDataCap, CommonMsg *msgBuf)
 	case APPCMD_CAP_EN:
 		err = data_cap_ctrl(hDataCap, msgHdr->param[0]);
 		break;
-	case APPCMD_FREE_RAW:
-		//err = free_raw_buf(hDataCap, (RawMsg *)msgBuf);
-		err = E_NO;
-		break;
 	case APPCMD_SET_WORK_MODE:
 		err = data_capture_config(hDataCap);
 		break;
@@ -503,6 +510,10 @@ static Int32 msg_process(DataCapHandle hDataCap, CommonMsg *msgBuf)
 		break;
 	case APPCMD_SET_TRIG_PARAMS:
 		err = detector_config(hDataCap);
+		break;
+	case APPCMD_SET_ROAD_INFO:
+		hDataCap->roadInfo = *(CamRoadInfo *)msgBuf->buf;
+		err = E_NO;
 		break;
 	case APPCMD_EXIT:
 		hDataCap->exit = TRUE;
@@ -616,12 +627,8 @@ static void *data_capture_thread(void *arg)
 			continue;
 		}
 
-		/* no data ready */
-		if(!ret)
-			continue;
-
 		/* check which is ready */
-		if( hDataCap->fdDetect >0 &&
+		if( hDataCap->fdDetect > 0 &&
 			FD_ISSET(hDataCap->fdDetect, &rdSet) ){
 			/* trigger capture */
 			detector_trigger(hDataCap);
@@ -683,7 +690,8 @@ DataCapHandle data_capture_create(const DataCapAttrs *attrs)
 		ERR("create msg handle failed...");
 		goto exit;
 	}
-	
+
+	hDataCap->roadInfo = attrs->roadInfo;
 	hDataCap->workMode = attrs->workMode;
 	hDataCap->hCap = attrs->hCapture;
 	if(!hDataCap->hCap) {
@@ -987,4 +995,46 @@ Int32 data_capture_ctrl(DataCapHandle hDataCap, MsgHandle hCurMsg, Int32 ctrl)
 	
 	return app_hdr_msg_send(hCurMsg, msg_get_name(hDataCap->hMsg), APPCMD_CAP_EN, ctrl, 0);
 }
+
+/*****************************************************************************
+ Prototype    : data_capture_set_road_info
+ Description  : update road info
+ Input        : DataCapHandle hDataCap  
+                MsgHandle hCurMsg       
+                CamRoadInfo *info       
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/1
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 data_capture_set_road_info(DataCapHandle hDataCap, MsgHandle hCurMsg, CamRoadInfo *info)
+{
+	if(!hDataCap || !info || !hCurMsg) {
+		return E_INVAL;
+	}
+
+	struct {
+		MsgHeader		hdr;
+		CamRoadInfo		info;
+	} msg;
+
+	/* fill header fileds */
+	msg.hdr.type = MSG_TYPE_REQU;
+	msg.hdr.index = 0;
+	msg.hdr.dataLen = sizeof(CamRoadInfo);
+	msg.hdr.cmd = APPCMD_SET_ROAD_INFO;
+	msg.info = *info;
+
+	/* send msg */
+	Int32 err = msg_send(hCurMsg, msg_get_name(hDataCap->hMsg), (MsgHeader *)&msg, 0);
+	
+	return err;
+}
+
 

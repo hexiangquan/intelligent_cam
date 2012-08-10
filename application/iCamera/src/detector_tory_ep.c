@@ -233,7 +233,9 @@ static void tory_ep_pre_parse(DetectorUart *dev, const CamDetectorParam *params)
 {
 	if(!dev || !params)
 		return;
-	
+
+	DBG("tory ep pre parse: red: 0x%04X, green: 0x%04X, retro: 0x%04X", 
+		params->redLightCapFlag, params->greenLightCapFlag, params->retrogradeCapFlag);
 	tory_ep_cap_pre_parse(params->redLightCapFlag, dev->epCapTable, &dev->lastFrameCode[TRIG_EP]);
 	tory_retrograde_cap_pre_parse(params->retrogradeCapFlag, dev->reCapTable, &dev->lastFrameCode[TRIG_RE]);
 }
@@ -456,6 +458,8 @@ static Int32 cp_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uin
 *****************************************************************************/
 static Int32 tory_ep_parse(DetectorUart *dev, const CamDetectorParam *params, Uint8 *rxBuf, TriggerInfo *info)
 {
+	//DBG("enter tory ep parse.");
+	
 	/* Validate data */
 	if((rxBuf[1] & 0x0F) != 0x01 || rxBuf[2] > 0x03)
 		return E_INVAL;
@@ -504,6 +508,7 @@ static Int32 tory_ep_init(DetectorUart *dev, Uint16 detectorId)
 	dev->dataBits = UART_D8;
 	dev->parity = UART_POFF;
 	dev->stopBits = UART_S1;
+	dev->chanId = UART_CHAN_RS485;
 
 	dev->packetLen = 5;
 	dev->private = NULL;

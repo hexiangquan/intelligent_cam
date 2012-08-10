@@ -1,5 +1,7 @@
 #include "uart.h"
 #include "log.h"
+#include "ext_io.h"
+#include <sys/ioctl.h>
 
 /*****************************************************************************
  Prototype    : uart_set_attrs
@@ -172,7 +174,7 @@ Int32 uart_set_timeout(Int32 fd, Uint8 minCnt, Uint8 timeout)
 	attrs.c_cc[VMIN] = minCnt;
 	
 	/* flush data */
-	tcflush(fd, TCOFLUSH);
+	//tcflush(fd, TCOFLUSH);
 
 	/* update attrs now */
 	if(tcsetattr(fd, TCSANOW, &attrs) < 0) {
@@ -181,6 +183,52 @@ Int32 uart_set_timeout(Int32 fd, Uint8 minCnt, Uint8 timeout)
 	}
 
 	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : uart_set_trans_delay
+ Description  : set uart transition delay type
+ Input        : Uint16 chanId          
+                UartBaudrate baudrate  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/9
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 uart_set_trans_delay(Uint16 chanId, UartBaudrate baudrate)
+{
+	if(chanId > UART_CHAN_RS485 || baudrate >= UART_B_MAX)
+		return E_INVAL;
+
+	int fd = open(EXTIO_DEV_NAME, O_RDWR);
+
+	if(fd < 0) {
+		ERRSTR("open %s failed", EXTIO_DEV_NAME);
+		return E_NOTEXIST;
+	}
+
+	struct hdcam_uart_cfg cfg;
+	const Uint16 hdcam_baud[] = { 
+		HDCAM_UART_BAUD_4800, HDCAM_UART_BAUD_4800, HDCAM_UART_BAUD_4800, HDCAM_UART_BAUD_4800,
+		HDCAM_UART_BAUD_9600, HDCAM_UART_BAUD_19200, HDCAM_UART_BAUD_38400, HDCAM_UART_BAUD_57600,
+		HDCAM_UART_BAUD_115200, HDCAM_UART_BAUD_115200, HDCAM_UART_BAUD_115200};
+	
+	cfg.id = chanId;
+	cfg.baudrate = hdcam_baud[baudrate];
+
+	Int32 err;
+
+	err = ioctl(fd, EXTIO_S_UART, &cfg);
+
+	close(fd);
+
+	return err ? E_IO : E_NO;
 }
 
 

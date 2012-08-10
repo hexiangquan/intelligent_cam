@@ -8,7 +8,7 @@ STATIC ?= 0
 
 LIB_PATH = lib
 LIB_NAME = capture
-LIB_SRC = capture.c
+LIB_SRC = capture.c cap_info_parse.c
 LIB_HEADER = $(addsuffix .h, $(basename $(LIB_SRC)))
 LIB_OBJ=$(addprefix $(LIB_PATH)/, $(addsuffix .o, $(basename $(LIB_SRC))))
 
@@ -61,7 +61,7 @@ $(LIB): $(LIB_OBJ)
 	$(CC) -shared -o $@ $^
 endif
 
-$(EXEC): $(SRC) $(LIB_HEADER)
+$(EXEC): $(SRC) $(LIB_HEADER) $(LIB)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) 
 	
 clean:

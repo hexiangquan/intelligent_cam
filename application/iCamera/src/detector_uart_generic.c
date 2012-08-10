@@ -65,7 +65,8 @@ static const DetectorUartFxns *uartDetectorFxns[] = {
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
-#define RX_BUF_SIZE				(8)
+
+#define RX_BUF_SIZE				(32)
 	
 #define detector_uart_stop(dev)	\
 		do { \
@@ -108,7 +109,11 @@ static Int32 detector_uart_start(DetectorUart *dev)
 		dev->fd = ret;
 
 		/* set timeout for 1 byte recv */
-		ret = uart_set_timeout(dev->fd, 1, dev->timeout);
+		ret = uart_set_timeout(dev->fd, dev->packetLen, dev->timeout);
+
+		/* set transition delay time */
+		if(!ret)
+			ret = uart_set_trans_delay(dev->chanId, dev->baudRate);
 	} else 
 		UART_FLUSH(dev->fd);
 
@@ -259,30 +264,35 @@ static Int32 detector_uart_close(DetectorHandle hDetector)
     Modification : Created function
 
 *****************************************************************************/
-static inline Int32 recv_start_code(DetectorUart *dev, Uint8 *buf)
+static Int32 recv_packet(DetectorUart *dev, Uint8 *buf, Int32 *offset, size_t bufSize)
 {
-	Int32 	status = E_NO;
+	Int32	i;
+	Int32 	len = *offset;
 
-	while(1) {
-		status = read(dev->fd, buf, 1);
-		if(status != 1) {
-			#ifdef UART_DEBUG
-			ERR("recv start code timeout.");		
-			#endif
-			status = E_TIMEOUT;
-			break;
+	if(len < dev->packetLen) {
+		/* calc len recv this time add last time left */
+		len += read(dev->fd, buf + *offset, bufSize);
+		//DBG("len: %d, offset: %d, buflen: %u", len, *offset, bufSize);
+		if(len < dev->packetLen) {
+			return E_TIMEOUT;
 		}
-
-		/* if no sync fxns, just return ok */
-		if(!dev->opts->startCodeSync)
-			break;
-
-		/* call sync fxn for cmp */
-		if(dev->opts->startCodeSync(dev, buf[0]))
-			break;
 	}
 
-	return status;
+	/* if no sync fxns, just return ok */
+	if(!dev->opts->startCodeSync) {
+		*offset = 0;
+		return len;
+	}
+
+	for(i = 0; i != len; ++i) {
+		/* call sync fxn for cmp */
+		if(dev->opts->startCodeSync(dev, buf[i])) {
+			*offset = i;
+			return len;
+		}
+	}
+
+	return E_CHECKSUM;
 }
 
 
@@ -310,6 +320,7 @@ static Int32 detector_uart_run(DetectorHandle hDetector, CaptureInfo *capInfo)
 	DetectorUart			*dev = DETECTOR_GET_PRIVATE(hDetector);
 	const CamDetectorParam	*params = DETECTOR_GET_PARAMS(hDetector);
 	TriggerInfo				*trigInfo = &capInfo->triggerInfo[0];
+	Int32					start = 0, offset = 0, recvLen;
 	
 	if(!capInfo || !dev || !params)
 		return E_INVAL;
@@ -320,23 +331,15 @@ static Int32 detector_uart_run(DetectorHandle hDetector, CaptureInfo *capInfo)
 	/* Recieve and parse trigger data  */
 	for(i = 0; i < APP_MAX_CAP_CNT; i++) {	
 		/* Check if there is trigger data recved */
-		status = recv_start_code(dev, rxBuf);
-		if(status) {
-			break;
-		}
-
-		/* Recv following data */
-		status = read(dev->fd, rxBuf + 1, dev->packetLen - 1);
-		if(status) {	
-			#ifdef UART_DEBUG
-			ERR("recv trigger code timeout.");	
-			#endif
-			status = E_TIMEOUT;
+		status = recv_packet(dev, rxBuf + start, &offset, sizeof(rxBuf) - offset - start);
+		if(status < 0) {
 			break;
 		}
 
 		/* Parse trigger data */
-		status = dev->opts->singleTrigParse(dev, params, rxBuf, trigInfo);
+		recvLen = status;
+		start += offset;
+		status = dev->opts->singleTrigParse(dev, params, rxBuf + start, trigInfo);
 		if(!status) {
 			capInfo->capCnt++;
 			/* set flags for top level flags */
@@ -344,13 +347,26 @@ static Int32 detector_uart_run(DetectorHandle hDetector, CaptureInfo *capInfo)
 				capInfo->flags |= CAPINFO_FLAG_DELAY_CAP;
 			if(trigInfo->flags & TRIG_INFO_OVERSPEED)
 				capInfo->flags |= CAPINFO_FLAG_OVERSPEED;
+
+		#ifdef UART_DEBUG
+			DBG("got trig data, way: %d, frame num: %d", trigInfo->wayNum, trigInfo->frameId);
+		#endif
+
 			trigInfo++;
 		}
+
+		/* Move to next packet */
+		start += dev->packetLen;
+		offset = recvLen - dev->packetLen;
+
+		if(offset)
+			usleep(5000);
 	}
 
 	/* We have received some data */
-	if(capInfo->capCnt) 
+	if(capInfo->capCnt) {
 		return E_NO;
+	}
 		
 	return status;
 }

@@ -66,7 +66,7 @@ typedef struct {
 	Uint16	saturation;		//value of saturation, unused at current ver.
 	Uint16	digiGain;		//digital gain
 	Uint16	drcStrength;	//strength of DRC
-	Uint16	reserved;		//reserved
+	Uint16	gamma;			//gamma value plus 100
 } CamImgEnhanceParams;
 
 /* Flags for image enhance */
@@ -81,13 +81,22 @@ typedef struct {
 
 /*
   * special capture params 
+  * Note: specail capture may use auto exposure params diff from normal params 
  */
 typedef struct {
-	Uint32	expTime;		// Unit: us
-	Uint16	globalGain;		// Range: 0~1023
+	Uint32	expTime;		// Fixed exposure, Unit: us
+	Uint16	globalGain;		// Fixed gain, Range: 0~1023
 	Uint16	strobeEn;		// Bit[0:1]- strobe0, strobe1, 1-enable, 1-disable
-	Uint32	reserved[2];
+	Uint32	aeMinExpTime;	// AE for special capture, Min exposure time, us
+	Uint32	aeMaxExpTime;	// AE for special capture Max exposure time, us 
+	Uint16	aeMinGain;		// AE for special capture, Min global gain, 0~1023
+	Uint16	aeMaxGain;		// AE for special capture, Max global gain, 0~1023
+	Uint16	aeTargetVal;	// AE for special capture, target lum value
+	Uint16	flags;			// flags for ctrl
+	Uint32	reserved[2];	
 }CamSpecCapParams;
+
+#define CAM_SPEC_CAP_FLAG_AE_EN	(1 << 0)	// enable ae for special trigger
 
 /*
  * Auto exposure params

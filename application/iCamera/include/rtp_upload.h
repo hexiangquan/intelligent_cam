@@ -66,6 +66,7 @@ typedef struct {
 	Uint32			bitRate;		//media bitrate
 	Uint16			cacheTime;		//time of video clips, half will be cached
 	Uint16			keepTime;		//time of video sending after enable upload
+	const char 		*savePath;		//video file save path when net link is not ready
 }RtpUploadParams;
 
 

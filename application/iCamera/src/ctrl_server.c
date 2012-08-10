@@ -387,6 +387,8 @@ static void *ctrl_server_thread(void *arg)
 			break;
 		case ICAMCMD_S_ROADINFO:
 			ret = params_mng_control(hParamsMng, PMCMD_S_ROADINFO, data, msgHdr->dataLen);
+			if(!ret)
+				ret = data_capture_set_road_info(hCtrlSrv->hDataCap, hCtrlSrv->hMsg, (CamRoadInfo *)data);
 			break;
 		case ICAMCMD_G_ROADINFO:
 			ret = params_mng_control(hParamsMng, PMCMD_G_ROADINFO, data, CTRL_MSG_BUF_LEN);

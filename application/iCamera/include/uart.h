@@ -53,6 +53,9 @@
 #define UART_RS232		"/dev/ttyS0"
 #define UART_RS485		"/dev/ttyS1"
 
+#define UART_CHAN_RS232	0
+#define UART_CHAN_RS485	1
+
 #define UART_FLUSH(fd)	(tcflush(fd, TCIOFLUSH))
 
 /*----------------------------------------------*
@@ -164,6 +167,24 @@ extern Int32 uart_set_attrs(int fd, UartBaudrate baudrate, UartDataBits dataBits
 
 *****************************************************************************/
 extern Int32 uart_set_timeout(Int32 fd, Uint8 minCnt, Uint8 timeout);
+
+/*****************************************************************************
+ Prototype    : uart_set_trans_delay
+ Description  : set uart transition delay type
+ Input        : Uint16 chanId          
+                UartBaudrate baudrate  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/9
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 uart_set_trans_delay(Uint16 chanId, UartBaudrate baudrate);
 
 
 #ifdef __cplusplus

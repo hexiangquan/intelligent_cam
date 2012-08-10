@@ -36,6 +36,7 @@ public:
   FramedSource* audioSource();
   int videoWrite(MediaFrame *frame);
   int audioWrite(MediaFrame *frame);
+  int isOpened();
   virtual ~ICamInput();
 
 private:

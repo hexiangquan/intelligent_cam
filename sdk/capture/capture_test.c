@@ -7,7 +7,8 @@
 #include <sys/ioctl.h>
 #include <asm/types.h>
 #include <linux/videodev2.h>
-
+#include "cap_info_parse.h"
+#include "img_ctrl.h"
 
 
 #define CAPTURE_DEVICE		"/dev/video0"
@@ -18,11 +19,13 @@
 #define DEF_OUT_FILE	"capOut.raw"
 #define IMG_MAX_WIDTH	4096
 #define IMG_MAX_HEIGHT	4096
+#define DEF_CAP_MODE	0
 
 
 typedef struct _TestParams {
 	int loopCnt;
 	const char *outFileName;
+	int capMode;
 }TestParams;
 
 static Bool check_all_zero(void *buf, Int32 bufSize)
@@ -74,6 +77,29 @@ static void cap_ctrl_test(CapHandle hCapture)
 
 }
 
+static void cap_info_test(FrameBuf *frame, CapInputInfo *inputInfo)
+{
+	ImgDimension	dim;
+
+	dim.size = inputInfo->size;
+	dim.width = inputInfo->width;
+	dim.height = inputInfo->height;
+	dim.bytesPerLine = inputInfo->bytesPerLine;
+	dim.colorSpace = inputInfo->colorSpace;
+
+	RawCapInfo capInfo;
+
+	Int32 err = cap_info_parse((Uint8 *)frame->dataBuf, &dim, &capInfo);
+	assert(err == E_NO);
+	
+	DBG("capInfo: size: %d, index: %d, cap mode: %d, avg Y: %u", 
+		dim.size, capInfo.index, capInfo.capMode, capInfo.avgLum);
+	DBG("  strobe: 0x%X, exposure: %u, global gain: %u", 
+		capInfo.strobeStat, capInfo.exposure, capInfo.globalGain);
+
+	return;
+}
+
 static Bool main_loop(TestParams *params)
 {
 	Bool ret = FALSE;
@@ -92,14 +118,31 @@ static Bool main_loop(TestParams *params)
 	attrs.std = CAP_STD_FULL_FRAME;
 	attrs.userAlloc = TRUE;
 	attrs.defRefCnt = 1;
+	attrs.mode = CAP_MODE_CONT;
 	
 	CapHandle hCapture = capture_create(&attrs);
 	assert(hCapture);
 
+	int trigCmd = 0;
+	if(params->capMode == 0)
+		attrs.mode = CAP_MODE_CONT;
+	else {
+		/* normal trig */
+		attrs.mode = CAP_MODE_TRIG;
+		if(params->capMode == 1)
+			trigCmd = IMGCTRL_TRIGCAP;
+		else
+			trigCmd = IMGCTRL_SPECTRIG;
+	}
+
+	err = capture_config(hCapture, CAP_STD_FULL_FRAME, attrs.mode);
+	assert(err == E_NO);
+	
 	CapInputInfo info;
 
 	err = capture_get_input_info(hCapture, &info);
-	DBG("Capture input: %u X %u, fmt: %d", info.width, info.height, info.colorSpace);
+	DBG("Capture input: %u X %u, fmt: %d, bytes per line: %d", 
+		info.width, info.height, info.colorSpace, info.bytesPerLine);
 	
 	FrameBuf frameBuf;
 	Uint32 size = 1600 * 1200 * 2;
@@ -118,12 +161,50 @@ static Bool main_loop(TestParams *params)
 	if(err)
 		goto exit;
 
-	capture_set_def_frame_ref_cnt(hCapture, 3);
+	//capture_set_def_frame_ref_cnt(hCapture, 3);
+
+	int fdImg = open("/dev/imgctrl", O_RDWR);
+	assert(fdImg > 0);
+	struct hdcam_ab_cfg cfg;
+	bzero(&cfg, sizeof(cfg));
+	cfg.flags = HDCAM_AB_FLAG_AE_EN | HDCAM_AB_FLAG_AG_EN;
+	cfg.targetValue = 100;
+	cfg.minShutterTime = 10;
+	cfg.maxShutterTime = 2000;
+	cfg.minGainValue = 1;
+	cfg.maxGainValue = 100;
+	cfg.maxAperture = 10;
+	cfg.minAperture = 0;
+	cfg.roi[0].endX = 1024;
+	cfg.roi[0].endY = 1000;
+	
+	err = ioctl(fdImg, IMGCTRL_S_ABCFG, &cfg);
+	assert(err == 0);
+
+	struct hdcam_spec_cap_cfg specTrig;
+	specTrig.exposureTime = 4000;
+	specTrig.globalGain = 123;
+	specTrig.strobeCtrl = 0x03;
+	specTrig.aeMinExpTime = 100;
+	specTrig.aeMaxExpTime = 5000;
+	specTrig.aeMinGain = 0;
+	specTrig.aeMaxGain = 200;
+	specTrig.aeTargetVal = 75;
+	specTrig.flags = 0;
+	err = ioctl(fdImg, IMGCTRL_S_SPECCAP, &specTrig);
+	assert(err == 0);
 
 	Int32 i = 0;
+	Uint16 frameId;
 
 	while(1) {
-		
+
+		if(trigCmd) {
+			//err = ioctl(fdImg, trigCmd, NULL);// &frameId);
+			err = ioctl(fdImg, trigCmd, NULL);// &frameId);
+			assert(err == 0);
+		}
+
 		err = capture_get_frame(hCapture, &frameBuf);
 		if(err) {
 			ERR("wait capture buffer failed...");
@@ -135,9 +216,9 @@ static Bool main_loop(TestParams *params)
 		
 
 		//check_all_zero(frameBuf.dataBuf, frameBuf.bytesUsed);
+		cap_info_test(&frameBuf, &info);
 		
 		usleep(1000);
-		
 		
 		err = capture_free_frame(hCapture, &frameBuf);
 		if(err < 0) {
@@ -145,14 +226,16 @@ static Bool main_loop(TestParams *params)
 			break;
 		}
 
-		err = capture_inc_frame_ref(hCapture, &frameBuf);
+		//err = capture_inc_frame_ref(hCapture, &frameBuf);
 		//assert(err == E_NO);
 		
-		err = capture_free_frame(hCapture, &frameBuf);
+		//err = capture_free_frame(hCapture, &frameBuf);
 
 		i++;
 		if(params->loopCnt > 0 && i > params->loopCnt)
 			break;
+
+		usleep(70000);
 	}
 
 	err = capture_stop(hCapture);
@@ -201,6 +284,8 @@ static void usage(void)
     INFO(" -h get help");
 	INFO(" -n loop count, default: %d", DEF_LOOP_CNT);
 	INFO(" -o out file name, default: %s", DEF_OUT_FILE);
+	INFO(" -m capture mode, 0-continue, 1-normal trig, 2-special trig, defualt: %d", 
+		DEF_CAP_MODE);
     INFO("Example:");
     INFO(" use default params: ./captureTest");
     INFO(" use specific params: ./captureTest -n 10");
@@ -209,11 +294,12 @@ static void usage(void)
 int main(int argc, char **argv)
 {
 	int c;
-    char *options = "n:o:h";
+    char *options = "n:o:m:h";
 	TestParams params;
 	
 	params.loopCnt = DEF_LOOP_CNT;
 	params.outFileName = DEF_OUT_FILE;
+	params.capMode = DEF_CAP_MODE;
 
 	while ((c = getopt(argc, argv, options)) != -1) {
 		switch (c) {
@@ -222,6 +308,9 @@ int main(int argc, char **argv)
 			break;
 		case 'o':
 			params.outFileName = optarg;
+			break;
+		case 'm':
+			params.capMode = atoi(optarg);
 			break;
 		case 'h':
 		default:

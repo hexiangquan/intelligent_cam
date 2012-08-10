@@ -618,14 +618,20 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 		ret = E_NO;
 		cmdHdr->dataLen = 0;
 		break;
-	case TC_FUN_UPDATE_ARM:
-		ret = firmware_update(params->armProg, data, cmdHdr->dataLen, cmdHdr->checkSum);
+	case TC_FUN_UPDATE_ARM: {
+		char fname[128];
+		if(strncmp(data, "lib", 3))	
+			snprintf(fname, sizeof(fname), "/home/root/%s", data + UPDATE_NAME_OFFSET);
+		else
+			snprintf(fname, sizeof(fname), "/usr/lib/%s", data + UPDATE_NAME_OFFSET);
+		ret = firmware_update(fname, data + UPDATE_DATA_OFFSET, cmdHdr->dataLen, cmdHdr->checkSum);
 		cmdHdr->dataLen = 0;
 		if(ret == E_NO)
 			params->reboot = TRUE;
 		break;
+	}
 	case TC_FUN_UPDATE_FPGA:
-		ret = firmware_update(params->fpgaFirmware, data, cmdHdr->dataLen, cmdHdr->checkSum);
+		ret = firmware_update(params->fpgaFirmware, data + UPDATE_DATA_OFFSET, cmdHdr->dataLen, cmdHdr->checkSum);
 		cmdHdr->dataLen = 0;
 		/* if file update ok, tell icam prog to reload */
 		if(ret == E_NO)

@@ -24,6 +24,7 @@
 #include "converter.h"
 #include "capture.h"
 #include "msg.h"
+#include "cam_info.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -65,6 +66,7 @@ typedef struct {
 	CamDetectorParam	detectorParams;
 	ConverterParams		convParams;
 	CapHandle			hCapture;
+	CamRoadInfo			roadInfo;
 }DataCapAttrs;
 
 typedef struct DataCapObj *DataCapHandle;
@@ -217,6 +219,25 @@ extern Int32 data_capture_get_input_info(DataCapHandle hDataCap, ImgDimension *i
 
 *****************************************************************************/
 extern Int32 data_capture_ctrl(DataCapHandle hDataCap, MsgHandle hCurMsg, Int32 ctrl);
+
+/*****************************************************************************
+ Prototype    : data_capture_set_road_info
+ Description  : update road info
+ Input        : DataCapHandle hDataCap  
+                MsgHandle hCurMsg       
+                CamRoadInfo *info       
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/1
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 data_capture_set_road_info(DataCapHandle hDataCap, MsgHandle hCurMsg, CamRoadInfo *info);
 
 #ifdef __cplusplus
 #if __cplusplus

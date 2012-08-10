@@ -100,7 +100,7 @@ const AppParams c_appParamsDef = {
 		.saturation = 0,
 		.digiGain = 64,
 		.drcStrength = 16,
-		.reserved = 0,
+		.gamma = 220,
 	},
 	.h264EncParams = {
 		.resolution = H264_RES_1920X1080,
@@ -118,9 +118,9 @@ const AppParams c_appParamsDef = {
 		.flags = 0,
 	},
 	.workMode = {
-		.format = CAM_FMT_JPEG_H264,
+		.format = CAM_FMT_JPEG,
 		.resType = CAM_RES_FULL_FRAME,
-		.capMode = CAM_CAP_MODE_CONTINUE,
+		.capMode = CAM_CAP_MODE_TRIGGER,
 		.flags = 0,
 		.reserved = {0},
 	},
@@ -142,9 +142,14 @@ const AppParams c_appParamsDef = {
 	},
 	.detectorParams = {
 		.detecotorId = DETECTOR_TORY_EP,
-		.redLightCapFlag = 0,
-		.greenLightCapFlag = 0,
-		.retrogradeCapFlag = 0,
+		.redLightCapFlag = 
+			DETECTOR_FLAG_LOOP1_POS_CAP | DETECTOR_FLAG_LOOP1_NEG_CAP | DETECTOR_FLAG_LOOP2_NEG_CAP,
+		.greenLightCapFlag = DETECTOR_FLAG_LOOP1_NEG_CAP,
+		.retrogradeCapFlag = 
+			DETECTOR_FLAG_LOOP1_POS_CAP | DETECTOR_FLAG_LOOP2_POS_CAP | DETECTOR_FLAG_LOOP2_NEG_CAP,
+		.loopDist = { 300, 300, 300, 300, },
+		.limitSpeed = 80,
+		.calcSpeed= 88,
 	},
 	.aeParams = {
 		.flags = CAM_AE_FLAG_AE_EN | CAM_AE_FLAG_AG_EN,
@@ -160,6 +165,17 @@ const AppParams c_appParamsDef = {
 	},
 	.dayNightCfg = {
 		.switchMethod = CAM_DN_SWT_OFF,
+	},
+	.specCapParams = {
+		.expTime = 4000,
+		.globalGain = 100,
+		.strobeEn = 0x03,
+		.aeMinExpTime = 100,
+		.aeMaxExpTime = 4000,
+		.aeMinGain = 0,
+		.aeMaxGain = 300,
+		.aeTargetVal = 75,
+		.flags = CAM_SPEC_CAP_FLAG_AE_EN,
 	},
 };
 

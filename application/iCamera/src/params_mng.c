@@ -857,6 +857,7 @@ static Int32 get_img_conv_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 	params->digiGain = appCfg->imgAdjParams.digiGain;
 	params->brigtness = appCfg->imgAdjParams.brightness;
 	params->contrast = appCfg->imgAdjParams.contrast;
+	params->gamma = appCfg->imgAdjParams.gamma;
 	params->inputFmt = hParamsMng->capInputInfo.colorSpace;
 	params->inputWidth = hParamsMng->capInputInfo.width;
 	params->inputHeight = hParamsMng->capInputInfo.height;
@@ -1620,7 +1621,7 @@ static Int32 set_tcp_srv_info(ParamsMngHandle hParamsMng, void *data, Int32 size
 
 	/* validate data */
 	if(!params->serverPort) {
-		ERR("invalid rtp params");
+		ERR("invalid server port: %d", (int)params->serverPort);
 		return E_INVAL;
 	}
 	
@@ -2220,7 +2221,10 @@ static Int32 set_strobe_params(ParamsMngHandle hParamsMng, void *data, Int32 siz
 		/* sync with hardware */
 		struct hdcam_strobe_info info;
 
-		info.status = params->ctrlFlags;
+		info.status = params->ctrlFlags & 0x0F;
+		info.sigVal = params->sigVal & 0x0F;
+		info.mode = params->mode & 0x0F;
+		info.syncAC = params->acSyncEn & 0x0F;
 		info.offset = params->offset;
 		
 		if(ioctl(hParamsMng->fdExtIo, EXTIO_S_STROBE, &info) < 0) {
@@ -2769,7 +2773,10 @@ static Int32 set_spec_cap_params(ParamsMngHandle hParamsMng, void *data, Int32 s
 	AppParams *appCfg = &hParamsMng->appParams;
 
 	/* validate data */
-	if( params->globalGain >= 1023 ) {
+	if( params->globalGain > 1023 ||
+		params->aeMaxGain > 1023 || 
+		params->aeMinGain > params->aeMaxGain || 
+		params->aeMinExpTime > params->aeMaxExpTime) {
 		ERR("invalid spec cap params");
 		return E_INVAL;
 	}
@@ -2783,7 +2790,7 @@ static Int32 set_spec_cap_params(ParamsMngHandle hParamsMng, void *data, Int32 s
 
 		cfg = *(struct hdcam_spec_cap_cfg *)data;
 		
-		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_SEPCCAP, &cfg) < 0) {
+		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_SPECCAP, &cfg) < 0) {
 			return E_IO;
 		}
 	}

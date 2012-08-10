@@ -24,8 +24,19 @@ typedef struct {
 
 #define CAM_STROBE_FLAG_EN0		(1 << 0)	//enable strobe0
 #define CAM_STROBE_FLAG_EN1		(1 << 1)	//enable strobe1
+#define CAM_STROBE_FLAG_EN2		(1 << 2)	//enable strobe2
+
 #define CAM_STROBE_FLAG_AUTO0	(1 << 8)	//enable strobe0 auto switch
 #define CAM_STROBE_FLAG_AUTO1	(1 << 9)	//enable strobe1 auto switch
+#define CAM_STROBE_FLAG_AUTO2	(1 << 10)	//enable strobe2 auto switch
+
+#define CAM_STROBE_SIG_HIGH		(1)	// edge of sync enable
+#define CAM_STROBE_SIG_LOW		(0)
+
+#define CAM_STROBE_MODE_TRIG	(1)	// trigger output
+#define CAM_STROBE_MODE_FREQ	(0)	// frequent output
+
+#define CAM_STROBE_AC_SYNC_EN	(1)	//sync with AC signals
 
 typedef enum {
 	CAM_STROBE_SWITCH_AUTO = 0, //switch automatically
@@ -43,6 +54,10 @@ typedef struct {
 	Uint8	enStartMin;		//start minute, 0~59
 	Uint8	enEndHour;		//end hour
 	Uint8	enEndMin;		//end minute, 0~59
+	Uint8	sigVal;			//output signals value, bit[0:2]-stobe[0:2], 
+	Uint8	mode;			//trig or freq output
+	Uint8	acSyncEn;		//sync with AC signals or not
+	Uint8	reserved[5];		
 } CamStrobeCtrlParam;
 
 #endif

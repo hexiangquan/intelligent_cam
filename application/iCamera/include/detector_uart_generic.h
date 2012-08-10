@@ -51,6 +51,8 @@
  *----------------------------------------------*/
 #define CAP_TABLE_SIZE			4
 
+//#define UART_DEBUG
+
 /*----------------------------------------------*
  * routines' implementations                    *
  *----------------------------------------------*/
@@ -79,6 +81,7 @@ enum TrigIndex{
 /* obj for uart detector */
 typedef struct DetectorUartObj {
 	Int32					fd;									//Uart fd
+	Int32					chanId;
 	const char 				*devName;							//uart attributes
 	UartBaudrate			baudRate;							
 	UartDataBits			dataBits;

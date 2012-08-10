@@ -172,6 +172,9 @@ int ICamInput::audioWrite(MediaFrame * frame) {
 	return ((AudioOpenFileSource *)fOurAudioSource)->writeToBuf(frame);
 }
 
+int ICamInput::isOpened() {
+	return fOurVideoSource ? 1 : 0;
+}
 
 ////////// OpenFileSource implementation //////////
 

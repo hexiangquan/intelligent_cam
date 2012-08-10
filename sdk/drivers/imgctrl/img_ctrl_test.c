@@ -6,12 +6,14 @@
 
 
 #define DEV_NAME		"/dev/imgctrl"
+#define SPEC_TRIG_CNT	10
 
 typedef struct _TestParams {
 	const char *devName;
 	int abEn;
 	int awbEn;
 	int hwTestEn;
+	int loopCnt;
 }TestParams;
 
 static void hw_test(int fd)
@@ -22,6 +24,45 @@ static void hw_test(int fd)
 		err = ioctl(fd, IMGCTRL_HW_TEST, NULL);
 		usleep(100000);
 	}
+}
+
+static int spec_cap_test(int fd, int cnt)
+{
+	int err;
+	struct hdcam_spec_cap_cfg cfg;
+
+	cfg.exposureTime = 4000;
+	cfg.globalGain = 100;
+	cfg.strobeCtrl = 0x03;
+	cfg.aeMinExpTime = 100;
+	cfg.aeMaxExpTime = 4000;
+	cfg.aeMinGain = 0;
+	cfg.aeMaxGain = 200;
+	cfg.aeTargetVal = 70;
+	cfg.flags = HDCAM_SPEC_CAP_AE_EN;
+
+	err = ioctl(fd, IMGCTRL_S_SPECCAP, &cfg);
+	if(err) {
+		ERRSTR("set spec cap failed");
+		return E_IO;
+	}
+
+	int i;
+	__u16 id;
+
+	for(i = 0; i < cnt; ++i) {
+		err = ioctl(fd, IMGCTRL_SPECTRIG, &id);
+		if(err)
+			break;
+		DBG("<%d> spec trig next id: %u", i, (unsigned)id);
+		usleep(100000);
+	}
+
+	if(!err)
+		DBG("spec cap test success.");
+	
+	return err;
+	
 }
 
 static Bool main_loop(TestParams *params)
@@ -135,6 +176,18 @@ static Bool main_loop(TestParams *params)
 		goto exit;
 	}
 
+	err = ioctl(fd, IMGCTRL_TRIGCAP, NULL);
+	if(err) {
+		ERR("trig cap failed!");
+		goto exit;
+	}
+
+	err = spec_cap_test(fd, params->loopCnt);
+	if(err) {
+		ERR("spec cap test failed");
+		goto exit;
+	}
+
 	ret = TRUE;
 exit:
 
@@ -155,6 +208,7 @@ static void usage(void)
 	INFO(" -b ab ctrl, 0-enable, 1-disable, default: enable");
 	INFO(" -w awb ctrl, 0-enable, 1-disable, default: enable");
 	INFO(" -t fpga rw test, 0-enable, 1-disable, default: disable");
+	INFO(" -n special trigger loop cnt, default: %d", SPEC_TRIG_CNT);
     INFO("Example:");
     INFO(" use default params: ./imgctrlTest");
     INFO(" use specific params: ./imgctrlTest -s /dev/imgctrl");
@@ -170,6 +224,7 @@ int main(int argc, char **argv)
 	params.abEn = 1;
 	params.awbEn = 1;
 	params.hwTestEn = 0;
+	params.loopCnt = SPEC_TRIG_CNT;
 
 	while ((c = getopt(argc, argv, options)) != -1) {
 		switch (c) {
@@ -184,6 +239,9 @@ int main(int argc, char **argv)
 			break;
 		case 't':
 			params.hwTestEn = atoi(optarg);
+			break;
+		case 'n':
+			params.loopCnt = atoi(optarg);
 			break;
 		case 'h':
 		default:

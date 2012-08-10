@@ -4,9 +4,56 @@
 #include "cam_time.h"
 #include "log.h"
 #include "app_msg.h"
+#include "img_trans.h"
 
 //#define TEST_SAVE_TIME	
 #define NO_SAVE_FILE
+
+/*****************************************************************************
+ Prototype    : add_append_data
+ Description  : add append data, only for jpeg
+ Input        : ImgMsg *img  
+                AlgBuf *buf  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/1
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 add_append_data(ImgMsg *img, AlgBuf *buf)
+{
+	ImgAppendInfo *info;
+	Uint32 offset = ROUND_UP(img->dimension.size, 4);
+
+	if(offset + sizeof(*info) > buf->bufSize)
+		return E_NOSPC;
+	
+	info = (ImgAppendInfo *)(buf->buf + offset);
+	img->dimension.size = offset + sizeof(*info);
+	info->dimension = img->dimension;
+	info->frameId = img->rawInfo.index;
+	info->capMode = img->rawInfo.capMode;
+	info->strobeStat = img->rawInfo.strobeStat;
+	info->exposureTime = img->rawInfo.exposure;
+	info->globalGain = img->rawInfo.globalGain;
+	info->avgLum = img->rawInfo.avgLum;
+	info->rgbGains[0] = img->rawInfo.redGain;
+	info->rgbGains[1] = img->rawInfo.greenGain;
+	info->rgbGains[2] = img->rawInfo.blueGain;
+	info->frameType = img->frameType;
+	info->timeStamp = img->timeStamp;
+	memcpy(&info->roadInfo,&img->roadInfo, sizeof(ImgRoadInfo));
+	memcpy(info->capInfo, &img->capInfo, sizeof(img->capInfo));
+	info->offset = sizeof(*info);
+	info->magicNum = IMG_APPEND_MAGIC;
+	
+	return E_NO;
+}
 
 /*****************************************************************************
  Prototype    : jpg_encoder_process
@@ -49,6 +96,9 @@ static Int32 jpg_encoder_process(IN AlgHandle hEncode, IN AlgBuf *pInBuf, OUT Al
 	/* fill some filed of msg */
 	msg->dimension.colorSpace = FMT_JPG;
 	msg->dimension.size = outArgs.bytesGenerated;
+
+	/* add append data */
+	add_append_data(msg, pOutBuf);
 
 	return E_NO;
 }
@@ -157,6 +207,9 @@ EncoderHandle jpg_encoder_create(IN EncoderParams *encParams, IN UploadParams *u
 	encAttrs.saveRootPath = SD_MNT_PATH;
 	encAttrs.mutex = mutex;
 	encAttrs.encBufSize = IMG_MAX_WIDTH * IMG_MAX_HEIGHT * 8 / 10;
+
+	/* display milisecod for jpeg img */
+	encParams->osdInfo.flags |= CAM_OSD_FLAG_MILISEC_EN;
 
 	hJpgEncoder = encoder_create(&encAttrs, encParams, uploadParams);
 	if(!hJpgEncoder) {

@@ -22,6 +22,9 @@ extern Int32 local_upload_test(const char *pathName);
 /* test rtp upload */
 extern Int32 rtp_upload_test();
 
+/* test sys commu data transfer */
+extern Int32 sys_commu_test();
+
 /*****************************************************************************
  Prototype    : self_test
  Description  : self test module
@@ -62,6 +65,9 @@ Int32 self_test(Int32 flags)
 	if(flags & SELF_TEST_RTPUPLOAD)
 		err = rtp_upload_test();
 
+	if(flags & SELF_TEST_SYSCOMMU)
+		err = sys_commu_test();
+	
 	INFO("self test pass...\n");
 
 	alg_exit();	

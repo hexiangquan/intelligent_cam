@@ -274,7 +274,7 @@ Int32 path_name_generate(PathNameHandle hPathName, const ImgMsg *imgBuf, PathNam
 	Int32 				capCnt = imgBuf->capInfo.capCnt;
 	const CaptureInfo	*capInfo = &imgBuf->capInfo;
 	Uint16 				redLightTime;
-	const CamDateTime 	*capTime = &imgBuf->timeStamp;
+	const DateTime 		*capTime = &imgBuf->timeStamp;
 
 	if(!hPathName || !imgBuf || !info)
 		return E_INVAL;

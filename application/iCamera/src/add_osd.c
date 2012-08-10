@@ -112,10 +112,15 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 	/* Add date & time */
 	if(osdInfo->flags & CAM_OSD_FLAG_TIME_EN) {
 		CamDateTime *dateTime = &imgMsg->timeStamp;
-		
-		sprintf( buf, "%04d.%02d.%02d %02d:%02d:%02d", 
+		if(osdInfo->flags & CAM_OSD_FLAG_MILISEC_EN) {
+			sprintf( buf, "%04d.%02d.%02d %02d:%02d:%02d.%03d", 
+				 dateTime->year, dateTime->month, dateTime->day, dateTime->hour, 
+				 dateTime->minute, dateTime->second, dateTime->ms);
+		} else {
+			sprintf( buf, "%04d.%02d.%02d %02d:%02d:%02d", 
 				 dateTime->year, dateTime->month, dateTime->day,
 				 dateTime->hour, dateTime->minute, dateTime->second);
+		}
 		err = osd_process(hOsd, &inBuf, &inArgs, NULL, NULL);
 		if(err)
 			return err;

@@ -35,6 +35,7 @@ static Int32 tory_cp_init(DetectorUart *dev, Uint16 detectorId)
 	dev->dataBits = UART_D8;
 	dev->parity = UART_POFF;
 	dev->stopBits = UART_S1;
+	dev->chanId = UART_CHAN_RS485;
 
 	dev->packetLen = 2;
 	dev->private = NULL;

@@ -29,7 +29,8 @@ typedef struct {
 #define CAM_OSD_FLAG_FRAME_NUM_EN			(1 << 7)	//Display frame number, only for image
 #define CAM_OSD_FLAG_GROUP_ID_EN			(1 << 8)	//Display group id, only for image
 #define CAM_OSD_FLAG_RETROGRADE_EN			(1 << 9) 	//Dsiplay retrograde info, only for image
-	
+#define CAM_OSD_FLAG_MILISEC_EN				(1 << 10)	//Display milisecond
+
 #define CAM_VID_OSD_FLAG_MASK				(0x0007)
 	
 /* OSD color define */

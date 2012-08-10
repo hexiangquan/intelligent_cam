@@ -216,6 +216,23 @@ extern Int32 media_srv_delete(MediaSrvHandle hSrv);
 *****************************************************************************/
 extern Int32 media_stream_in(MediaSubSessionHandle hSubSession, MediaFrame *frame, Bool isVideo);
 
+/*****************************************************************************
+ Prototype    : media_get_link_status
+ Description  : Check link status
+ Input        : MediaSubSessionHandle hSubSession  
+ Output       : None
+ Return Value : TRUE -- data link is established, FALSE -- not linked
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/10
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Bool media_get_link_status(MediaSubSessionHandle hSubSession);
+
 #ifdef __cplusplus
 #if __cplusplus
 }

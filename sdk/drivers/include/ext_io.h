@@ -29,6 +29,8 @@
 #include <asm/io.h>
 #endif		/* end of #ifdef __KERNEL__ */
 
+#define EXTIO_DEV_NAME		"/dev/extio"
+
 /* IO direction define */
 #define EXTIO_DIR_INPUT		0u
 #define EXTIO_DIR_OUTPUT	1u
@@ -51,14 +53,18 @@
 #define EXTIO_S_REG			_IOW(EXTIO_MAGIC_NO, 9, struct hdcam_reg *)
 #define EXTIO_G_REG			_IOWR(EXTIO_MAGIC_NO, 10, struct hdcam_reg *)
 #define EXTIO_S_RESET		_IO(EXTIO_MAGIC_NO, 11)
+#define EXTIO_S_UART		_IOW(EXTIO_MAGIC_NO, 12, struct hdcam_uart_cfg *)
 #pragma  pack()
 
 /* 
  * Strobe info
  */
 struct hdcam_strobe_info {
-	__u32	status;			//enable status, bit[0:1]~strobe[0:1]
 	__u32	offset;			//offset for enable strobe before exposure, unit: us
+	__u8	status;			//enable status, bit[0:2]~strobe[0:2]
+	__u8	sigVal;			//trigger signal value, 0--low edge, 1--high edge, bit[0:2]~strobe[0:2]
+	__u8	mode;			//trigger mode, 0--normal trig, 1--frequency trigger
+	__u8	syncAC;			//sync with AC signals
 };
 
 /* 
@@ -104,5 +110,27 @@ struct hdcam_firmware {
 	__u32	len;		//len of data in bytes
 	__u32	check_sum;  //crc check sum
 };
+
+/*
+ * Uart TX/RX transition delay
+ */
+#define HDCAM_UART_MAX_ID	1
+
+enum hdcam_uart_trans_delay {
+	HDCAM_UART_BAUD_4800 = 0,
+	HDCAM_UART_BAUD_9600,
+	HDCAM_UART_BAUD_19200,
+	HDCAM_UART_BAUD_38400,
+	HDCAM_UART_BAUD_57600,
+	HDCAM_UART_BAUD_115200,
+	HDCAM_UART_BAUD_MAX
+};
+
+struct hdcam_uart_cfg {
+	__u16	id;				// channel id
+	__u16	baudrate;		// baudrate, see enum above 
+	__u32	reserved;
+};
+
 #endif /* end of #ifdef _EXT_IO_H_ */
 

@@ -152,6 +152,19 @@ typedef struct _ImgDimension {
 	Uint16			reserved;
 }ImgDimension;
 
+/* Date time */
+typedef struct _DateTime {
+	Uint16	year;			//year, >= 2011
+	Uint8	month;			//month, 1~12
+	Uint8	day;			//day, 1~31
+	Uint8	weekDay;		//weekday, 1~7
+	Uint8	hour;			//hour, 0~23
+	Uint8	minute;			//minute, 0~59
+	Uint8	second;			//second, 0~59
+	Uint16	ms;				//mili second
+	Uint16	us;				//us
+}DateTime;
+
 /* Common APIs */
 #ifdef __cplusplus
 #if __cplusplus
