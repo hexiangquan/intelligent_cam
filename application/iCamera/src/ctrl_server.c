@@ -753,7 +753,7 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 
 	/* create local upload handle */
 	LocalUploadAttrs localAttrs;
-	localAttrs.filePath = SD_MNT_PATH;
+	localAttrs.filePath = SD0_MNT_PATH;
 	localAttrs.flags = uploadCfg.flags;
 	localAttrs.maxFileSize = IMG_MAX_WIDTH * IMG_MAX_HEIGHT * 8 / 10;
 	localAttrs.msgName = MSG_LOCAL;

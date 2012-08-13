@@ -3008,6 +3008,12 @@ static Int32 get_vid_upload_params(ParamsMngHandle hParamsMng, void *data, Int32
 		rtpParams->cacheTime = appCfg->h264EncParams.videoLen / 2;
 		rtpParams->keepTime = appCfg->h264EncParams.videoLen / 2;
 		rtpParams->frameRate = appCfg->h264EncParams.frameRate;
+		rtpParams->flags = 0;
+		rtpParams->savePath = SD1_MNT_PATH;
+		if(appCfg->rtpParams.flags & CAM_RTP_SAVE_ONLY)
+			rtpParams->flags |= RTP_FLAG_SAVE_ONLY;
+		if(appCfg->rtpParams.flags & CAM_RTP_SAVE_EN)
+			rtpParams->flags |= RTP_FLAG_SAVE_EN;
 	} else {
 		/* not send */
 		params->protol = CAM_UPLOAD_PROTO_NONE;

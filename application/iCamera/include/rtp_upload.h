@@ -53,6 +53,10 @@
 
 #define RTP_CMD_SND_VID_CLIP	(1)		// flush cache frames and enable video send for a while, auto disable send after cahce  
 
+/* flags for cfg */
+#define RTP_FLAG_SAVE_ONLY		(1 << 1)
+#define RTP_FLAG_SAVE_EN		(1 << 0)	// save when net is not available
+
 /*----------------------------------------------*
  * routines' implementations                    *
  *----------------------------------------------*/
@@ -67,6 +71,7 @@ typedef struct {
 	Uint16			cacheTime;		//time of video clips, half will be cached
 	Uint16			keepTime;		//time of video sending after enable upload
 	const char 		*savePath;		//video file save path when net link is not ready
+	Int32			flags;			//flags for ctrl
 }RtpUploadParams;
 
 

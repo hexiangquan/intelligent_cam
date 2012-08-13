@@ -23,6 +23,7 @@
 #include <pthread.h>
 #include "common.h"
 #include "h264_enc.h"
+#include "writer.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -65,6 +66,10 @@
 
 #define BUF_SIZE			2500000
 
+#define RTP_MAX_FILE_LEN	(15 * 1024 * 1024)
+
+#define RTP_FLAG_SAVE_MASK	(0x0003)
+
 /*----------------------------------------------*
  * routines' implementations                    *
  *----------------------------------------------*/
@@ -84,6 +89,9 @@ typedef struct {
 	Int32					maxFrameNum;		//max num of caching frames
 	Int32					numFrameCached;		//current num of caching frames
 	const char 				*savePath;
+	FILE 					*fpSave;
+	Uint32					saveLen;
+	Int32					flags;
 }RtpTransObj;
 
 typedef struct {
@@ -233,6 +241,8 @@ static inline void img_msg_to_media_frame(const ImgMsg *img, MediaFrame *frame)
 	frame->timestamp = img->timeCode;
 	frame->data = buffer_get_user_addr(img->hBuf);
 	frame->dataLen = img->dimension.size;
+	frame->dateTime = img->timeStamp;
+	frame->reserved = 0;
 }
 
 /*****************************************************************************
@@ -499,6 +509,111 @@ static Int32 rtp_upload_cache_frame(RtpTransObj *rtpTrans, const MediaFrame *fra
 	return E_NO;
 }
 
+/*****************************************************************************
+ Prototype    : rtp_upload_open_save_file
+ Description  : open file for save
+ Input        : RtpTransObj *rtpTrans  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/10
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 rtp_upload_open_save_file(RtpTransObj *rtpTrans, MediaFrame *curFrame)
+{
+	MediaFrame *frame = curFrame ? curFrame : (MediaFrame *)(rtpTrans->cacheBuf + rtpTrans->rdPos);
+	DateTime	*capTime = &frame->dateTime;
+	char dirName[64];
+	char fileName[128];
+
+	if(rtpTrans->fpSave) {
+		fclose(rtpTrans->fpSave);
+		rtpTrans->fpSave = NULL;
+	}
+
+	if( !(rtpTrans->flags & RTP_FLAG_SAVE_EN) && 
+		!(rtpTrans->flags & RTP_FLAG_SAVE_ONLY)) {
+		/* don't save to local or directly save */
+		return E_NO;
+	}
+		
+
+	/* generate file name */
+	snprintf(dirName, sizeof(dirName), "%s/%04u_%02u_%02u_%02u", rtpTrans->savePath,
+             capTime->year, capTime->month, capTime->day, capTime->hour);
+	snprintf(fileName, sizeof(fileName), "%s/%02u_%02u_%03u.h264", dirName, 
+			capTime->minute, capTime->second, capTime->ms);
+
+	/* open file */
+	mkdir_if_need(dirName);
+	rtpTrans->fpSave = fopen(fileName, "wb");
+	rtpTrans->saveLen = 0;
+	assert(rtpTrans->fpSave);
+
+	DBG("open file %s", fileName);
+
+	return rtpTrans->fpSave ? E_NO : E_IO;
+	
+}
+
+/*****************************************************************************
+ Prototype    : rtp_upload_process_frame
+ Description  : process frame
+ Input        : RtpTransObj *rtpTrans  
+                MediaFrame *frame      
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/10
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 rtp_upload_process_frame(RtpTransObj *rtpTrans, MediaFrame *frame)
+{
+	Int32 ret;
+
+	if(!rtpTrans->fpSave) {
+		if( rtpTrans->flags & RTP_FLAG_SAVE_ONLY ||
+			((rtpTrans->flags & RTP_FLAG_SAVE_EN) && 
+			 !media_get_link_status(rtpTrans->hSubSession)) ) {
+			/* open file for save */
+			rtp_upload_open_save_file(rtpTrans, frame);
+		}
+	}
+	
+	if(rtpTrans->fpSave) {
+		/* write to file */
+		ret = fwrite(frame->data, frame->dataLen, 1, rtpTrans->fpSave);
+		if(ret < 0) {
+			ERRSTR("write to file failed");
+			ret = E_IO;
+			fclose(rtpTrans->fpSave);
+			rtpTrans->fpSave = NULL;
+		} else {
+			ret = E_NO;
+			rtpTrans->saveLen += frame->dataLen;
+			if(rtpTrans->saveLen > RTP_MAX_FILE_LEN) {
+				/* close current file and open new one */
+				rtp_upload_open_save_file(rtpTrans, frame);
+			}
+		}
+	} else {
+		/* send to net */
+		ret = media_stream_in(rtpTrans->hSubSession, frame, TRUE);
+	}
+
+	return ret;
+}
+
 
 /*****************************************************************************
  Prototype    : rtp_upload_send
@@ -525,11 +640,16 @@ static Int32 rtp_upload_send(void *handle, const ImgMsg *img)
 	img_msg_to_media_frame(img, &frame);
 
 	if(!rtpTrans->cacheBuf || rtpTrans->disableCache) {
-		/* send to media server */
-		err = media_stream_in(rtpTrans->hSubSession, &frame, TRUE);
+		/* send to media server or save to local */
+		err = rtp_upload_process_frame(rtpTrans, &frame);
 		if(rtpTrans->disableCache && (time(NULL) > rtpTrans->vidEndTime)) {
 			rtpTrans->disableCache = FALSE;
 			//DBG("Restart cache, %u/%u", time(NULL), rtpTrans->vidEndTime);
+			if(rtpTrans->fpSave) {
+				/* close previous opened file */
+				fclose(rtpTrans->fpSave);
+				rtpTrans->fpSave = NULL;
+			}
 		}
 		
 	} else {
@@ -590,6 +710,7 @@ static Int32 rtp_upload_set_params(void *handle, const void *params)
 	}
 
 	rtpTrans->savePath = rtpParams->savePath;
+	rtpTrans->flags = rtpParams->flags;
 	
 	return E_NO;
 }
@@ -656,6 +777,13 @@ static Int32 rtp_upload_flush_cache(RtpTransObj *rtpTrans)
 	SyncHdr 	*hdr;
 	MediaFrame 	*frame;
 
+	if( !media_get_link_status(rtpTrans->hSubSession) && 
+		!rtpTrans->fpSave && 
+		rtpTrans->rdPos != rtpTrans->wrPos ) {
+		/* open file for save */
+		rtp_upload_open_save_file(rtpTrans, NULL);
+	}
+
 	while(rtpTrans->rdPos != rtpTrans->wrPos) {
 		hdr = (SyncHdr *)(rtpTrans->cacheBuf + rtpTrans->rdPos);
 		
@@ -664,8 +792,8 @@ static Int32 rtp_upload_flush_cache(RtpTransObj *rtpTrans)
 			frame = (MediaFrame *)(rtpTrans->cacheBuf + rtpTrans->rdPos);
 			/* set ptr to following data */
 			frame->data = (void *)(rtpTrans->cacheBuf + rtpTrans->rdPos + sizeof(*frame)); 
-			/* send to media server for upload */
-			media_stream_in(rtpTrans->hSubSession, frame, TRUE);
+			/* send to media server for upload or save to file */
+			rtp_upload_process_frame(rtpTrans, frame);
 			rd_pos_inc(rtpTrans, hdr->len);
 		} else if(hdr->syncCode == SYNC_CODE_SKIP) {
 			/* skip code, back to the beginning */

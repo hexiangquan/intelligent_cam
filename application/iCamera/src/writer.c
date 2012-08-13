@@ -71,7 +71,7 @@
     Modification : Created function
 
 *****************************************************************************/
-static Int32 mkdir_if_need(const char *dir)
+Int32 mkdir_if_need(const char *dir)
 {
 	char 		dirname[128] = "";
 	struct stat fstat;

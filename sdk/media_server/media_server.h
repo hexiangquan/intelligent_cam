@@ -96,6 +96,7 @@ typedef struct {
 	struct timeval	timestamp;		//timestamp for frame capture
 	void			*data;			//addr of data
 	Int32			dataLen;		//data len
+	DateTime		dateTime;		//capture time
 	Int32			reserved;		//reserved
 }MediaFrame;
 

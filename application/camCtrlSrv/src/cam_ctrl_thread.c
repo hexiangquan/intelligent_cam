@@ -525,11 +525,15 @@ static Int32 firmware_update(const char *name, const void *data, Int32 len, Uint
 		return E_IO;
 	}
 
+	DBG("open file %s for update", name);
+
 	/* set to start */
 	fseek(fp, 0, SEEK_SET);
 
 	/* write data */
-	err = fwrite(data, len, 1, fp);
+	const Int8 *firmware = (const Int8 *)data + UPDATE_DATA_OFFSET;
+	size_t wrLen = len - UPDATE_DATA_OFFSET;
+	err = fwrite(firmware, wrLen, 1, fp);
 	if(err < 0) {
 		ERRSTR("write data failed");
 		err = E_IO;
@@ -538,8 +542,10 @@ static Int32 firmware_update(const char *name, const void *data, Int32 len, Uint
 
 	/* sync to hard disk & close file */
 	fclose(fp);
+	fp = NULL;
 	sync();
-
+	
+#if 0
 	/* open for read */
 	fp = fopen(name, "rb");
 	if(!fp) {
@@ -565,20 +571,23 @@ static Int32 firmware_update(const char *name, const void *data, Int32 len, Uint
 	}
 
 	/* compare data */
-	if(memcmp(data, buf, len)) {
+	if(memcmp(data + UPDATE_DATA_OFFSET, buf, len)) {
 		ERR("data cmp failed");
 		err = E_CHECKSUM;
 		goto exit;
 	}
+#endif
 
 	err = E_NO;
 	DBG("update %s success...", name);
 
 exit:	
-	fclose(fp);
+
+	if(fp)
+		fclose(fp);
 
 	if(buf)
-		free(buf);
+		free(buf);		
 
 	return err;
 
@@ -621,17 +630,18 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 	case TC_FUN_UPDATE_ARM: {
 		char fname[128];
 		if(strncmp(data, "lib", 3))	
-			snprintf(fname, sizeof(fname), "/home/root/%s", data + UPDATE_NAME_OFFSET);
-		else
+			snprintf(fname, sizeof(fname), "/home/root/update/%s", data + UPDATE_NAME_OFFSET);
+		else {
 			snprintf(fname, sizeof(fname), "/usr/lib/%s", data + UPDATE_NAME_OFFSET);
-		ret = firmware_update(fname, data + UPDATE_DATA_OFFSET, cmdHdr->dataLen, cmdHdr->checkSum);
+		}
+		ret = firmware_update(fname, data, cmdHdr->dataLen, cmdHdr->checkSum);
 		cmdHdr->dataLen = 0;
 		if(ret == E_NO)
-			params->reboot = TRUE;
+			params->reboot = FALSE;
 		break;
 	}
 	case TC_FUN_UPDATE_FPGA:
-		ret = firmware_update(params->fpgaFirmware, data + UPDATE_DATA_OFFSET, cmdHdr->dataLen, cmdHdr->checkSum);
+		ret = firmware_update(params->fpgaFirmware, data, cmdHdr->dataLen, cmdHdr->checkSum);
 		cmdHdr->dataLen = 0;
 		/* if file update ok, tell icam prog to reload */
 		if(ret == E_NO)
@@ -697,7 +707,7 @@ void *cam_ctrl_thread(void *arg)
 	TcpCmdHeader		cmdHdr;
 	/* leave space for msg header */
 	void				*dataBuf = (Int8 *)(params->dataBuf) + sizeof(MsgHeader);
-	Int32				bufLen = params->bufLen;
+	Int32				bufLen = params->bufLen - sizeof(MsgHeader);
 	int					sock = params->sock;
 	Int32				errCnt = 0;
 	
@@ -740,6 +750,9 @@ void *cam_ctrl_thread(void *arg)
 
 exit:
 
+	if(params->reboot)
+		sleep(3);
+	
 	close(sock);
 
 	if(params->reboot)

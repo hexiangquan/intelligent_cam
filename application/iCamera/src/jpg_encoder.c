@@ -204,7 +204,7 @@ EncoderHandle jpg_encoder_create(IN EncoderParams *encParams, IN UploadParams *u
 	encAttrs.encInitParams = &jpgEncInitParams;
 	encAttrs.encOps = &c_jpgEncOps;
 	encAttrs.poolBufNum = IMG_ENC_POOL_BUF_NUM;
-	encAttrs.saveRootPath = SD_MNT_PATH;
+	encAttrs.saveRootPath = SD0_MNT_PATH;
 	encAttrs.mutex = mutex;
 	encAttrs.encBufSize = IMG_MAX_WIDTH * IMG_MAX_HEIGHT * 8 / 10;
 

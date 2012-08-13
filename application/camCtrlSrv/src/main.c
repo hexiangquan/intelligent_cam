@@ -61,7 +61,7 @@
 #define CAM_CTRL_LISTEN_NUM			5
 #define CAM_CTRL_MAX_CONNECT_NUM	5
 #define CAM_CTRL_TIMEOUT			5	//second
-#define CAM_CTRL_BUF_SIZE			(2 * 1024 * 0124)
+#define CAM_CTRL_BUF_SIZE			(8 * 1024 * 1024)
 #define ARM_PROG_NAME				"/home/root/iCamera"
 #define FPGA_FIRMAWRE				"/home/root/fpga.bin"
 

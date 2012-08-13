@@ -61,6 +61,7 @@ extern "C"{
 #endif
 #endif /* __cplusplus */
 
+extern Int32 mkdir_if_need(const char *dir);
 extern Int32 write_file(const char *dirName, const char *fileName, const Int8 *header, Int32 hdrLen, const Int8 *data, Int32 len);
 
 #ifdef __cplusplus

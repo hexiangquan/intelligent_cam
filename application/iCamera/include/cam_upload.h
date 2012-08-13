@@ -14,6 +14,8 @@ typedef struct {
 } CamRtpParams;
 
 #define CAM_RTP_FLAG_EN		(1 << 0) //Enable Rtsp send
+#define CAM_RTP_SAVE_EN		(1 << 1) //Save to SD if no net available
+#define CAM_RTP_SAVE_ONLY	(1 << 2) //Direct save to SD card, no matter net is ok or not
 
 /* 
   * Image upload type 
