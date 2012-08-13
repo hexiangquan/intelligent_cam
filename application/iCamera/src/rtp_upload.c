@@ -404,7 +404,7 @@ static inline void rd_pos_inc(RtpTransObj *rtpTrans, Uint32 len)
     Modification : Created function
 
 *****************************************************************************/
-static void clear_to_next_iframe(RtpTransObj *rtpTrans, Uint32 minSize)
+static void clear_to_next_iframe(RtpTransObj *rtpTrans, Uint32 minSize, Bool dropFirstFrame)
 {
 	SyncHdr	*hdr;
 	Bool	firstFrame = TRUE;
@@ -422,6 +422,9 @@ static void clear_to_next_iframe(RtpTransObj *rtpTrans, Uint32 minSize)
 		//read_buf(rtpTrans, &hdr, sizeof(hdr), FALSE);
 		hdr = (SyncHdr *)(rtpTrans->cacheBuf + rtpTrans->rdPos);
 		if(hdr->syncCode == SYNC_CODE_IFRAME) {
+			if(!dropFirstFrame) // no matter this is the first frame
+				break;
+			
 			if(!firstFrame) {
 				//DBG("rtp clear, got next i frame");
 				break;
@@ -480,7 +483,7 @@ static Int32 rtp_upload_cache_frame(RtpTransObj *rtpTrans, const MediaFrame *fra
 	pthread_mutex_lock(&rtpTrans->mutex);
 
 	while(free_size_for_write(rtpTrans) < hdr.len + sizeof(hdr)) {
-		clear_to_next_iframe(rtpTrans, hdr.len + sizeof(hdr));
+		clear_to_next_iframe(rtpTrans, hdr.len + sizeof(hdr), TRUE);
 		//if(rtpTrans->rdPos == rtpTrans->wrPos) {
 			//DBG("rtp clear, buf is empty");
 			//if(free_size_for_write(rtpTrans) < hdr.len + sizeof(hdr))
@@ -500,7 +503,7 @@ static Int32 rtp_upload_cache_frame(RtpTransObj *rtpTrans, const MediaFrame *fra
 	if( rtpTrans->maxFrameNum > 0 && 
 		++rtpTrans->numFrameCached > rtpTrans->maxFrameNum ) {
 		//DBG("max num frames cached, clear oldest ones.");
-		clear_to_next_iframe(rtpTrans, 0);
+		clear_to_next_iframe(rtpTrans, 0, TRUE);
 	}
 
 //exit:
@@ -526,8 +529,8 @@ static Int32 rtp_upload_cache_frame(RtpTransObj *rtpTrans, const MediaFrame *fra
 *****************************************************************************/
 static Int32 rtp_upload_open_save_file(RtpTransObj *rtpTrans, MediaFrame *curFrame)
 {
-	MediaFrame *frame = curFrame ? curFrame : (MediaFrame *)(rtpTrans->cacheBuf + rtpTrans->rdPos);
-	DateTime	*capTime = &frame->dateTime;
+	MediaFrame *frame;
+	DateTime	*capTime;
 	char dirName[64];
 	char fileName[128];
 
@@ -541,6 +544,21 @@ static Int32 rtp_upload_open_save_file(RtpTransObj *rtpTrans, MediaFrame *curFra
 		/* don't save to local or directly save */
 		return E_NO;
 	}
+
+	/* get frame info */
+	if(curFrame) {
+		frame = curFrame;
+	} else {
+		/* using cached frames, find first I frame */
+		clear_to_next_iframe(rtpTrans, 0, FALSE);
+		if(free_size_for_read(rtpTrans) < sizeof(SyncHdr) + sizeof(MediaFrame)) {
+			ERR("no frame left after clear p frames.");
+			return E_AGAIN;
+		}
+		frame = (MediaFrame *)(rtpTrans->cacheBuf + rtpTrans->rdPos + sizeof(SyncHdr));
+	}
+
+	capTime = &frame->dateTime;
 		
 
 	/* generate file name */
@@ -553,7 +571,7 @@ static Int32 rtp_upload_open_save_file(RtpTransObj *rtpTrans, MediaFrame *curFra
 	mkdir_if_need(dirName);
 	rtpTrans->fpSave = fopen(fileName, "wb");
 	rtpTrans->saveLen = 0;
-	assert(rtpTrans->fpSave);
+	//assert(rtpTrans->fpSave);
 
 	DBG("open file %s", fileName);
 
@@ -649,6 +667,7 @@ static Int32 rtp_upload_send(void *handle, const ImgMsg *img)
 				/* close previous opened file */
 				fclose(rtpTrans->fpSave);
 				rtpTrans->fpSave = NULL;
+				DBG("close video save file");
 			}
 		}
 		
@@ -744,6 +763,10 @@ static Int32 rtp_upload_delete(void *handle)
 		free(rtpTrans->cacheBuf);
 		rtpTrans->cacheBuf = NULL;
 	}
+
+	/* close save file */
+	if(rtpTrans->fpSave)
+		fclose(rtpTrans->fpSave);
 
 	pthread_mutex_destroy(&rtpTrans->mutex);
 	

@@ -251,8 +251,9 @@ static Int32 encode_frame(EncoderHandle hEnc, ImgMsg *msg)
 	}
 	
 	/* save to local filesys */
-	if((saveToLocal || err) && hEnc->ops->saveFrame) {
-		err = hEnc->ops->saveFrame(msg, hEnc->saveRootPath);
+	if(saveToLocal || err) {
+		if(hEnc->ops->saveFrame)
+			err = hEnc->ops->saveFrame(msg, hEnc->saveRootPath);
 		goto err_quit;
 	}
 

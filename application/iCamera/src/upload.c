@@ -521,7 +521,8 @@ static Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data)
 
 #ifdef PRINT_FPS
 	hUpload->frameCnt++;
-	if(time(NULL) - hUpload->lastSnd > 8) {
+	if( time(NULL) - hUpload->lastSnd > 8 && 
+		data->dimension.colorSpace == FMT_JPG ) {
 		INFO("upload frame fps: %d", hUpload->frameCnt >> 3);
 		hUpload->frameCnt = 0;
 		hUpload->lastSnd = time(NULL);

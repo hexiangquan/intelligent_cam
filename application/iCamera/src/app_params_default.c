@@ -114,7 +114,7 @@ const AppParams c_appParamsDef = {
 		.QPMin = 1,
 		.encPreset = 0,
 		.packetSize = 1280,
-		.videoLen = 0,
+		.videoLen = 10,
 		.flags = 0,
 	},
 	.workMode = {

@@ -308,7 +308,7 @@ static Int32 data_cap_ctrl(DataCapHandle hDataCap, CamCapCtrl ctrl)
 {
 	Int32 ret = E_NO;
 
-	DBG("capture ctrl: %d", ctrl);
+	//DBG("capture ctrl: %d", ctrl);
 
 	/* stop capture */
 	if(ctrl == CAM_CAP_STOP || ctrl == CAM_CAP_RESTART) {
@@ -346,14 +346,15 @@ static Int32 data_cap_ctrl(DataCapHandle hDataCap, CamCapCtrl ctrl)
 		hDataCap->capInfo.capCnt = 1;
 		hDataCap->capInfo.flags = 0;
 		hDataCap->capInfo.triggerInfo[0].frameId = FRAME_MANUALTRIG;
+		hDataCap->capIndex = -1;
 
 		int cmd = ((ctrl == CAM_CAP_TRIG) ? IMGCTRL_TRIGCAP : IMGCTRL_SPECTRIG);
-		ret = ioctl(hDataCap->fdImgCtrl, cmd, NULL);
+		ret = ioctl(hDataCap->fdImgCtrl, cmd, &hDataCap->capIndex);
 		if(ret < 0) {
 			ERRSTR("trig failed");
 			ret = E_IO;
 		} else {
-			DBG("trig %d success", ctrl);
+			//DBG("trig %d success", ctrl);
 		}
 	}
 
@@ -425,7 +426,7 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 		/* check frame index from img data */
 		Uint16 frameIndex = imgMsg.rawInfo.index;
 		
-		if(hDataCap->capIndex < 0 || hDataCap->capIndex >= frameIndex) {
+		if(hDataCap->capIndex < 0 || hDataCap->capIndex <= frameIndex) {
 			if(hDataCap->dstName[1])
 				streamId = 1;
 			dstName = hDataCap->dstName[1];
