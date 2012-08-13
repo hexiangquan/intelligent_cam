@@ -272,8 +272,8 @@ static Int32 single_file_send(LocalUploadHandle hLocalUpload, const char *fileNa
 
 	dataLen = fstat.st_size - sizeof(img);
 	if(hLocalUpload->bufSize < dataLen) {
-	    ERR("file is too large: %d, max: %d", 
-			dataLen, hLocalUpload->bufSize);
+	    //ERR("file is too large: %d, max: %d", 
+			//dataLen, hLocalUpload->bufSize);
 		/* ignore large file */
 		ret = E_NO;
 		goto exit;
