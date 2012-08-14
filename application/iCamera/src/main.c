@@ -318,7 +318,7 @@ static Int32 main_loop(MainEnv *envp)
 
 	if(envp->reboot) {
 		INFO("we are going to reboot system");
-		system("shutdown -r now");
+		system("shutdown -r now\n");
 	}
 	
 exit:

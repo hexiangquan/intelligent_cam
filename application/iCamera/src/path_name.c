@@ -26,6 +26,7 @@
 #include "log.h"
 #include "net_utils.h"
 #include "cam_detector.h"
+#include "cam_time.h"
 
 /*----------------------------------------------*
  * external variables                           *

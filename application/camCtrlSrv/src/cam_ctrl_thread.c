@@ -756,7 +756,7 @@ exit:
 	close(sock);
 
 	if(params->reboot)
-		system("shutdown -r now");
+		system("shutdown -r now\n");
 
 	free(arg);
 

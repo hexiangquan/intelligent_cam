@@ -401,4 +401,135 @@ Int32 get_local_ip(Int8* buf, Int32 bufSize)
 #endif
 }
 
+/*****************************************************************************
+ Prototype    : sys_set_ip
+ Description  : set system ip addr and netmask
+ Input        : Int32 ethId          
+                const char *ipaddr   
+                const char *netmask  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 sys_set_ip(Int32 ethId, const char *ipaddr, const char *netmask)
+{
+	char buf[128];
+	size_t offset = 0;
+
+	if(ethId > 10)
+		return E_INVAL;
+
+	offset = snprintf(buf, sizeof(buf), "ifconfig eth%d", ethId);
+
+	if(ipaddr)
+		offset += snprintf(buf + offset, sizeof(buf) - offset, " %s", ipaddr);
+
+	if(netmask)
+		offset += snprintf(buf + offset, sizeof(buf) - offset, " netmask %s", netmask);
+
+	strcat(buf, "\n");
+	
+	Int32 err = system(buf);
+
+	if(err < 0) {
+		ERRSTR("set ip failed");
+		return E_IO;
+	}
+
+	DBG("sys ip change to %s:%s", ipaddr, netmask);
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : sys_set_gateway
+ Description  : set system gateway addr
+ Input        : const char *gateway  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 sys_set_gateway(const char *gateway, const char *netmask)
+{
+	char	buf[128];
+	Int32	err;
+	
+	if(!gateway) 
+		return E_INVAL;
+
+	size_t offset;
+	
+	offset = snprintf(buf, sizeof(buf), "route add default gw %s", gateway);
+
+	if(netmask)
+		snprintf(buf + offset, sizeof(buf) - offset, " netmask %s", netmask);
+	
+	strcat(buf, "\n");
+	
+	err = system(buf);
+	if(err < 0) {
+		ERRSTR("set gateway failed");
+		return E_IO;
+	}
+
+	DBG("sys new gateway: %s:%s", gateway, netmask);
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : sys_set_domain_info
+ Description  : set system net domain info
+ Input        : const char *hostname  
+                const char *dns       
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 sys_set_domain_info(const char *hostname, const char *dns)
+{
+	char 	buf[128];
+	Int32	err;
+
+	if(hostname) {
+		snprintf(buf, sizeof(buf), "hostname %s\n", hostname);
+		err = system(buf);
+		if(err < 0) {
+			ERRSTR("set host name err");
+		}
+	}
+
+	if(dns) {
+		snprintf(buf, sizeof(buf), "echo nameserver %s > /etc/resolv.conf\n", dns);
+		err = system(buf);
+		if(err < 0) {
+			ERRSTR("set dns server err");
+			return E_IO;
+		}
+	}
+
+	DBG("sys hostname: %s, dns: %s", hostname, dns);
+	return E_NO;
+}
+
 

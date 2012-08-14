@@ -67,12 +67,12 @@ typedef struct {
   * Network info 
   */
 typedef struct {
-	Uint8	ipAddr[16];  	// Set to "0.0.0.0" for DHCP    
-	Uint8	ipMask[16];  	// Not used when using DHCP
-	Uint8	gatewayIP[16];  // Not used when using DHCP
-	Uint8	domainName[20];	// Not used when using DHCP
-	Uint8	hostName[20];	// Host name
-	Uint8	dnsServer[16];	// Used when set to anything but zero
+	Int8	ipAddr[16];  	// Set to "0.0.0.0" for DHCP    
+	Int8	ipMask[16];  	// Not used when using DHCP
+	Int8	gatewayIP[16];  // Not used when using DHCP
+	Int8	domainName[20];	// Not used when using DHCP
+	Int8	hostName[20];	// Host name
+	Int8	dnsServer[16];	// Used when set to anything but zero
 } CamNetworkInfo;
 
 /* 

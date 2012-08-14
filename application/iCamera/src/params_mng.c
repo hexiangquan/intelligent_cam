@@ -35,6 +35,7 @@
 #include "ext_io.h"
 #include "img_ctrl.h"
 #include <sys/ioctl.h>
+#include "net_utils.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -68,10 +69,10 @@ extern const AppParams c_appParamsDef;
  *----------------------------------------------*/
 #define PM_FLAG_CAPINFO_SET		(1 << 0)
 #define PM_CMD_MASK				(0xFFFF0000)
+#define PM_CONFIG_NET
 
 #define IMG_CTRL_DEV			"/dev/imgctrl"
 #define IMG_EXTIO_DEV			"/dev/extio"
-
 
 typedef Int32 (*PmCtrlFxn)(ParamsMngHandle hParamsMng, void *data, Int32 size);
 
@@ -98,7 +99,7 @@ struct ParamsMngObj {
 };
 
 /* internal fxn for init hardware */
-static Int32 params_mng_init_hw(ParamsMngHandle hParamsMng);
+static Int32 params_mng_init_sys(ParamsMngHandle hParamsMng);
 
 /*****************************************************************************
  Prototype    : params_mng_create
@@ -186,7 +187,7 @@ ParamsMngHandle params_mng_create(const char *cfgFile)
 	hParamsMng->cfgFile = cfgFile;
 
 	/* init hardware */
-	params_mng_init_hw(hParamsMng);
+	params_mng_init_sys(hParamsMng);
 
 	return hParamsMng;
 
@@ -1365,6 +1366,17 @@ static Int32 set_network_info(ParamsMngHandle hParamsMng, void *data, Int32 size
 
 	CamNetworkInfo *info = (CamNetworkInfo *)data;
 	AppParams *appCfg = &hParamsMng->appParams;
+
+#ifdef PM_CONFIG_NET // do not config net when using nfs
+	Int32 err;
+
+	/* Set system net config */
+	err = sys_set_ip(0, info->ipAddr, info->ipMask);
+	err |= sys_set_gateway(info->gatewayIP, NULL);
+	err |= sys_set_domain_info(info->hostName, info->dnsServer);
+	if(err)
+		return E_IO;
+#endif
 	
 	/* Copy data */
 	appCfg->networkInfo = *info;
@@ -1395,6 +1407,9 @@ static Int32 get_network_info(ParamsMngHandle hParamsMng, void *data, Int32 size
 		return E_INVAL;
 
 	AppParams *appCfg = &hParamsMng->appParams;
+	CamNetworkInfo *info = &appCfg->networkInfo;
+
+	get_local_ip(info->ipAddr, sizeof(info->ipAddr));
 	
 	/* Copy data */
 	*(CamNetworkInfo *)data = appCfg->networkInfo;
@@ -3184,7 +3199,7 @@ Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void 
 }
 
 /*****************************************************************************
- Prototype    : params_mng_init_hw
+ Prototype    : params_mng_init_sys
  Description  : using current params to init hardware
  Input        : ParamsMngHandle hParamsMng  
  Output       : None
@@ -3198,12 +3213,13 @@ Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void 
     Modification : Created function
 
 *****************************************************************************/
-static Int32 params_mng_init_hw(ParamsMngHandle hParamsMng)
+static Int32 params_mng_init_sys(ParamsMngHandle hParamsMng)
 {
 	Int32 		err;
 	AppParams 	*appCfg = &hParamsMng->appParams;
-	
-	err = set_exposure_params(hParamsMng, &appCfg->exposureParams, sizeof(appCfg->exposureParams));
+
+	err = set_network_info(hParamsMng, &appCfg->networkInfo, sizeof(appCfg->networkInfo));
+	err |= set_exposure_params(hParamsMng, &appCfg->exposureParams, sizeof(appCfg->exposureParams));
 	err |= set_rgb_gains(hParamsMng, &appCfg->rgbGains, sizeof(appCfg->rgbGains));
 	err |= set_light_regions(hParamsMng, &appCfg->correctRegs, sizeof(appCfg->correctRegs));
 	err |= set_img_adj_params(hParamsMng, &appCfg->imgAdjParams, sizeof(appCfg->imgAdjParams));

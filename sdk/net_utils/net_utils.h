@@ -379,6 +379,59 @@ static inline Int32 set_sock_send_timeout(int sockfd, Uint32 timeoutSec)
 *****************************************************************************/
 extern Int32 get_local_ip(Int8* buf, Int32 bufSize);
 
+/*****************************************************************************
+ Prototype    : sys_set_ip
+ Description  : set system ip addr and netmask
+ Input        : Int32 ethId          
+                const char *ipaddr   
+                const char *netmask  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 sys_set_ip(Int32 ethId, const char *ipaddr, const char *netmask);
+
+/*****************************************************************************
+ Prototype    : sys_set_gateway
+ Description  : set system gateway addr
+ Input        : const char *gateway  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 sys_set_gateway(const char *gateway, const char *netmask);
+
+/*****************************************************************************
+ Prototype    : sys_set_domain_info
+ Description  : set system net domain info
+ Input        : const char *hostname  
+                const char *dns       
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/14
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 sys_set_domain_info(const char *hostname, const char *dns);
 
 #ifdef __cplusplus
 #if __cplusplus

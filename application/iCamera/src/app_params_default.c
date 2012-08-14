@@ -1,10 +1,10 @@
 #include "params_mng.h"
 
-#define LOCAL_IP		"192.168.0.66"
+#define LOCAL_IP		"192.168.0.218"
 #define IP_MASK			"255.255.255.0"
 #define GATE_WAY		"192.168.0.1"
 #define DOMAIN_NAME		"WORKGROUP"
-#define HOST_NAME		"hdcam"
+#define HOST_NAME		"dm36x-ipnc"
 #define DNS_SERVER		"192.168.0.1"
 #define SERVER_IP		"192.168.0.25"
 #define TCP_SRV_PORT	9300
