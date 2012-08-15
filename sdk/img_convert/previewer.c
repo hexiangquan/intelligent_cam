@@ -151,8 +151,7 @@ Int32 previewer_ss_config(int fd, PreviewAttrs *attrs)
 	prev_ss_config.input.pix_fmt = pix_format_convert(attrs->inputFmt);
 	prev_ss_config.input.gain = attrs->digiGain;
 	prev_ss_config.input.avg_filter_en = (attrs->ctrlFlags & CONV_FLAG_AVG_EN) ? 1 : 0;
-	
-        prev_ss_config.input.frame_div_mode_en = 0;
+    prev_ss_config.input.frame_div_mode_en = 0;
 
 	if(prev_ss_config.input.pix_fmt == IPIPE_BAYER) {
 		prev_ss_config.input.data_shift = IPIPEIF_5_1_BITS11_0;
@@ -268,10 +267,10 @@ int previewer_init(const char *name, Bool onTheFly, PreviewAttrs *attrs)
         prev_chan_config.len = sizeof(struct prev_continuous_config);
         prev_chan_config.config = &prev_cont_config; /* to set defaults in driver */
 
-        prev_cont_config.input.colp_elep= IPIPE_BLUE;
-        prev_cont_config.input.colp_elop= IPIPE_GREEN_BLUE;
-        prev_cont_config.input.colp_olep= IPIPE_GREEN_RED;
-        prev_cont_config.input.colp_olop= IPIPE_RED;
+        prev_cont_config.input.colp_elep = IPIPE_BLUE;
+        prev_cont_config.input.colp_elop = IPIPE_GREEN_BLUE;
+        prev_cont_config.input.colp_olep = IPIPE_GREEN_RED;
+        prev_cont_config.input.colp_olop = IPIPE_RED;
 
         if (ioctl(preview_fd, PREV_S_CONFIG, &prev_chan_config) < 0) {
             ERRSTR("Error in setting default previewer configuration");

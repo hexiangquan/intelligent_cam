@@ -48,6 +48,14 @@ typedef enum {
 
 #define ERRSTR(fmt, args...)	fprintf(stderr, "Err @ func: %s, " fmt ": %s\n", __func__, ##args, strerror(errno))
 
+#define ASSERT(cond, msg) \
+	do { \
+		if(!(cond)) { \
+			ERR("Assert failed: %s, %s", #cond, msg); \
+			assert(cond); \
+		}\
+	}while(0)
+
 #define LOG_FLAG_SAVE_TO_FILE	(1 << 0)	//save to log file
 #define LOG_FLAG_PRINT			(1 << 1)	//print to screen
 #define LOG_FLAG_ERR_STR		(1 << 2)	//print errno string
