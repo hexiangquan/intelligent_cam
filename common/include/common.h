@@ -165,6 +165,9 @@ typedef struct _DateTime {
 	Uint16	us;				//us
 }DateTime;
 
+/* Macro for convert hour to mintues */
+#define HOUR_TO_MIN(h, m) ((h)*(60) + (m))
+
 /* Common APIs */
 #ifdef __cplusplus
 #if __cplusplus

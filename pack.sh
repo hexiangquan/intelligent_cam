@@ -7,7 +7,10 @@
 
 PRJ="hdcam"
 DST="/home/sun/work/ext-disc/Projects/HDCAM/ARM/Application"
-DIR="HDCAM"
+
+# Get current dir name
+DIR=`pwd`
+DIR=`basename $DIR`
 
 DATE=`date +%Y.%m.%d`
 TAR_FILE="$PRJ.$DATE.tar.gz"

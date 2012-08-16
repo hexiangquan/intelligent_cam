@@ -84,6 +84,7 @@ typedef struct {
 	Bool			reboot;
 	CtrlSrvHandle	hCtrlSrv;
 	Int32			flags;
+	DayNightHandle	hDayNight;
 }MainEnv;
 
 static Bool s_exit = FALSE;
@@ -118,12 +119,16 @@ static Int32 app_init(MainEnv *envp)
 
 	/* load fpga rom */
 	ret = fpga_firmware_load(envp->fpgaRomFile);
+
+	/* create obj for day/night switch */
+	envp->hDayNight = day_night_create(NULL);
 	
 	/* create ctrl server */
 	CtrlSrvAttrs ctrlSrvAttrs;
 
 	ctrlSrvAttrs.cfgFileName = envp->cfgFileName;
 	ctrlSrvAttrs.msgName = ICAM_MSG_NAME;
+	ctrlSrvAttrs.hDayNight = envp->hDayNight;
 	
 	envp->hCtrlSrv = ctrl_server_create(&ctrlSrvAttrs);
 	if(!envp->hCtrlSrv) {
@@ -271,7 +276,7 @@ static Int32 main_loop(MainEnv *envp)
 	Int32 			status;
 	MsgHandle 		hMsg = NULL;
 	CommonMsg		msgBuf;
-	CamDateTime		curTime;
+	//CamDateTime		curTime;
 
 	/* init and create modules for application */
 	status = app_init(envp);
@@ -285,7 +290,7 @@ static Int32 main_loop(MainEnv *envp)
 		goto exit;
 	}
 
-	msg_set_recv_timeout(hMsg, 1);
+	msg_set_recv_timeout(hMsg, 5);
 
 	/* catch signals */
 	signal(SIGINT, sig_handler);
@@ -319,14 +324,8 @@ static Int32 main_loop(MainEnv *envp)
 			msg_process(&msgBuf, envp);
 		}
 			
-		/* get current time */
-    	status = cam_get_time(&curTime);
-		if(!status) {
-			/* check if it is time to reboot */
-		}
-		
-		/* wait a while */
-		sleep(1);
+		/* check day/night switch */
+		status = day_night_check_by_time(envp->hDayNight, hMsg);
 	}
 
 	/* close watch dog */
@@ -346,7 +345,7 @@ exit:
 	/* exit modules */
 	app_exit(envp, hMsg);
 
-	return status;
+	return E_NO;
 	
 }
 

@@ -88,6 +88,7 @@ struct CtrlSrvObj{
 	pthread_mutex_t 	encMutex;		//mutex for encoders
 	Bool				exit;			//flag for exit
 	const char			*msgName;		//our msg name for IPC
+	DayNightHandle		hDayNight;		//day night  switch obj
 };
 
 typedef enum {
@@ -270,7 +271,6 @@ static Int32 local_upload_update(CtrlSrvHandle hCtrlSrv)
 	return ret;
 }
 
-
 /*****************************************************************************
  Prototype    : ctrl_server_thread
  Description  : thread for recv and process request
@@ -330,6 +330,12 @@ static void *ctrl_server_thread(void *arg)
 		case APPCMD_SET_CAP_INPUT:
 			ret = cap_info_update(hCtrlSrv);
 			needResp = FALSE;
+			break;
+		case APPCMD_DAY_NIGHT_SWITCH:
+			ret = params_mng_control(hCtrlSrv->hParamsMng, 
+					PMCMD_S_SWITCHDAYNIGHT, &msgHdr->param[0], sizeof(msgHdr->param[0]));
+			if(!ret)
+				ret = conv_params_update(hCtrlSrv);
 			break;
 		case ICAMCMD_G_VERSION:
 			ret = params_mng_control(hParamsMng, PMCMD_G_VERSION, data, CTRL_MSG_BUF_LEN);
@@ -578,6 +584,10 @@ static void *ctrl_server_thread(void *arg)
 			break;
 		case ICAMCMD_S_DAYNIGHTMODE:
 			ret = params_mng_control(hParamsMng, PMCMD_S_DAYNIGHTCFG, data, msgHdr->dataLen);
+			/* cfg data capture module */
+			if(!ret) {
+				ret = conv_params_update(hCtrlSrv);
+			}
 			break;
 		case ICAMCMD_G_DAYNIGHTMODE:
 			ret = params_mng_control(hParamsMng, PMCMD_G_DAYNIGHTCFG, data, CTRL_MSG_BUF_LEN);
@@ -709,8 +719,23 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	ret = cap_info_update(hCtrlSrv);
 	assert(ret == E_NO);
 
+	/* cfg day night switch */
+	hCtrlSrv->hDayNight = attrs->hDayNight;
+	if(hCtrlSrv->hDayNight) {
+		CamDayNightModeCfg dayNightCfg;
+		ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_DAYNIGHTCFG, 
+				&dayNightCfg, sizeof(dayNightCfg));
+		ret = day_night_cfg_params(hCtrlSrv->hDayNight, &dayNightCfg);
+		ret |= day_night_cfg_dst_msg(hCtrlSrv->hDayNight, attrs->msgName, APPCMD_DAY_NIGHT_SWITCH);
+		if(ret) {
+			ERR("cfg day night failed");
+			goto exit;
+		}
+	}
+
 	/* create data capture module */
 	dataCapAttrs.hCapture = hCtrlSrv->hCapture;
+	dataCapAttrs.hDayNight = attrs->hDayNight;
 	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_DETECTORPARAMS, 
 			&dataCapAttrs.detectorParams, sizeof(dataCapAttrs.detectorParams));
 	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_CONVTERPARAMS, 

@@ -64,6 +64,10 @@
 
 #define CONV_BUF_NUM				2
 
+/* min lum count before day/night mode switch for trigger and continue capture */
+#define DAY_NIGHT_MIN_SWITCH_TRIG	(30)		
+#define DAY_NIGHT_MIN_SWITCH_CONT	(150)		
+
 //#define CAP_TRIG_TEST
 
 /* index for trigger capture */
@@ -96,6 +100,7 @@ struct DataCapObj{
 	CamRoadInfo			roadInfo;
 	pthread_t			pid;
 	const char 			*dstName[2];
+	DayNightHandle		hDayNight;
 };
 
 
@@ -160,8 +165,10 @@ static Int32 data_capture_config(DataCapHandle hDataCap)
 	if(workMode->capMode == CAM_CAP_MODE_CONTINUE) {
 		hDataCap->encImg = FALSE;
 		hDataCap->status &= ~CAPTHR_STAT_TRIG;
+		day_night_cfg_min_switch_cnt(hDataCap->hDayNight, DAY_NIGHT_MIN_SWITCH_CONT);
 	} else {
 		hDataCap->status |= CAPTHR_STAT_TRIG;
+		day_night_cfg_min_switch_cnt(hDataCap->hDayNight, DAY_NIGHT_MIN_SWITCH_TRIG);
 	}
 	
 	hDataCap->dstName[1] = NULL;
@@ -422,6 +429,10 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 	DBG("  strobe: 0x%X, exposure: %u, global gain: %u", 
 		imgMsg.rawInfo.strobeStat, imgMsg.rawInfo.exposure, imgMsg.rawInfo.globalGain);
 	*/
+
+	/* do day/night check */
+	day_night_check_by_lum(hDataCap->hDayNight, imgMsg.rawInfo.avgLum, hDataCap->hMsg);
+	
 	if(hDataCap->encImg) {
 		/* check frame index from img data */
 		Uint16 frameIndex = imgMsg.rawInfo.index;
@@ -720,6 +731,7 @@ DataCapHandle data_capture_create(const DataCapAttrs *attrs)
 
 	/* record params */
 	hDataCap->detectorParams = attrs->detectorParams;
+	hDataCap->hDayNight = attrs->hDayNight;
 
 	/* init our running evironment */
 	ret = data_capture_config(hDataCap);
@@ -1014,7 +1026,7 @@ Int32 data_capture_ctrl(DataCapHandle hDataCap, MsgHandle hCurMsg, Int32 ctrl)
     Modification : Created function
 
 *****************************************************************************/
-Int32 data_capture_set_road_info(DataCapHandle hDataCap, MsgHandle hCurMsg, CamRoadInfo *info)
+Int32 data_capture_set_road_info(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamRoadInfo *info)
 {
 	if(!hDataCap || !info || !hCurMsg) {
 		return E_INVAL;

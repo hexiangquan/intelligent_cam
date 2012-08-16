@@ -58,6 +58,7 @@ typedef enum _AppCmd {
 	APPCMD_SEND_DIR,			//send all file in a dir
 	APPCMD_SEND_FILE,			//send specified file
 	APPCMD_UPLOAD_CTRL,			//upload ctrl cmds
+	APPCMD_DAY_NIGHT_SWITCH,	//switch day/night mode
 	APPCMD_MAX
 }AppCmd;
 

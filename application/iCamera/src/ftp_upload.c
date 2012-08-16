@@ -27,6 +27,7 @@
 #include "ftp_upload.h"
 #include "ftp_client.h"
 #include "path_name.h"
+#include "cam_time.h"
 
 /*----------------------------------------------*
  * external variables                           *

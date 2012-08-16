@@ -3,29 +3,24 @@
   Copyright (C), 2001-2011, DCN Co., Ltd.
 
  ******************************************************************************
-  File Name     : data_capture.h
+  File Name     : day_night_switch.h
   Version       : Initial Draft
   Author        : Sun
-  Created       : 2012/3/6
+  Created       : 2012/8/16
   Last Modified :
-  Description   : data_capture.c header file
+  Description   : day_night_switch.c header file
   Function List :
   History       :
-  1.Date        : 2012/3/6
+  1.Date        : 2012/8/16
     Author      : Sun
     Modification: Created file
 
 ******************************************************************************/
-#ifndef __DATA_CAPTURE_H__
-#define __DATA_CAPTURE_H__
+#ifndef __DAY_NIGHT_SWITCH_H__
+#define __DAY_NIGHT_SWITCH_H__
 
 #include "cam_status.h"
-#include "cam_detector.h"
-#include "converter.h"
-#include "capture.h"
 #include "msg.h"
-#include "cam_info.h"
-#include "day_night_switch.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -59,19 +54,14 @@
  * routines' implementations                    *
  *----------------------------------------------*/
 
-/* init argument for this module */
-typedef struct {
-	Uint16				maxOutWidth;
-	Uint16				maxOutHeight;
-	CamWorkMode			workMode;
-	CamDetectorParam	detectorParams;
-	ConverterParams		convParams;
-	CapHandle			hCapture;
-	CamRoadInfo			roadInfo;
-	DayNightHandle		hDayNight;
-}DataCapAttrs;
+typedef struct _DayNightSwitchObj *DayNightHandle;
 
-typedef struct DataCapObj *DataCapHandle;
+typedef struct _DayNightAttrs {
+	CamDayNightModeCfg	cfg;
+	Int32				minSwitchCnt;
+	const char			*dstMsg;
+	Int32				cmd;
+}DayNightAttrs;
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -80,166 +70,128 @@ extern "C"{
 #endif /* __cplusplus */
 
 /*****************************************************************************
- Prototype    : data_capture_create
- Description  : create this module
- Input        : DataCapAttrs *attrs  
+ Prototype    : day_night_create
+ Description  : create module
+ Input        : const DayNightAttrs *attrs  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/16
+  1.Date         : 2012/8/16
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern DataCapHandle data_capture_create(const DataCapAttrs *attrs);
+DayNightHandle day_night_create(const DayNightAttrs *attrs);
 
 /*****************************************************************************
- Prototype    : data_capture_delete
- Description  : delete collector handle
- Input        : DataCapHandle hDataCap
+ Prototype    : day_night_delete
+ Description  : delete module
+ Input        : DayNightHandle hDayNight  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/16
+  1.Date         : 2012/8/16
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_delete(DataCapHandle hDataCap, MsgHandle hCurMsg);
+Int32 day_night_delete(DayNightHandle hDayNight);
 
 /*****************************************************************************
- Prototype    : data_capture_run
- Description  : run data collect, capture frame, recv trigger, etc.
- Input        : DataCapHandle hDataCap
+ Prototype    : day_night_cfg_params
+ Description  : cfg switch mode params
+ Input        : DayNightHandle hDayNight       
+                const CamDayNightModeCfg *cfg  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/16
+  1.Date         : 2012/8/16
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_run(DataCapHandle hDataCap);
+Int32 day_night_cfg_params(DayNightHandle hDayNight, const CamDayNightModeCfg *cfg);
 
 /*****************************************************************************
- Prototype    : data_capture_set_work_mode
- Description  : set work mode
- Input        : DataCapHandle hDataCap  
-                MsgHandle hCurMsg       
+ Prototype    : day_night_cfg_min_switch_cnt
+ Description  : cfg min switch count
+ Input        : DayNightHandle hDayNight  
+                Int32 minCnt              
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/21
+  1.Date         : 2012/8/16
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_set_work_mode(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamWorkMode *workMode);
+Int32 day_night_cfg_min_switch_cnt(DayNightHandle hDayNight, Int32 minCnt);
 
 /*****************************************************************************
- Prototype    : data_capture_conv_params
- Description  : set convert params
- Input        : DataCapHandle hDataCap  
-                MsgHandle hCurMsg       
+ Prototype    : day_night_cfg_dst_msg
+ Description  : cfg dest msg for switch notification
+ Input        : DayNightHandle hDayNight  
+                const char *msgName       
+                Int32 cmd                 
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/21
+  1.Date         : 2012/8/16
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_set_conv_params(DataCapHandle hDataCap, MsgHandle hCurMsg, const ConverterParams *params);
+Int32 day_night_cfg_dst_msg(DayNightHandle hDayNight, const char *msgName, Int32 cmd);
 
 /*****************************************************************************
- Prototype    : data_capture_set_detector_params
- Description  : set detector params
- Input        : DataCapHandle hDataCap          
-                MsgHandle hCurMsg               
-                const CamDetectorParam *params  
- Output       : None
- Return Value : extern
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/4/12
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-extern Int32 data_capture_set_detector_params(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamDetectorParam *params);
-
-/*****************************************************************************
- Prototype    : data_capture_get_input_info
- Description  : get input info
- Input        : DataCapHandle hDataCap   
-                CamInputInfo *inputInfo  
+ Prototype    : day_night_check_by_time
+ Description  : check by time
+ Input        : DayNightHandle hDayNight  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/4/12
+  1.Date         : 2012/8/16
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_get_input_info(DataCapHandle hDataCap, ImgDimension *inputInfo);
+Int32 day_night_check_by_time(DayNightHandle hDayNight, MsgHandle hCurMsg);
 
 /*****************************************************************************
- Prototype    : data_capture_ctrl
- Description  : change capture status
- Input        : DataCapHandle hDataCap  
-                MsgHandle hCurMsg       
-                CamCapCtrl ctrl         
+ Prototype    : day_night_check_by_lum
+ Description  : check day/night mode change by avg lum value
+ Input        : DayNightHandle hDayNight  
+                Uint16 lumVal             
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/4/12
+  1.Date         : 2012/8/16
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_ctrl(DataCapHandle hDataCap, MsgHandle hCurMsg, Int32 ctrl);
-
-/*****************************************************************************
- Prototype    : data_capture_set_road_info
- Description  : update road info
- Input        : DataCapHandle hDataCap  
-                MsgHandle hCurMsg       
-                CamRoadInfo *info       
- Output       : None
- Return Value : 
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/8/1
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-extern Int32 data_capture_set_road_info(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamRoadInfo *info);
+Int32 day_night_check_by_lum(DayNightHandle hDayNight, Uint16 lumVal, MsgHandle hCurMsg);
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -248,4 +200,4 @@ extern Int32 data_capture_set_road_info(DataCapHandle hDataCap, MsgHandle hCurMs
 #endif /* __cplusplus */
 
 
-#endif /* __CAPTURE_THR_H__ */
+#endif /* __DAY_NIGHT_SWITCH_H__ */

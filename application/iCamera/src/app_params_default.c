@@ -164,6 +164,7 @@ const AppParams c_appParamsDef = {
 		.flags = 0,
 	},
 	.dayNightCfg = {
+		.mode = CAM_DAY_MODE,
 		.switchMethod = CAM_DN_SWT_OFF,
 	},
 	.specCapParams = {

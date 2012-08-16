@@ -3038,6 +3038,41 @@ static Int32 get_vid_upload_params(ParamsMngHandle hParamsMng, void *data, Int32
 }
 
 /*****************************************************************************
+ Prototype    : day_night_switch
+ Description  : switch day night mode
+ Input        : ParamsMngHandle hParamsMng  
+                void *data                  
+                Int32 size                  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/16
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 day_night_switch(ParamsMngHandle hParamsMng, void *data, Int32 size)
+{
+	if(!data || size != sizeof(CamDayNightMode)) 
+		return E_INVAL;
+
+	CamDayNightMode mode = *(CamDayNightMode *)data;
+
+	if(mode >= CAM_DN_MODE_MAX)
+		return E_INVAL;
+
+	AppParams *appCfg = &hParamsMng->appParams;
+	CamDayNightModeCfg *dayNight = &appCfg->dayNightCfg;
+	
+	dayNight->mode = (Uint16)mode;
+	
+	return E_NO;
+}
+
+/*****************************************************************************
  Prototype    : restore_default
  Description  : restore to default params
  Input        : ParamsMngHandle hParamsMng  
@@ -3140,6 +3175,7 @@ static const PmCtrlInfo g_paramsConvert[] = {
 	{.cmd = PMCMD_G_CONVTERPARAMS, .fxn = get_converter_params, },
 	{.cmd = PMCMD_G_IMGENCODERPARAMS, .fxn = get_img_encoder_params, },
 	{.cmd = PMCMD_G_VIDENCODERPARAMS, .fxn = get_vid_encoder_params, },
+	{.cmd = PMCMD_S_SWITCHDAYNIGHT, .fxn = day_night_switch, },
 	{.cmd = PMCMD_MAX1, .fxn = NULL,},
 };
 

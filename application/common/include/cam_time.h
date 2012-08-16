@@ -3,24 +3,23 @@
   Copyright (C), 2001-2011, DCN Co., Ltd.
 
  ******************************************************************************
-  File Name     : ctrl_thr.h
+  File Name     : time.h
   Version       : Initial Draft
   Author        : Sun
-  Created       : 2012/3/15
+  Created       : 2012/3/5
   Last Modified :
-  Description   : ctrl_thr.c header file
+  Description   : time.c header file
   Function List :
   History       :
-  1.Date        : 2012/3/15
+  1.Date        : 2012/3/5
     Author      : Sun
     Modification: Created file
 
 ******************************************************************************/
-#ifndef __CTRL_SERVER_H__
-#define __CTRL_SERVER_H__
+#ifndef __CAM_TIME_H__
+#define __CAM_TIME_H__
 
-#include "msg.h"
-#include "day_night_switch.h"
+#include "common.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -54,14 +53,11 @@
  * routines' implementations                    *
  *----------------------------------------------*/
 
-typedef struct CtrlSrvObj *CtrlSrvHandle;
+/* 
+  * Time for sync
+  */
+typedef DateTime CamDateTime;
 
-/* init argument for this thread */
-typedef struct {
-	const char		*cfgFileName;
-	const char 		*msgName;
-	DayNightHandle	hDayNight;
-}CtrlSrvAttrs;
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -70,57 +66,56 @@ extern "C"{
 #endif /* __cplusplus */
 
 /*****************************************************************************
- Prototype    : ctrl_server_create
- Description  : create ctrl server
- Input        : CtrlSrvAttrs *attrs  
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/3/22
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs);
-
-/*****************************************************************************
- Prototype    : ctrl_server_run
- Description  : start ctrl server running
- Input        : CtrlSrvHandle hCtrlSrv  
+ Prototype    : cam_convert_time
+ Description  : Convert from timeval to CamDateTime
+ Input        : struct timeval *tv     
+                CamDateTime *dateTime  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/22
+  1.Date         : 2012/3/5
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-Int32 ctrl_server_run(CtrlSrvHandle hCtrlSrv);
+extern Int32 cam_convert_time(IN struct timeval *tv, OUT CamDateTime *dateTime);
 
 /*****************************************************************************
- Prototype    : ctrl_server_delete
- Description  : delete this module
- Input        : CtrlSrvHandle hCtrlSrv  
-                MsgHandle hCurMsg       
+ Prototype    : cam_get_time
+ Description  : get current time
+ Input        : CamDateTime *dateTime  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/22
+  1.Date         : 2012/3/5
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-Int32 ctrl_server_delete(CtrlSrvHandle hCtrlSrv, MsgHandle hCurMsg);
+extern Int32 cam_get_time(OUT CamDateTime *dateTime);
 
+/*****************************************************************************
+ Prototype    : cam_set_time
+ Description  : Set time to system
+ Input        : CamDateTime *dateTime  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/3/5
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 cam_set_time(IN CamDateTime *dateTime);
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -129,4 +124,4 @@ Int32 ctrl_server_delete(CtrlSrvHandle hCtrlSrv, MsgHandle hCurMsg);
 #endif /* __cplusplus */
 
 
-#endif /* __CTRL_THR_H__ */
+#endif /* __TIME_H__ */
