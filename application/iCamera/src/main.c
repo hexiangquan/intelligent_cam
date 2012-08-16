@@ -66,8 +66,10 @@
 #define PROGRAM_NAME			"iCamera"
 #define CONFIG_FILE				"./cam.cfg"
 #define FPGA_ROM_FILE			"./fpga.rbf"
+#define WDT_DEV					"/dev/watchdog"
 
 #define MAIN_FLAG_TEST_EN		(1 << 0)
+#define MAIN_FLAG_WDT_EN		(1 << 1)	// enable watch dog timer
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -296,9 +298,20 @@ static Int32 main_loop(MainEnv *envp)
 	if(status)
 		goto exit;
 
+	/* open watch dog */
+	int fdWdt = -1;
+	if(envp->flags & MAIN_FLAG_WDT_EN) {
+		fdWdt = open(WDT_DEV, O_WRONLY);
+		if(fdWdt < 0) {
+			ERRSTR("open watch dog failed");
+		}
+	}
+
 	/* start main loop */
 	while(!s_exit && !envp->exit) {
 		/* feed dog */
+		if(fdWdt > 0)
+			write(fdWdt, "a", 1);
 
 		/* recv msg */
 		status = msg_recv(hMsg, (MsgHeader *)&msgBuf, sizeof(msgBuf), 0);
@@ -314,6 +327,13 @@ static Int32 main_loop(MainEnv *envp)
 		
 		/* wait a while */
 		sleep(1);
+	}
+
+	/* close watch dog */
+	if(fdWdt > 0) {
+		write(fdWdt, "V", 1);
+		close(fdWdt);
+		fdWdt = -1;
 	}
 
 	if(envp->reboot) {
@@ -355,6 +375,7 @@ static void usage(void)
 	INFO(" -f config file name, default: %s", CONFIG_FILE);
 	INFO(" -r FPGA rom file name, default: %s", FPGA_ROM_FILE);
 	INFO(" -p local file save path, default: %s", FILE_SAVE_PATH);
+	INFO(" -w enable watch dog");
 	INFO(" -t self-test enable, 1-detector test, 2-path name test, 4-ftp upload test, 8-local send test");
     INFO(" use default params: ./%s", PROGRAM_NAME);
     INFO(" use specific config file: ./%s -f ./cfg/myCfg", PROGRAM_NAME);
@@ -380,7 +401,7 @@ static void usage(void)
 Int32 main(Int32 argc, char **argv)
 {
 	Int32 		c;
-    const char 	*options = "f:p:r:t:h";
+    const char 	*options = "f:p:r:t:wh";
 	MainEnv 	env;
 	int 		ret, testFlags = 0;
 
@@ -406,6 +427,9 @@ Int32 main(Int32 argc, char **argv)
 			break;
 		case 't':
 			testFlags = atoi(optarg);
+			break;
+		case 'w':
+			env.flags |= MAIN_FLAG_WDT_EN;
 			break;
 		case 'h':
 		default:
