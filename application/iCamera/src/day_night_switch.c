@@ -358,3 +358,88 @@ Int32 day_night_check_by_lum(DayNightHandle hDayNight, Uint16 lumVal, MsgHandle 
 	return E_AGAIN;	
 }
 
+/* test day/night switch module */
+Int32 day_night_test(void)
+{
+	DayNightAttrs attrs;
+	const char *msgName = "/tmp/dnTest";
+
+	attrs.cfg.mode = CAM_DAY_MODE;
+	attrs.cfg.switchMethod = CAM_DN_SWT_TIME;
+	attrs.cfg.threshold = 255;
+	attrs.cfg.dayModeStartHour = 6;
+	attrs.cfg.dayModeStartMin = 0;
+	attrs.cfg.nightModeStartHour = 17;
+	attrs.cfg.nightModeStartMin = 15;
+	attrs.cmd = 1;
+	attrs.dstMsg = msgName;
+	attrs.minSwitchCnt = 150;
+	
+	DayNightHandle hDayNight = day_night_create(&attrs);
+	assert(hDayNight);
+
+	MsgHandle hMsg = msg_create(msgName, msgName, 0);
+	assert(hMsg);
+
+	Int32 err;
+
+	/* test check by time */
+	CamDateTime time;
+
+	time.year = 2012;
+	time.month = 8;
+	time.day = 17;
+	time.hour = 10;
+	time.minute = 58;
+	time.second = 0;
+	err = cam_set_time(&time);
+	assert(err == E_NO);
+
+	/* should not change */
+	err = day_night_check_by_time(hDayNight, hMsg);
+	assert(err == E_AGAIN);
+
+	time.hour = 18;
+	err = cam_set_time(&time);
+	assert(err == E_NO);
+	/* should change to night mode */
+	err = day_night_check_by_time(hDayNight, hMsg);
+	assert(err == E_NO);
+
+	err = day_night_check_by_lum(hDayNight, 100, hMsg);
+	assert(err == E_MODE);
+
+
+	/* change to auto switch mode */
+	attrs.cfg.switchMethod = CAM_DN_SWT_AUTO;
+	err = day_night_cfg_params(hDayNight, &attrs.cfg);
+	assert(err == E_NO);
+	err = day_night_cfg_dst_msg(hDayNight, msgName, 1);
+	assert(err == E_NO);
+	attrs.minSwitchCnt = 10;
+	err = day_night_cfg_min_switch_cnt(hDayNight, attrs.minSwitchCnt);
+	assert(err == E_NO);
+
+	/* run check by lum value */
+	err = day_night_check_by_time(hDayNight, hMsg);
+	assert(err == E_MODE);
+	err = day_night_check_by_lum(hDayNight, 230, hMsg);
+	assert(err == E_AGAIN);
+
+	int i;
+	for(i = 0; i <= attrs.minSwitchCnt + 1; ++i) {
+		err = day_night_check_by_lum(hDayNight, attrs.cfg.threshold - i, hMsg);
+		if(i <= attrs.minSwitchCnt)
+			ASSERT(err == E_AGAIN, "i = %d", i);
+		else
+			ASSERT(err == E_NO, "i = %d", i);
+	}
+
+	err = day_night_delete(hDayNight);
+	assert(err == E_NO);
+
+	DBG("day night test success....");
+	return E_NO;
+	
+}
+

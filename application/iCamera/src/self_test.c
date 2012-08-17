@@ -25,6 +25,9 @@ extern Int32 rtp_upload_test();
 /* test sys commu data transfer */
 extern Int32 sys_commu_test();
 
+/* test day night switch */
+extern Int32 day_night_test();
+
 /*****************************************************************************
  Prototype    : self_test
  Description  : self test module
@@ -67,6 +70,9 @@ Int32 self_test(Int32 flags)
 
 	if(flags & SELF_TEST_SYSCOMMU)
 		err = sys_commu_test();
+
+	if(flags & SELF_TEST_DAYNIGHT)
+		err = day_night_test();
 	
 	INFO("self test pass...\n");
 

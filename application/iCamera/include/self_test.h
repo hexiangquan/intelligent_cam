@@ -54,6 +54,7 @@
 #define SELF_TEST_LOCALSND		(1 << 3)
 #define SELF_TEST_RTPUPLOAD		(1 << 4)
 #define SELF_TEST_SYSCOMMU		(1 << 5)
+#define SELF_TEST_DAYNIGHT		(1 << 6)
 
 /*----------------------------------------------*
  * routines' implementations                    *

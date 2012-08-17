@@ -72,7 +72,7 @@
     Modification : Created function
 
 *****************************************************************************/
-Int32 cam_set_time(CamDateTime *dateTime)
+Int32 cam_set_time(const CamDateTime *dateTime)
 {
 	Int32			result;
 	time_t			newTime;

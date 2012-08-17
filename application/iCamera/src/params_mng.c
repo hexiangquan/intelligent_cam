@@ -577,9 +577,9 @@ static Int32 set_img_adj_params(ParamsMngHandle hParamsMng, void *data, Int32 si
 
 	/* Validate data */
 	CamImgEnhanceParams *params = (CamImgEnhanceParams *)data;
-	if( params->brightness > 255 || 
-		params->sharpness > 255 ||
-		params->saturation > 255 ) {
+	if( params->dayCfg.brightness > 255 || params->dayCfg.sharpness > 255 ||
+		params->dayCfg.saturation > 255 || params->nightCfg.brightness > 255 ||
+		params->nightCfg.sharpness > 255 || params->nightCfg.saturation > 255) {
 		ERR("invalid img adj data");
 		return E_INVAL;
 	}
@@ -589,27 +589,35 @@ static Int32 set_img_adj_params(ParamsMngHandle hParamsMng, void *data, Int32 si
 	if(hParamsMng->fdImgCtrl > 0) {
 		/* sync with hardware */
 		struct hdcam_img_enhance_cfg cfg;
+		CamImgAdjCfg *adj;
+
+		/* check current day/night mode */
+		if(hParamsMng->appParams.dayNightCfg.mode == CAM_NIGHT_MODE)
+			adj = &params->nightCfg;
+		else
+			adj = &params->dayCfg;
+		
 		cfg.flags = 0;
-		if(params->flags & CAM_IMG_CONTRAST_EN)
+		if(adj->flags & CAM_IMG_CONTRAST_EN)
 			cfg.flags |= HDCAM_ENH_FLAG_CONTRAST_EN;
-		if(params->flags & CAM_IMG_SHARP_EN)
+		if(adj->flags & CAM_IMG_SHARP_EN)
 			cfg.flags |= HDCAM_ENH_FLAG_SHARP_EN;
-		if(params->flags & CAM_IMG_GAMMA_EN)
+		if(adj->flags & CAM_IMG_GAMMA_EN)
 			cfg.flags |= HDCAM_ENH_FLAG_GAMMA_EN;
-		if(params->flags & CAM_IMG_SAT_EN)
+		if(adj->flags & CAM_IMG_SAT_EN)
 			cfg.flags |= HDCAM_ENH_FLAG_SAT_EN;
-		if(params->flags & CAM_IMG_MED_FILTER_EN)
+		if(adj->flags & CAM_IMG_MED_FILTER_EN)
 			cfg.flags |= HDCAM_ENH_FLAG_NF_EN;
-		if(params->flags & CAM_IMG_DRC_EN)
+		if(adj->flags & CAM_IMG_DRC_EN)
 			cfg.flags |= HDCAM_ENH_FLAG_DRC_EN;
-		if(params->flags & CAM_IMG_BRIGHTNESS_EN)
+		if(adj->flags & CAM_IMG_BRIGHTNESS_EN)
 			cfg.flags |= HDCAM_ENH_FLAG_BRIGHT_EN;
 
-		cfg.brightness = params->brightness;
-		cfg.contrast = params->contrast;
-		cfg.drcStrength = params->drcStrength;
-		cfg.saturation = params->saturation;
-		cfg.sharpness = params->sharpness;
+		cfg.brightness = adj->brightness;
+		cfg.contrast = adj->contrast;
+		cfg.drcStrength = adj->drcStrength;
+		cfg.saturation = adj->saturation;
+		cfg.sharpness = adj->sharpness;
 		cfg.reserved[0] = cfg.reserved[1] = 0;
 
 		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_ENHCFG, &cfg) < 0) {
@@ -849,29 +857,40 @@ static Int32 get_img_conv_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 
 	ImgConvDynParams *params = (ImgConvDynParams *)data;
 	AppParams *appCfg = &hParamsMng->appParams;
+	CamImgAdjCfg *adjCfg;
 
+	/* cfg according to day/night mode */
+	if(appCfg->dayNightCfg.mode == CAM_DAY_MODE)
+		adjCfg = &appCfg->imgAdjParams.dayCfg;
+	else
+		adjCfg = &appCfg->imgAdjParams.nightCfg;
+	
 	/* Clear data first */
 	memset(params, 0, sizeof(ImgConvDynParams));
 	params->size = sizeof(ImgConvDynParams);
 	params->inputFmt = FMT_BAYER_RGBG;
 	
-	params->digiGain = appCfg->imgAdjParams.digiGain;
-	params->brigtness = appCfg->imgAdjParams.brightness;
-	params->contrast = appCfg->imgAdjParams.contrast;
-	params->gamma = appCfg->imgAdjParams.gamma;
+	params->digiGain = adjCfg->digiGain;
+	params->brigtness = adjCfg->brightness;
+	params->contrast = adjCfg->contrast;
+	params->gamma = adjCfg->gamma;
 	params->inputFmt = hParamsMng->capInputInfo.colorSpace;
 	params->inputWidth = hParamsMng->capInputInfo.width;
 	params->inputHeight = hParamsMng->capInputInfo.height;
 	
 	/* Set control flags */
-	if(appCfg->imgAdjParams.flags & CAM_IMG_GAMMA_EN)
+	if(adjCfg->flags & CAM_IMG_GAMMA_EN)
 		params->ctrlFlags |= CONV_FLAG_GAMMA_EN;
-	if(appCfg->imgAdjParams.flags & CAM_IMG_SHARP_EN)
+	if(adjCfg->flags & CAM_IMG_SHARP_EN)
 		params->ctrlFlags |= CONV_FLAG_EE_EN;
-	if(appCfg->imgAdjParams.flags & CAM_IMG_NF_EN)
+	if(adjCfg->flags & CAM_IMG_NF_EN)
 		params->ctrlFlags |= CONV_FLAG_NF_EN;
-	if(appCfg->imgAdjParams.flags & CAM_IMG_MED_FILTER_EN)
+	if(adjCfg->flags & CAM_IMG_MED_FILTER_EN)
 		params->ctrlFlags |= CONV_FLAG_AVG_EN;
+	if(adjCfg->flags & CAM_IMG_BRIGHTNESS_EN)
+		params->ctrlFlags |= CONV_FLAG_LUMA_EN;
+	if(adjCfg->flags & CAM_IMG_CONTRAST_EN)
+		params->ctrlFlags |= CONV_FLAG_CONTRAST_EN;
 
 	/* Set output params */
 	params->outAttrs[0].enbale = TRUE;
