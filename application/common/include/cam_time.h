@@ -115,7 +115,7 @@ extern Int32 cam_get_time(OUT CamDateTime *dateTime);
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 cam_set_time(IN CamDateTime *dateTime);
+extern Int32 cam_set_time(IN const CamDateTime *dateTime);
 
 #ifdef __cplusplus
 #if __cplusplus

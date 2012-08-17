@@ -121,7 +121,7 @@ $(LIB_OBJ):	$(OBJ_DIR)/%.o: %.c $(HEADERS)
 	@mkdir -p $(OBJ_DIR)
 	$(COMPILE) -o $@ $<
 
-$(EXEC): $(EXEC_OBJ)
+$(EXEC): $(EXEC_OBJ) $(LIB)
 	$(LINK) -o $@ $^ $(LD_LIBS)
 
 $(EXEC_OBJ): $(OBJ_DIR)/%.o: %.c $(HEADERS)

@@ -48,10 +48,10 @@ typedef enum {
 
 #define ERRSTR(fmt, args...)	fprintf(stderr, "Err @ func: %s, " fmt ": %s\n", __func__, ##args, strerror(errno))
 
-#define ASSERT(cond, msg) \
+#define ASSERT(cond, fmt, args...) \
 	do { \
 		if(!(cond)) { \
-			ERR("Assert failed: %s, %s", #cond, msg); \
+			ERR("Assert failed: %s, " fmt, #cond, ##args); \
 			assert(cond); \
 		}\
 	}while(0)

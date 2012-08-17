@@ -23,6 +23,7 @@
 #define DEF_CONTRAST	16
 #define DEF_IN_WIDTH	2560
 #define DEF_IN_HEIGHT	2048
+#define DEF_GAMMA		220
 
 #define THR_MSG_NAME0	"/tmp/convThr0"
 #define THR_MSG_NAME1	"/tmp/convThr1"
@@ -54,6 +55,7 @@ typedef struct _TestParams {
 	Bool	fakeInput;
 	Uint8	flip;
 	Uint8	outFmt;
+	Uint16	gamma;
 }TestParams;
 
 typedef struct {
@@ -521,6 +523,7 @@ static Bool main_loop(TestParams *params)
 	attrs.inputType = CAP_INPUT_CAMERA;
 	attrs.std = CAP_STD_FULL_FRAME;
 	attrs.userAlloc = TRUE;
+	attrs.mode = CAP_MODE_CONT;
 	
 	hCapture = capture_create(&attrs);
 	CapInputInfo info;
@@ -553,6 +556,7 @@ static Bool main_loop(TestParams *params)
 	convDynParams.contrast = params->contrast;
 	convDynParams.eeTable = NULL;
 	convDynParams.eeTabSize = 0;
+	convDynParams.gamma = params->gamma;
 	
 	
 	convDynParams.outAttrs[0].enbale = TRUE;
@@ -577,6 +581,7 @@ static Bool main_loop(TestParams *params)
 
 	}
 
+	DBG("img conv create done.");
 
 	convInArgs.size = sizeof(convInArgs);
 	convInArgs.outAttrs[0] = convDynParams.outAttrs[0];
@@ -650,6 +655,7 @@ static Bool main_loop(TestParams *params)
 	Int32 i = 0;
 	msg.frame.index = 0;
 
+	DBG("capture start...");
 	
 	while(1) {
 #ifdef CONV_IN_CAP_THR
@@ -854,7 +860,7 @@ static void usage(void)
 	INFO(" -N enable 2D noise filter");
 	INFO(" -e enable edge enhance");
 	INFO(" -a enable average filter.");
-	INFO(" -m enable gamma");
+	INFO(" -m gamma plus 100, e.g for 2.2 gamma, set 220, default: %d", DEF_GAMMA);
 	INFO(" -i using fake input file instead of capture dev");
 	INFO(" -W input width, ignored when using capture dev, default %d", DEF_IN_WIDTH);
 	INFO(" -L input height, ignored when using capture dev, default %d", DEF_IN_HEIGHT);
@@ -870,7 +876,7 @@ static void usage(void)
 int main(int argc, char **argv)
 {
 	int c;
-    char *options = "n:o:w:l:g:b:c:hyNeamiW:L:F:f:";
+    char *options = "n:o:w:l:g:b:c:hyNeam:iW:L:F:f:";
 	TestParams params;
 	
 	params.loopCnt = DEF_LOOP_CNT;
@@ -880,6 +886,7 @@ int main(int argc, char **argv)
 	params.flags = 0;
 	params.brightness = DEF_BRIGHTNESS;
 	params.contrast = DEF_CONTRAST;
+	params.gamma = DEF_GAMMA;
 	params.flip = 0;
 	params.inWidth = DEF_IN_WIDTH;
 	params.inHeight = DEF_IN_HEIGHT;
@@ -919,6 +926,7 @@ int main(int argc, char **argv)
 			break;
 		case 'c':
 			params.contrast = atoi(optarg);
+			params.flags |= CONV_FLAG_CONTRAST_EN;
 			break;
 		case 'o':
 			params.outFileName = optarg;
@@ -928,6 +936,7 @@ int main(int argc, char **argv)
 			break;
 		case 'm':
 			params.flags |= CONV_FLAG_GAMMA_EN;
+			params.gamma = atoi(optarg);
 			break;
 		case 'e':
 			params.flags |= CONV_FLAG_EE_EN;

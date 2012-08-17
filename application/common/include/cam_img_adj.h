@@ -67,9 +67,14 @@ typedef struct {
 	Uint16	digiGain;		//digital gain
 	Uint16	drcStrength;	//strength of DRC
 	Uint16	gamma;			//gamma value plus 100
-} CamImgEnhanceParams;
+}CamImgAdjCfg;
 
-/* Flags for image enhance */
+typedef struct {
+	CamImgAdjCfg	dayCfg;		// cfg preset for day period
+	CamImgAdjCfg	nightCfg;	// cfg preset for night period
+}CamImgEnhanceParams;
+
+/* Flags for CamImgAdjCfg.flags */
 #define CAM_IMG_CONTRAST_EN		(1 << 0)	//enable contrast adjust
 #define CAM_IMG_SHARP_EN		(1 << 1)	//enable sharpness adjust
 #define CAM_IMG_GAMMA_EN		(1 << 2)	//enable brightness adjust

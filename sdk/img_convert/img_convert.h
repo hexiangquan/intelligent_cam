@@ -36,6 +36,7 @@
 #define CONV_FLAG_GAMMA_EN			(1 << 3)	/* gamma enable */
 #define CONV_FLAG_LUMA_EN			(1 << 4)	/* lumanance adjust enable */
 #define CONV_FLAG_DFC_EN			(1 << 5)	/* defect correction enable */
+#define CONV_FLAG_CONTRAST_EN		(1 << 6)	/* contrast enable */
 
 #define CONV_MAX_OUT_CHAN_NUM		2
 #define CONV_CHANB_MAX_OUT_WIDTH	1088		/* Maxium output width for channel B */

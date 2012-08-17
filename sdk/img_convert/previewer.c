@@ -71,6 +71,8 @@
  *----------------------------------------------*/
 #define YEE_LUT_MAX_SIZE 	1024
 #define GAMMA_TBL_MAX_SIZE	512
+#define RGB2YUV_Y_ADJ(x)	((x)-128)
+#define CONTRAST_ADJ(x)		((x)>>3)
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -203,7 +205,7 @@ int previewer_init(const char *name, Bool onTheFly, PreviewAttrs *attrs)
 		goto err_quit;
     }
 
-    if (ioctl(preview_fd,PREV_G_OPER_MODE, &oper_mode) < 0) {
+    if (ioctl(preview_fd, PREV_G_OPER_MODE, &oper_mode) < 0) {
         ERRSTR("Can't get operation mode from previewer");
         err = E_IO;
 		goto err_quit;
@@ -412,6 +414,7 @@ static Int32 gamma_table_generate(struct prev_gamma *params, Uint16 gamma)
 
 	if(gamma == 0) {
 		params->tbl_sel = IPIPE_GAMMA_TBL_ROM;
+		DBG("using gamma tabl in ROM.");
 		return E_NO;
 	}
 
@@ -440,6 +443,21 @@ static Int32 gamma_table_generate(struct prev_gamma *params, Uint16 gamma)
 	params->table_g = gamma_table;
 	params->table_b = gamma_table;
 
+#ifdef CONV_DBG
+		DBG("output gamma table to gamma.txt");
+		FILE *fp = fopen("gamma.txt", "w");
+		if(!fp) {
+			ERRSTR("open gamma.txt failed.");
+			return E_IO;
+		}
+
+		for(i = 0; i < GAMMA_TBL_MAX_SIZE; ++i) {
+			fprintf(fp, "%d\t\t%d\n", gamma_table[i].offset, gamma_table[i].slope);
+		}
+
+		fclose(fp);
+#endif
+
 	return E_NO;
 }
 
@@ -467,7 +485,7 @@ static Int32 previewer_set_gamma(struct prev_module_param *modParam, struct prev
 	params->bypass_b = bypass;
 	params->bypass_g = bypass;
 	params->tbl_sel = IPIPE_GAMMA_TBL_ROM;
-
+	
 	if(!bypass)
 		gamma_table_generate(params, gamma);
 	
@@ -537,12 +555,54 @@ static Int32 previewer_set_nf(struct prev_module_param *modParam, struct prev_nf
 *****************************************************************************/
 static Int32 previewer_set_lum(struct prev_module_param *modParam, struct prev_lum_adj *lum, PreviewAttrs *attrs)
 {
-	if(attrs->ctrlFlags & CONV_FLAG_LUMA_EN) {
-		lum->brightness = attrs->brightness;
-		lum->contrast = attrs->contrast;
+	if(attrs->ctrlFlags & CONV_FLAG_CONTRAST_EN) {
+		lum->brightness = 0;
+		lum->contrast = CONTRAST_ADJ(attrs->contrast);
 		modParam->param = lum;
 		modParam->len = sizeof (struct prev_lum_adj);
 	} else {
+		modParam->param = NULL;
+		modParam->len = 0;
+	}
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : previewer_set_y_offset
+ Description  : set y offset for brightness adjust
+ Input        : int fd                              
+                struct prev_module_param *modParam  
+                struct prev_rgb2yuv *rgb2yuv        
+                PreviewAttrs *attrs                 
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/17
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 previewer_set_y_offset(int fd, struct prev_module_param *modParam, struct prev_rgb2yuv *rgb2yuv, PreviewAttrs *attrs)
+{
+	Int32 err = -1;
+	
+	if(attrs->ctrlFlags & CONV_FLAG_LUMA_EN) {
+		/* get current params */
+		modParam->param = rgb2yuv;
+		modParam->len = sizeof(*rgb2yuv);
+		err = ioctl(fd, PREV_G_PARAM, modParam);
+		if(err == 0) {
+			rgb2yuv->out_ofst_y = RGB2YUV_Y_ADJ(attrs->brightness);
+		} else {
+			ERRSTR("get rgb2yuv prams failed");
+		}
+	} 
+
+	if(err < 0) {
 		modParam->param = NULL;
 		modParam->len = 0;
 	}
@@ -683,6 +743,7 @@ Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
 	struct prev_nf nf;
 	struct prev_wb wb;
 	struct prev_yee yee;
+	struct prev_rgb2yuv rgb2yuv;
 	
 	short *yeeTab = NULL;
 	Bool bypass;
@@ -731,6 +792,9 @@ Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
 			} else {
 				modParam.param = NULL;
 			}
+			break;
+		case PREV_RGB2YUV:
+			previewer_set_y_offset(fdPrev, &modParam, &rgb2yuv, attrs);
 			break;
 		default:
 			/* using defaults */
