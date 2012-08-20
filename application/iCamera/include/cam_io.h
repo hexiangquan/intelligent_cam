@@ -33,8 +33,8 @@ typedef struct {
 #define CAM_STROBE_SIG_HIGH		(1)	// edge of sync enable
 #define CAM_STROBE_SIG_LOW		(0)
 
-#define CAM_STROBE_MODE_TRIG	(1)	// trigger output
-#define CAM_STROBE_MODE_FREQ	(0)	// frequent output
+#define CAM_STROBE_MODE_TRIG	(0)	// trigger output
+#define CAM_STROBE_MODE_FREQ	(1)	// frequent output
 
 #define CAM_STROBE_AC_SYNC_EN	(1)	//sync with AC signals
 
