@@ -14,11 +14,15 @@ install:
 	cp -rp home/root/* $(TARGET_FILESYS_DIR)/home/root
 	@mkdir -p $(TARGET_FILESYS_DIR)/home/root/backup
 	@mkdir -p $(TARGET_FILESYS_DIR)/home/root/update
-	@cd $(TARGET_FILESYS_DIR)/etc/rc5.d
-	@ln -s ../rc.local S99rclocal
+
+#	cd $(TARGET_FILESYS_DIR)/etc/rc5.d
+#	-ln -s ../rc.local S99rclocal
 
 clean:
 	-rm *~
+	@-rm home/root/*~
+	@-rm etc/*~
+	@-rm etc/init.d/*~
 exe:
 
 

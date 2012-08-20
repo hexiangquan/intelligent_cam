@@ -242,6 +242,33 @@ Int32 ftp_set_password(FtpHandle hFtp, const Int8 *password)
 	return E_NO;
 }
 
+/*****************************************************************************
+ Prototype    : ftp_set_trans_timeout
+ Description  : set send and recv timeout
+ Input        : FtpHandle hFtp     
+                Uint32 sndTimeout  
+                Uint32 rcvTimeout  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/20
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 ftp_set_trans_timeout(FtpHandle hFtp, Uint32 sndTimeout, Uint32 rcvTimeout)
+{
+	if(!hFtp)
+		return E_INVAL;
+
+	hFtp->sndTimeout = sndTimeout;
+	hFtp->recvTimeout = rcvTimeout;
+
+	return E_NO;
+}
 
 /*****************************************************************************
  Prototype    : ftp_create
@@ -276,6 +303,8 @@ FtpHandle ftp_create(const Int8 *userName, const Int8 *password, const Int8 *ser
 	hFtpClient->connectMode = FTP_PASSIVE_MODE;
 	hFtpClient->cmdSock = -1;
 	hFtpClient->dataSock = -1;
+	hFtpClient->sndTimeout = FTP_SEND_TIMEOUT;
+	hFtpClient->recvTimeout = FTP_RECV_TIMEOUT;
 
 	if(userName != NULL)
 		err |= ftp_set_user_name(hFtpClient, userName);
@@ -371,8 +400,11 @@ Int32 ftp_connect_server(FtpHandle hFtp, Int32 timeoutSec)
 		goto connect_server_quit;
 	}
 
-	ret = set_sock_send_timeout(cmdSock, FTP_SEND_TIMEOUT);
-	ret |= set_sock_recv_timeout(cmdSock, FTP_RECV_TIMEOUT);
+	ret = 0;
+	if(hFtp->sndTimeout)
+		ret |= set_sock_send_timeout(cmdSock, hFtp->sndTimeout);
+	if(hFtp->recvTimeout)
+		ret |= set_sock_recv_timeout(cmdSock, hFtp->recvTimeout);
 	if(ret) {
 		ret = E_INVAL;
 		ERR("set sock opt error.");

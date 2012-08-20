@@ -54,7 +54,7 @@
  * macros                                       *
  *----------------------------------------------*/
 
- #define TRANS_TIMEOUT	0 //seconds
+ #define TRANS_TIMEOUT	10 //seconds
 
 /*----------------------------------------------*
  * routines' implementations                    *

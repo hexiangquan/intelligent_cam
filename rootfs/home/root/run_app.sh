@@ -71,6 +71,11 @@ if [ ! -d "$1" ]; then
 fi
 
 # Go to app dir
+INSTALL_DIR="/home/root"
+UPDATE_DIR="update"
+BACKUP_DIR="backup"
+APP_LIST="iCamera camCtrlSrv"
+
 cd $1
 
 UPDATE_DIR="$2"

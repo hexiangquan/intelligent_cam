@@ -74,12 +74,18 @@ extern const AppParams c_appParamsDef;
 #define IMG_CTRL_DEV			"/dev/imgctrl"
 #define IMG_EXTIO_DEV			"/dev/extio"
 
+
 typedef Int32 (*PmCtrlFxn)(ParamsMngHandle hParamsMng, void *data, Int32 size);
 
 typedef struct {
 	ParamsMngCtrlCmd 	cmd;
 	PmCtrlFxn			fxn;
+	Int32				flags;
 }PmCtrlInfo;
+
+/* flags for save cfg params */
+#define PM_CTRL_INFO_SAVE		(1 << 0)
+
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -1386,8 +1392,26 @@ static Int32 set_network_info(ParamsMngHandle hParamsMng, void *data, Int32 size
 	CamNetworkInfo *info = (CamNetworkInfo *)data;
 	AppParams *appCfg = &hParamsMng->appParams;
 
+	
+	if( strlen(info->ipAddr) + 1 > sizeof(info->ipAddr) ||
+		strlen(info->ipMask) + 1 > sizeof(info->ipMask) ||
+		!strlen(info->ipAddr) || !strlen(info->ipMask) || 
+		strlen(info->gatewayIP) + 1 > sizeof(info->gatewayIP) || 
+		strlen(info->domainName) + 1 > sizeof(info->domainName) ||
+		!strlen(info->gatewayIP) || !strlen(info->domainName) || 
+		strlen(info->hostName) + 1 > sizeof(info->hostName) || 
+		strlen(info->dnsServer) + 1 > sizeof(info->dnsServer) || 
+		!strlen(info->hostName) || !strlen(info->dnsServer)) {
+		ERR("invalid string for network info.");
+		return E_INVAL;
+	}
+	
 #ifdef PM_CONFIG_NET // do not config net when using nfs
 	Int32 err;
+
+	DBG("net info: ip: %s:%s", info->ipAddr, info->ipMask);
+	DBG("gateway: %s", info->gatewayIP);
+	DBG("hostname: %s, dns ip: %s", info->hostName, info->dnsServer);
 
 	/* Set system net config */
 	err = sys_set_ip(0, info->ipAddr, info->ipMask);
@@ -3122,80 +3146,80 @@ static Int32 restore_default(ParamsMngHandle hParamsMng, void *data, Int32 size)
 
 /* tables for control fxns */
 static const PmCtrlInfo g_paramsConfig[] = {
-	{.cmd = PMCMD_S_NETWORKINFO, .fxn = set_network_info,},
-	{.cmd = PMCMD_G_NETWORKINFO, .fxn = get_network_info,},
-	{.cmd = PMCMD_S_DEVINFO, .fxn = set_dev_info,},
-	{.cmd = PMCMD_G_DEVINFO, .fxn = get_dev_info,},
-	{.cmd = PMCMD_S_OSDPARAMS, .fxn = set_osd_params,},
-	{.cmd = PMCMD_G_OSDPARAMS, .fxn = get_osd_params,},
-	{.cmd = PMCMD_S_ROADINFO, .fxn = set_road_info,},
-	{.cmd = PMCMD_G_ROADINFO, .fxn = get_road_info,},
-	{.cmd = PMCMD_S_RTPPARAMS, .fxn = set_rtp_params,},
-	{.cmd = PMCMD_G_RTPPARAMS, .fxn = get_rtp_params,},
-	{.cmd = PMCMD_S_IMGTRANSPROTO, .fxn = set_upload_cfg,},
-	{.cmd = PMCMD_G_IMGTRANSPROTO, .fxn = get_upload_cfg,},
-	{.cmd = PMCMD_S_TCPSRVINFO, .fxn = set_tcp_srv_info,},
-	{.cmd = PMCMD_G_TCPSRVINFO, .fxn = get_tcp_srv_info,},
-	{.cmd = PMCMD_S_FTPSRVINFO, .fxn = set_ftp_srv_info,},
-	{.cmd = PMCMD_G_FTPSRVINFO, .fxn = get_ftp_srv_info,},
-	{.cmd = PMCMD_S_NTPSRVINFO, .fxn = set_ntp_srv_info,},
-	{.cmd = PMCMD_G_NTPSRVINFO, .fxn = get_ntp_srv_info,},
-	{.cmd = PMCMD_S_EXPPARAMS, .fxn = set_exposure_params,},
-	{.cmd = PMCMD_G_EXPPARAMS, .fxn = get_exposure_params,},
-	{.cmd = PMCMD_S_RGBGAINS, .fxn = set_rgb_gains,},
-	{.cmd = PMCMD_G_RGBGAINS, .fxn = get_rgb_gains,},
-	{.cmd = PMCMD_S_LIGHTCORRECT, .fxn = set_light_regions,},
-	{.cmd = PMCMD_G_LIGHTCORRECT, .fxn = get_light_regions,},
-	{.cmd = PMCMD_S_IMGADJPARAMS, .fxn = set_img_adj_params,},
-	{.cmd = PMCMD_G_IMGADJPARAMS, .fxn = get_img_adj_params,},
-	{.cmd = PMCMD_S_H264ENCPARAMS, .fxn = set_h264_params,},
-	{.cmd = PMCMD_G_H264ENCPARAMS, .fxn = get_h264_params,},
-	{.cmd = PMCMD_S_WORKMODE, .fxn = set_work_mode,},
-	{.cmd = PMCMD_G_WORKMODE, .fxn = get_work_mode,},
-	{.cmd = PMCMD_S_IMGENCPARAMS, .fxn = set_img_enc_params,},
-	{.cmd = PMCMD_G_IMGENCPARAMS, .fxn = get_img_enc_params,},
-	{.cmd = PMCMD_S_IOCFG, .fxn = set_io_cfg,},
-	{.cmd = PMCMD_G_IOCFG, .fxn = get_io_cfg,},
-	{.cmd = PMCMD_S_STROBEPARAMS, .fxn = set_strobe_params,},
-	{.cmd = PMCMD_G_STROBEPARAMS, .fxn = get_strobe_params,},
-	{.cmd = PMCMD_S_DETECTORPARAMS, .fxn = set_detector_params,},
-	{.cmd = PMCMD_G_DETECTORPARAMS, .fxn = get_detector_params,},
-	{.cmd = PMCMD_S_AEPARAMS, .fxn = set_ae_params,},
-	{.cmd = PMCMD_G_AEPARAMS, .fxn = get_ae_params,},
-	{.cmd = PMCMD_S_AWBPARAMS, .fxn = set_awb_params,},
-	{.cmd = PMCMD_G_AWBPARAMS, .fxn = get_awb_params,},
-	{.cmd = PMCMD_S_DAYNIGHTCFG, .fxn = set_day_night_params,},
-	{.cmd = PMCMD_G_DAYNIGHTCFG, .fxn = get_day_night_params,},
-	{.cmd = PMCMD_G_VERSION, .fxn = get_version_info,},
-	{.cmd = PMCMD_S_WORKSTATUS, .fxn = set_work_status,},
-	{.cmd = PMCMD_G_WORKSTATUS, .fxn = get_work_status,},
-	{.cmd = PMCMD_S_AVPARAMS, .fxn = set_av_params,},
-	{.cmd = PMCMD_G_AVPARAMS, .fxn = get_av_params,},
-	{.cmd = PMCMD_S_SPECCAPPARAMS, .fxn = set_spec_cap_params,},
-	{.cmd = PMCMD_G_SPECCAPPARAMS, .fxn = get_spec_cap_params,},
-	{.cmd = PMCMD_S_RESTOREDEFAULT, .fxn = restore_default,},
-	{.cmd = PMCMD_MAX0, .fxn = NULL,},
+	{.cmd = PMCMD_S_NETWORKINFO, .fxn = set_network_info, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_NETWORKINFO, .fxn = get_network_info, .flags = 0,},
+	{.cmd = PMCMD_S_DEVINFO, .fxn = set_dev_info, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_DEVINFO, .fxn = get_dev_info, .flags = 0,},
+	{.cmd = PMCMD_S_OSDPARAMS, .fxn = set_osd_params, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_OSDPARAMS, .fxn = get_osd_params, .flags = 0,},
+	{.cmd = PMCMD_S_ROADINFO, .fxn = set_road_info, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_ROADINFO, .fxn = get_road_info, .flags = 0,},
+	{.cmd = PMCMD_S_RTPPARAMS, .fxn = set_rtp_params, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_RTPPARAMS, .fxn = get_rtp_params, .flags = 0,},
+	{.cmd = PMCMD_S_IMGTRANSPROTO, .fxn = set_upload_cfg, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_IMGTRANSPROTO, .fxn = get_upload_cfg, .flags = 0,},
+	{.cmd = PMCMD_S_TCPSRVINFO, .fxn = set_tcp_srv_info, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_TCPSRVINFO, .fxn = get_tcp_srv_info, .flags = 0,},
+	{.cmd = PMCMD_S_FTPSRVINFO, .fxn = set_ftp_srv_info, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_FTPSRVINFO, .fxn = get_ftp_srv_info, .flags = 0,},
+	{.cmd = PMCMD_S_NTPSRVINFO, .fxn = set_ntp_srv_info, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_NTPSRVINFO, .fxn = get_ntp_srv_info, .flags = 0,},
+	{.cmd = PMCMD_S_EXPPARAMS, .fxn = set_exposure_params, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_EXPPARAMS, .fxn = get_exposure_params, .flags = 0,},
+	{.cmd = PMCMD_S_RGBGAINS, .fxn = set_rgb_gains, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_RGBGAINS, .fxn = get_rgb_gains, .flags = 0,},
+	{.cmd = PMCMD_S_LIGHTCORRECT, .fxn = set_light_regions, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_LIGHTCORRECT, .fxn = get_light_regions, .flags = 0,},
+	{.cmd = PMCMD_S_IMGADJPARAMS, .fxn = set_img_adj_params, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_IMGADJPARAMS, .fxn = get_img_adj_params, .flags = 0,},
+	{.cmd = PMCMD_S_H264ENCPARAMS, .fxn = set_h264_params, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_H264ENCPARAMS, .fxn = get_h264_params, .flags = 0,},
+	{.cmd = PMCMD_S_WORKMODE, .fxn = set_work_mode, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_WORKMODE, .fxn = get_work_mode, .flags = 0,},
+	{.cmd = PMCMD_S_IMGENCPARAMS, .fxn = set_img_enc_params, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_IMGENCPARAMS, .fxn = get_img_enc_params, .flags = 0,},
+	{.cmd = PMCMD_S_IOCFG, .fxn = set_io_cfg, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_IOCFG, .fxn = get_io_cfg, .flags = 0,},
+	{.cmd = PMCMD_S_STROBEPARAMS, .fxn = set_strobe_params, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_STROBEPARAMS, .fxn = get_strobe_params, .flags = 0,},
+	{.cmd = PMCMD_S_DETECTORPARAMS, .fxn = set_detector_params, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_DETECTORPARAMS, .fxn = get_detector_params, .flags = 0,},
+	{.cmd = PMCMD_S_AEPARAMS, .fxn = set_ae_params, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_AEPARAMS, .fxn = get_ae_params, .flags = 0,},
+	{.cmd = PMCMD_S_AWBPARAMS, .fxn = set_awb_params, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_AWBPARAMS, .fxn = get_awb_params, .flags = 0,},
+	{.cmd = PMCMD_S_DAYNIGHTCFG, .fxn = set_day_night_params, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_DAYNIGHTCFG, .fxn = get_day_night_params, .flags = 0,},
+	{.cmd = PMCMD_G_VERSION, .fxn = get_version_info, .flags = 0,},
+	{.cmd = PMCMD_S_WORKSTATUS, .fxn = set_work_status, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_WORKSTATUS, .fxn = get_work_status, .flags = 0,},
+	{.cmd = PMCMD_S_AVPARAMS, .fxn = set_av_params, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_AVPARAMS, .fxn = get_av_params, .flags = 0,},
+	{.cmd = PMCMD_S_SPECCAPPARAMS, .fxn = set_spec_cap_params, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_G_SPECCAPPARAMS, .fxn = get_spec_cap_params, .flags = 0,},
+	{.cmd = PMCMD_S_RESTOREDEFAULT, .fxn = restore_default, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_MAX0, .fxn = NULL, .flags = 0,},
 };
 
 /* tables for params convert fxns */
 static const PmCtrlInfo g_paramsConvert[] = {
-	{.cmd = PMCMD_G_IMGCONVDYN, .fxn = get_img_conv_dyn,},
-	{.cmd = PMCMD_G_2NDSTREAMATTRS, .fxn = get_stream2_out_attrs, },
-	{.cmd = PMCMD_G_JPGENCDYN, .fxn = get_jpg_enc_dyn, },
-	{.cmd = PMCMD_S_CAPINFO, .fxn = set_cap_input_info, },
-	{.cmd = PMCMD_G_CAPINFO, .fxn = get_cap_input_info, },
-	{.cmd = PMCMD_G_IMGOSDDYN, .fxn = get_img_osd_dyn, },
-	{.cmd = PMCMD_G_H264ENCDYN, .fxn = get_h264_enc_dyn, },
-	{.cmd = PMCMD_G_VIDOSDDYN, .fxn = get_vid_osd_dyn, },
-	{.cmd = PMCMD_G_IMGUPLOADPARAMS, .fxn = get_img_upload_params, },
-	{.cmd = PMCMD_G_IMGOSDINFO, .fxn = get_img_osd_info, },
-	{.cmd = PMCMD_G_VIDOSDINFO, .fxn = get_vid_osd_info, },
-	{.cmd = PMCMD_G_VIDUPLOADPARAMS, .fxn = get_vid_upload_params,},
-	{.cmd = PMCMD_G_CONVTERPARAMS, .fxn = get_converter_params, },
-	{.cmd = PMCMD_G_IMGENCODERPARAMS, .fxn = get_img_encoder_params, },
-	{.cmd = PMCMD_G_VIDENCODERPARAMS, .fxn = get_vid_encoder_params, },
-	{.cmd = PMCMD_S_SWITCHDAYNIGHT, .fxn = day_night_switch, },
-	{.cmd = PMCMD_MAX1, .fxn = NULL,},
+	{.cmd = PMCMD_G_IMGCONVDYN, .fxn = get_img_conv_dyn, .flags = 0,},
+	{.cmd = PMCMD_G_2NDSTREAMATTRS, .fxn = get_stream2_out_attrs, .flags = 0,},
+	{.cmd = PMCMD_G_JPGENCDYN, .fxn = get_jpg_enc_dyn, .flags = 0,},
+	{.cmd = PMCMD_S_CAPINFO, .fxn = set_cap_input_info, .flags = 0,},
+	{.cmd = PMCMD_G_CAPINFO, .fxn = get_cap_input_info, .flags = 0,},
+	{.cmd = PMCMD_G_IMGOSDDYN, .fxn = get_img_osd_dyn, .flags = 0,},
+	{.cmd = PMCMD_G_H264ENCDYN, .fxn = get_h264_enc_dyn, .flags = 0,},
+	{.cmd = PMCMD_G_VIDOSDDYN, .fxn = get_vid_osd_dyn, .flags = 0,},
+	{.cmd = PMCMD_G_IMGUPLOADPARAMS, .fxn = get_img_upload_params, .flags = 0,},
+	{.cmd = PMCMD_G_IMGOSDINFO, .fxn = get_img_osd_info, .flags = 0,},
+	{.cmd = PMCMD_G_VIDOSDINFO, .fxn = get_vid_osd_info, .flags = 0,},
+	{.cmd = PMCMD_G_VIDUPLOADPARAMS, .fxn = get_vid_upload_params,.flags = 0,},
+	{.cmd = PMCMD_G_CONVTERPARAMS, .fxn = get_converter_params, .flags = 0,},
+	{.cmd = PMCMD_G_IMGENCODERPARAMS, .fxn = get_img_encoder_params, .flags = 0,},
+	{.cmd = PMCMD_G_VIDENCODERPARAMS, .fxn = get_vid_encoder_params, .flags = 0,},
+	{.cmd = PMCMD_S_SWITCHDAYNIGHT, .fxn = day_night_switch, .flags = 0,},
+	{.cmd = PMCMD_MAX1, .fxn = NULL, .flags = 0,},
 };
 
 
@@ -3222,9 +3246,8 @@ Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void 
 	if(!hParamsMng)
 		return E_INVAL;
 
-	Int32 		ret;
-	Int32 		index;
-	PmCtrlFxn	ctrlFxn = NULL;
+	Int32 				index;
+	const PmCtrlInfo	*ctrlInfo;
 
 	if((cmd & PM_CMD_MASK) == PMCMD_BASE0) {
 		index = cmd - PMCMD_BASE0;
@@ -3232,23 +3255,29 @@ Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void 
 			ERR("can't find fxn for cmd: 0x%X", (__u32)cmd);
 			return E_UNSUPT;
 		}
-		ctrlFxn = g_paramsConfig[index].fxn;
+		ctrlInfo = &g_paramsConfig[index];
 	} else if((cmd & PM_CMD_MASK) == PMCMD_BASE1) {
 		index = cmd - PMCMD_BASE1;
 		if(cmd > PMCMD_MAX1 || g_paramsConvert[index].cmd != cmd) {
 			ERR("can't find fxn for cmd: 0x%X", (__u32)cmd);
 			return E_UNSUPT;
 		}
-		ctrlFxn = g_paramsConvert[index].fxn;
+		ctrlInfo = &g_paramsConvert[index];
 	} else {
 		ERR("unsupported cmd: 0x%X", (__u32)cmd);
 		return E_UNSUPT;
 	}
 
-	assert(ctrlFxn);
+	assert(ctrlInfo && ctrlInfo->fxn);
+
+	Int32 	ret;
 	pthread_mutex_lock(&hParamsMng->mutex);
-	ret = ctrlFxn(hParamsMng, arg, size);
+	ret = ctrlInfo->fxn(hParamsMng, arg, size);
 	pthread_mutex_unlock(&hParamsMng->mutex);
+
+	/* write back params if cfg changed */
+	if(!ret && (ctrlInfo->flags & PM_CTRL_INFO_SAVE))
+		ret = params_mng_write_back(hParamsMng);
 
 	return ret;
 }

@@ -160,7 +160,7 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 				  (osdInfo->flags & CAM_OSD_FLAG_RED_LIGHT_TIME_EN)) {
 			/* print red light time */
 			offset += sprintf( buf + offset, "Red light time: %u s. ", 
-							   capInfo->triggerInfo[i].redlightTime);
+							   capInfo->triggerInfo[i].redlightTime/100);
 		} else if(!(capInfo->triggerInfo[i].flags & TRIG_INFO_RED_LIGHT) && 
 				  !(capInfo->triggerInfo[i].flags & CAM_OSD_FLAG_RETROGRADE_EN)) {
 			/* print speed */

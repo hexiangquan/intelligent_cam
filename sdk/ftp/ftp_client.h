@@ -55,7 +55,7 @@
 #define FTP_MAX_LINE_SIZE			512
 #define FTP_MAX_DIR_LEN				(FTP_MAX_LINE_SIZE - 7)
 #define FTP_RECONNECT_TIMEOUT		5u		//s
-#define FTP_SEND_TIMEOUT			5u 		//s
+#define FTP_SEND_TIMEOUT			10u 	//s
 #define FTP_RECV_TIMEOUT			15u		//s
 
 /* FTP connection mode */
@@ -86,6 +86,8 @@ typedef struct _FtpObj{
 	Int8				passWord[FTP_MAX_PASSWD_LEN];	 	//pass word
 	Int8 				currentDir[FTP_MAX_DIR_LEN];		//current dir	
 	Int8				cmdBuf[FTP_MAX_LINE_SIZE];
+	Uint32				sndTimeout;							//send timeout, second
+	Uint32				recvTimeout;						//recv timeout, second
 }FtpObject, *FtpHandle;
 
 
@@ -427,6 +429,25 @@ extern Int32 ftp_set_password(FtpHandle hFtp, const Int8 *password);
 
 *****************************************************************************/
 extern Int32 ftp_keep_alive(FtpHandle hFtp);
+
+/*****************************************************************************
+ Prototype    : ftp_set_trans_timeout
+ Description  : set send and recv timeout
+ Input        : FtpHandle hFtp     
+                Uint32 sndTimeout  
+                Uint32 rcvTimeout  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/20
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 ftp_set_trans_timeout(FtpHandle hFtp, Uint32 sndTimeout, Uint32 rcvTimeout);
 
 
 #ifdef __cplusplus

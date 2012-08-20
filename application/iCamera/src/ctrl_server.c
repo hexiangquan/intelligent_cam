@@ -637,7 +637,7 @@ static void *ctrl_server_thread(void *arg)
 			else
 				msgHdr->dataLen = respLen;
 
-			//DBG("reply cmd len: %d, ret: %d", msgHdr->dataLen, (int)msgHdr->param[0]);
+			//DBG("reply cmd: 0x%X, cmd len: %d, ret: %d", msgHdr->cmd, msgHdr->dataLen, (int)msgHdr->param[0]);
 			msgHdr->type = MSG_TYPE_RESP;
 			/* send back response */
 			ret = msg_send(hCtrlSrv->hMsg, NULL, (MsgHeader *)&hCtrlSrv->msgBuf, 0);
@@ -947,7 +947,6 @@ Int32 ctrl_server_delete(CtrlSrvHandle hCtrlSrv, MsgHandle hCurMsg)
 
 	/* save and free params */
 	if(hCtrlSrv->hParamsMng) {
-		params_mng_write_back(hCtrlSrv->hParamsMng);
 		params_mng_delete(hCtrlSrv->hParamsMng);
 	}
 
