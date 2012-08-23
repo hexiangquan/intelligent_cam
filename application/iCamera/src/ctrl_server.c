@@ -33,6 +33,7 @@
 #include "local_upload.h"
 #include "ext_io.h"
 #include <sys/ioctl.h>
+#include "strobe_ctrl.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -89,6 +90,7 @@ struct CtrlSrvObj{
 	Bool				exit;			//flag for exit
 	const char			*msgName;		//our msg name for IPC
 	DayNightHandle		hDayNight;		//day night  switch obj
+	StrobeHandle		hStrobe;		//strobe ctrl obj
 };
 
 typedef enum {
@@ -552,9 +554,11 @@ static void *ctrl_server_thread(void *arg)
 			break;
 		case ICAMCMD_S_STROBEPARAMS:
 			ret = params_mng_control(hParamsMng, PMCMD_S_STROBEPARAMS, data, msgHdr->dataLen);
+			if(!ret)
+				ret = strobe_ctrl_set_cfg(hCtrlSrv->hStrobe, (CamStrobeCtrlParam *)data);
 			break;
 		case ICAMCMD_G_STROBEPARAMS:
-			ret = params_mng_control(hParamsMng, PMCMD_G_STROBEPARAMS, data, CTRL_MSG_BUF_LEN);
+			ret = strobe_ctrl_get_cfg(hCtrlSrv->hStrobe, (CamStrobeCtrlParam *)data);
 			respLen = sizeof(CamStrobeCtrlParam);
 			break;
 		case ICAMCMD_S_DETECTORPARAMS:
@@ -733,9 +737,23 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 		}
 	}
 
+	/* create strobe ctrl object */
+	StrobeCtrlAttrs strobeAttrs;
+	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_STROBEPARAMS, 
+				&strobeAttrs.params, sizeof(strobeAttrs.params));
+	strobeAttrs.checkPrd = 10; 	// default check prd in seconds
+	strobeAttrs.devName = EXTIO_DEV_NAME;
+	strobeAttrs.minSwitchCnt = 100; // default switch count num
+	hCtrlSrv->hStrobe = strobe_ctrl_create(&strobeAttrs);
+	if(!hCtrlSrv->hStrobe) {
+		ERR("create strobe module failed!");
+		goto exit;
+	}
+
 	/* create data capture module */
 	dataCapAttrs.hCapture = hCtrlSrv->hCapture;
 	dataCapAttrs.hDayNight = attrs->hDayNight;
+	dataCapAttrs.hStrobe = hCtrlSrv->hStrobe;
 	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_DETECTORPARAMS, 
 			&dataCapAttrs.detectorParams, sizeof(dataCapAttrs.detectorParams));
 	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_CONVTERPARAMS, 
@@ -942,6 +960,10 @@ Int32 ctrl_server_delete(CtrlSrvHandle hCtrlSrv, MsgHandle hCurMsg)
 	/* delete image capture */
 	if(hCtrlSrv->hCapture)
 		capture_delete(hCtrlSrv->hCapture);
+
+	/* delete strobe module */
+	if(hCtrlSrv->hStrobe)
+		strobe_ctrl_delete(hCtrlSrv->hStrobe);
 
 	pthread_mutex_destroy(&hCtrlSrv->encMutex);
 

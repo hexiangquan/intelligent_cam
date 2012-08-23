@@ -64,9 +64,11 @@
 
 #define CONV_BUF_NUM				2
 
-/* min lum count before day/night mode switch for trigger and continue capture */
-#define DAY_NIGHT_MIN_SWITCH_TRIG	(30)		
-#define DAY_NIGHT_MIN_SWITCH_CONT	(150)		
+/* min lum count before day/night mode & strobe enable switch for trigger and continue capture */
+#define MIN_SWITCH_TRIG				(30)		
+#define MIN_SWITCH_CONT				(150)		
+
+#define STROBE_SWITCH_CHECK_PRD		(20)	// seconds
 
 //#define CAP_TRIG_TEST
 
@@ -101,6 +103,7 @@ struct DataCapObj{
 	pthread_t			pid;
 	const char 			*dstName[2];
 	DayNightHandle		hDayNight;
+	StrobeHandle		hStrobe;
 };
 
 
@@ -165,10 +168,12 @@ static Int32 data_capture_config(DataCapHandle hDataCap)
 	if(workMode->capMode == CAM_CAP_MODE_CONTINUE) {
 		hDataCap->encImg = FALSE;
 		hDataCap->status &= ~CAPTHR_STAT_TRIG;
-		day_night_cfg_min_switch_cnt(hDataCap->hDayNight, DAY_NIGHT_MIN_SWITCH_CONT);
+		day_night_cfg_min_switch_cnt(hDataCap->hDayNight, MIN_SWITCH_CONT);
+		strobe_ctrl_set_check_params(hDataCap->hStrobe, MIN_SWITCH_CONT, STROBE_SWITCH_CHECK_PRD);
 	} else {
 		hDataCap->status |= CAPTHR_STAT_TRIG;
-		day_night_cfg_min_switch_cnt(hDataCap->hDayNight, DAY_NIGHT_MIN_SWITCH_TRIG);
+		day_night_cfg_min_switch_cnt(hDataCap->hDayNight, MIN_SWITCH_TRIG);
+		strobe_ctrl_set_check_params(hDataCap->hStrobe, MIN_SWITCH_TRIG, STROBE_SWITCH_CHECK_PRD);
 	}
 	
 	hDataCap->dstName[1] = NULL;
@@ -455,6 +460,11 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 	imgMsg.timeCode = capFrame.timeStamp;
 	imgMsg.roadInfo = hDataCap->roadInfo;
 	cam_convert_time(&capFrame.timeStamp, &imgMsg.timeStamp);
+
+	/* do strobe switch check */
+	strobe_ctrl_auto_switch(hDataCap->hStrobe, &imgMsg.timeStamp, imgMsg.rawInfo.avgLum);
+
+	/* convert format */
 	err = converter_run(hDataCap->hConverter, &capFrame, streamId, &imgMsg);
 
 	/* free cap buffer */
@@ -574,6 +584,9 @@ static Int32 detector_trigger(DataCapHandle hDataCap)
 			hDataCap->capIndex = CAP_INDEX_NEXT_FRAME;
 			cmd = IMGCTRL_SPECTRIG;
 		}
+
+		/* enable strobe output */
+		strobe_ctrl_output_enable(hDataCap->hStrobe, capInfo);
 
 		/* send trig cmd */
 		ret = ioctl(hDataCap->fdImgCtrl, cmd, NULL);
@@ -732,6 +745,8 @@ DataCapHandle data_capture_create(const DataCapAttrs *attrs)
 	/* record params */
 	hDataCap->detectorParams = attrs->detectorParams;
 	hDataCap->hDayNight = attrs->hDayNight;
+	hDataCap->hStrobe = attrs->hStrobe;
+	assert(hDataCap->hDayNight && hDataCap->hStrobe);
 
 	/* init our running evironment */
 	ret = data_capture_config(hDataCap);

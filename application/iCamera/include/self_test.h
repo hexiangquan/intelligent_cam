@@ -55,6 +55,7 @@
 #define SELF_TEST_RTPUPLOAD		(1 << 4)
 #define SELF_TEST_SYSCOMMU		(1 << 5)
 #define SELF_TEST_DAYNIGHT		(1 << 6)
+#define SELF_TEST_STROBE		(1 << 7)
 
 /*----------------------------------------------*
  * routines' implementations                    *

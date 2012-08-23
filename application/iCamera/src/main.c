@@ -189,6 +189,9 @@ static void app_exit(MainEnv *envp, MsgHandle hMsg)
 	if(envp->hCtrlSrv)
 		ctrl_server_delete(envp->hCtrlSrv, hMsg);
 
+	if(envp->hDayNight)
+		day_night_delete(envp->hDayNight);
+
 	if(hMsg)
 		msg_delete(hMsg);
 

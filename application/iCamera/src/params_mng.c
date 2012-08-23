@@ -68,6 +68,7 @@ extern const AppParams c_appParamsDef;
  * macros                                       *
  *----------------------------------------------*/
 #define PM_FLAG_CAPINFO_SET		(1 << 0)
+#define PM_FLAG_NET_CFG_DONE	(1 << 1)		// only config once for net info
 #define PM_CMD_MASK				(0xFFFF0000)
 #define PM_CONFIG_NET
 
@@ -1406,20 +1407,25 @@ static Int32 set_network_info(ParamsMngHandle hParamsMng, void *data, Int32 size
 		return E_INVAL;
 	}
 	
-#ifdef PM_CONFIG_NET // do not config net when using nfs
-	Int32 err;
+	if(!(hParamsMng->flags & PM_FLAG_NET_CFG_DONE)) {
+		/* Only cfg network info after restart, 
+		 * if params is set, it will be used next time 
+		 */
+		Int32 err;
 
-	DBG("net info: ip: %s:%s", info->ipAddr, info->ipMask);
-	DBG("gateway: %s", info->gatewayIP);
-	DBG("hostname: %s, dns ip: %s", info->hostName, info->dnsServer);
+		DBG("net info: ip: %s:%s", info->ipAddr, info->ipMask);
+		DBG("gateway: %s", info->gatewayIP);
+		DBG("hostname: %s, dns ip: %s", info->hostName, info->dnsServer);
 
-	/* Set system net config */
-	err = sys_set_ip(0, info->ipAddr, info->ipMask);
-	err |= sys_set_gateway(info->gatewayIP, NULL);
-	err |= sys_set_domain_info(info->hostName, info->dnsServer);
-	if(err)
-		return E_IO;
-#endif
+		/* Set system net config */
+		err = sys_set_ip(0, info->ipAddr, info->ipMask);
+		err |= sys_set_gateway(info->gatewayIP, NULL);
+		err |= sys_set_domain_info(info->hostName, info->dnsServer);
+		if(err)
+			return E_IO;
+		hParamsMng->flags |= PM_FLAG_NET_CFG_DONE;
+	}
+
 	
 	/* Copy data */
 	appCfg->networkInfo = *info;
@@ -2275,21 +2281,6 @@ static Int32 set_strobe_params(ParamsMngHandle hParamsMng, void *data, Int32 siz
 	/* Copy data */
 	appCfg->strobeParams = *params;
 
-	if(hParamsMng->fdExtIo > 0) {
-		/* sync with hardware */
-		struct hdcam_strobe_info info;
-
-		info.status = params->ctrlFlags & 0x0F;
-		info.sigVal = params->sigVal & 0x0F;
-		info.mode = params->mode & 0x0F;
-		info.syncAC = params->acSyncEn & 0x0F;
-		info.offset = params->offset;
-		
-		if(ioctl(hParamsMng->fdExtIo, EXTIO_S_STROBE, &info) < 0) {
-			return E_IO;
-		}
-	}
-
 	return E_NO;
 }
 
@@ -2320,19 +2311,6 @@ static Int32 get_strobe_params(ParamsMngHandle hParamsMng, void *data, Int32 siz
 	/* Copy data */
 	*(CamStrobeCtrlParam *)data = appCfg->strobeParams;
 	
-	if(hParamsMng->fdExtIo > 0) {
-		/* read from hardware */
-		struct hdcam_strobe_info info;
-		CamStrobeCtrlParam *params = (CamStrobeCtrlParam *)data;
-
-		if(ioctl(hParamsMng->fdExtIo, EXTIO_G_STROBE, &info) < 0) {
-			return E_IO;
-		}
-
-		params->status = info.status;
-		params->offset = info.offset;
-	}
-
 	return E_NO;
 }
 

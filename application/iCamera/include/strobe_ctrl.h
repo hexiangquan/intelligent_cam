@@ -3,30 +3,25 @@
   Copyright (C), 2001-2011, DCN Co., Ltd.
 
  ******************************************************************************
-  File Name     : data_capture.h
+  File Name     : strobe_ctrl.h
   Version       : Initial Draft
   Author        : Sun
-  Created       : 2012/3/6
+  Created       : 2012/8/22
   Last Modified :
-  Description   : data_capture.c header file
+  Description   : strobe_ctrl.c header file
   Function List :
   History       :
-  1.Date        : 2012/3/6
+  1.Date        : 2012/8/22
     Author      : Sun
     Modification: Created file
 
 ******************************************************************************/
-#ifndef __DATA_CAPTURE_H__
-#define __DATA_CAPTURE_H__
+#ifndef __STROBE_CTRL_H__
+#define __STROBE_CTRL_H__
 
-#include "cam_status.h"
+#include "common.h"
+#include "cam_io.h"
 #include "cam_detector.h"
-#include "converter.h"
-#include "capture.h"
-#include "msg.h"
-#include "cam_info.h"
-#include "day_night_switch.h"
-#include "strobe_ctrl.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -60,20 +55,14 @@
  * routines' implementations                    *
  *----------------------------------------------*/
 
-/* init argument for this module */
-typedef struct {
-	Uint16				maxOutWidth;
-	Uint16				maxOutHeight;
-	CamWorkMode			workMode;
-	CamDetectorParam	detectorParams;
-	ConverterParams		convParams;
-	CapHandle			hCapture;
-	CamRoadInfo			roadInfo;
-	DayNightHandle		hDayNight;
-	StrobeHandle		hStrobe;
-}DataCapAttrs;
+typedef struct  {
+	const char 			*devName;
+	CamStrobeCtrlParam	params;
+	Uint32				checkPrd;	// period of time when checking by time, unit: second
+	Int32				minSwitchCnt;
+}StrobeCtrlAttrs;
 
-typedef struct DataCapObj *DataCapHandle;
+typedef struct StrobeObj *StrobeHandle;
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -82,166 +71,131 @@ extern "C"{
 #endif /* __cplusplus */
 
 /*****************************************************************************
- Prototype    : data_capture_create
- Description  : create this module
- Input        : DataCapAttrs *attrs  
+ Prototype    : strobe_ctrl_create
+ Description  : create strobe ctrl object
+ Input        : const char *devName               
+                const CamStrobeCtrlParam *params  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/16
+  1.Date         : 2012/8/22
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern DataCapHandle data_capture_create(const DataCapAttrs *attrs);
+extern StrobeHandle strobe_ctrl_create(const StrobeCtrlAttrs *attrs);
 
 /*****************************************************************************
- Prototype    : data_capture_delete
- Description  : delete collector handle
- Input        : DataCapHandle hDataCap
+ Prototype    : strobe_ctrl_delete
+ Description  : delete this object
+ Input        : StrobeHandle hStrobe  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/16
+  1.Date         : 2012/8/22
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_delete(DataCapHandle hDataCap, MsgHandle hCurMsg);
+extern Int32 strobe_ctrl_delete(StrobeHandle hStrobe);
 
 /*****************************************************************************
- Prototype    : data_capture_run
- Description  : run data collect, capture frame, recv trigger, etc.
- Input        : DataCapHandle hDataCap
+ Prototype    : strobe_ctrl_set_cfg
+ Description  : cfg strobe ctrl params
+ Input        : StrobeHandle hStrobe              
+                const CamStrobeCtrlParam *params  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/16
+  1.Date         : 2012/8/22
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_run(DataCapHandle hDataCap);
+extern Int32 strobe_ctrl_set_cfg(StrobeHandle hStrobe, const CamStrobeCtrlParam *params);
 
 /*****************************************************************************
- Prototype    : data_capture_set_work_mode
- Description  : set work mode
- Input        : DataCapHandle hDataCap  
-                MsgHandle hCurMsg       
+ Prototype    : strobe_ctrl_get_cfg
+ Description  : get strobe ctrl params
+ Input        : StrobeHandle hStrobe        
+                CamStrobeCtrlParam *params  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/21
+  1.Date         : 2012/8/22
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_set_work_mode(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamWorkMode *workMode);
+extern Int32 strobe_ctrl_get_cfg(StrobeHandle hStrobe, CamStrobeCtrlParam *params);
 
 /*****************************************************************************
- Prototype    : data_capture_conv_params
- Description  : set convert params
- Input        : DataCapHandle hDataCap  
-                MsgHandle hCurMsg       
+ Prototype    : strobe_ctrl_set_check_params
+ Description  : set check params for switch
+ Input        : StrobeHandle hStrobe  
+                Int32 minSwitchCnt    
+                Uint32 checkPrd       
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/3/21
+  1.Date         : 2012/8/22
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_set_conv_params(DataCapHandle hDataCap, MsgHandle hCurMsg, const ConverterParams *params);
+extern Int32 strobe_ctrl_set_check_params(StrobeHandle hStrobe, Int32 minSwitchCnt, Uint32 checkPrd);
 
 /*****************************************************************************
- Prototype    : data_capture_set_detector_params
- Description  : set detector params
- Input        : DataCapHandle hDataCap          
-                MsgHandle hCurMsg               
-                const CamDetectorParam *params  
- Output       : None
- Return Value : extern
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/4/12
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-extern Int32 data_capture_set_detector_params(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamDetectorParam *params);
-
-/*****************************************************************************
- Prototype    : data_capture_get_input_info
- Description  : get input info
- Input        : DataCapHandle hDataCap   
-                CamInputInfo *inputInfo  
+ Prototype    : strobe_ctrl_auto_switch
+ Description  : switch according to cfg
+ Input        : StrobeHandle hStrobe     
+                const DateTime *curTime  
+                Uint16 lumVal            
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/4/12
+  1.Date         : 2012/8/22
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_get_input_info(DataCapHandle hDataCap, ImgDimension *inputInfo);
+extern Int32 strobe_ctrl_auto_switch(StrobeHandle hStrobe, const DateTime *curTime, Uint16 lumVal);
 
 /*****************************************************************************
- Prototype    : data_capture_ctrl
- Description  : change capture status
- Input        : DataCapHandle hDataCap  
-                MsgHandle hCurMsg       
-                CamCapCtrl ctrl         
+ Prototype    : strobe_ctrl_output_enable
+ Description  : check and enable strobe for special cfg flags
+ Input        : StrobeHandle hStrobe        
+                const CaptureInfo *capInfo  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/4/12
+  1.Date         : 2012/8/23
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 data_capture_ctrl(DataCapHandle hDataCap, MsgHandle hCurMsg, Int32 ctrl);
-
-/*****************************************************************************
- Prototype    : data_capture_set_road_info
- Description  : update road info
- Input        : DataCapHandle hDataCap  
-                MsgHandle hCurMsg       
-                CamRoadInfo *info       
- Output       : None
- Return Value : 
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/8/1
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-extern Int32 data_capture_set_road_info(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamRoadInfo *info);
+extern Int32 strobe_ctrl_output_enable(StrobeHandle hStrobe, const CaptureInfo *capInfo);
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -250,4 +204,4 @@ extern Int32 data_capture_set_road_info(DataCapHandle hDataCap, MsgHandle hCurMs
 #endif /* __cplusplus */
 
 
-#endif /* __CAPTURE_THR_H__ */
+#endif /* __STROBE_CTRL_H__ */
