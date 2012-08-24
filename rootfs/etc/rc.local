@@ -18,7 +18,7 @@ fi
 
 # Start application
 if test -e "/home/root/run_app.sh"; then
-	/home/root/run_app.sh /home/root update backup iCamera camCtrlSrv
+	/home/root/run_app.sh restart
 fi
 
 exit 0

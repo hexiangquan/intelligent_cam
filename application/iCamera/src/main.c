@@ -64,8 +64,8 @@
  * macros                                       *
  *----------------------------------------------*/
 #define PROGRAM_NAME			"iCamera"
-#define CONFIG_FILE				"./cam.cfg"
-#define FPGA_ROM_FILE			"./fpga.rbf"
+#define CONFIG_FILE				"/home/root/cam.cfg"
+#define FPGA_ROM_FILE			"/home/root/fpga.rbf"
 #define WDT_DEV					"/dev/watchdog"
 
 #define MAIN_FLAG_TEST_EN		(1 << 0)

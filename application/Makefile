@@ -27,6 +27,7 @@ $(INSTALL_SUBDIRS):
 	@cd $(basename $@) ; $(MAKE) install
 
 clean:	$(CLEAN_SUBDIRS)
+	-rm -f *~ *.o *.dep
 
 $(CLEAN_SUBDIRS):
 	@cd $(basename $@) ; $(MAKE) clean

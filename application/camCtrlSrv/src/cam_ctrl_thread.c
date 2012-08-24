@@ -637,7 +637,7 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 		ret = firmware_update(fname, data, cmdHdr->dataLen, cmdHdr->checkSum);
 		cmdHdr->dataLen = 0;
 		if(ret == E_NO)
-			params->reboot = FALSE;
+			params->reboot = TRUE;
 		break;
 	}
 	case TC_FUN_UPDATE_FPGA:

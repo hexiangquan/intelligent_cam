@@ -4,17 +4,20 @@
 #		check and run backup app. 
 # History:
 # 2012/08/14	SK Sun	Create
+# 2012/08/24	SK Sun	Using app name in internal define
 
-# Check arguments
-if [ $# -lt 4 ]; then
-	echo -e "$0 -- srcipts for running applicaiton\n"
-	echo -e "           1. check updates dir, copy update app to current dir if possible"
-	echo -e "           2. run each app"
-	echo -e "           3. if run cur app failed, try run app in backup dir"
-	echo -e "\n  Usage: run_app APP_DIR UPDATE_SUB_DIR BACKUP_SUB_DIR APP1 APP2 ... "
-	echo -e "  Example: run_app.sh /home/root update backup iCamera camCtrlSrv\n"
-	exit 1
-fi
+# Show usage of this program
+Usage() 
+{
+	PROGRAM=`basename $0`
+	echo -e "$PROGRAM -- srcipts for running applicaiton"
+	echo -e "running applications by following steps:"
+	echo -e "\t1. check updates dir, copy update app to current dir if possible"
+	echo -e "\t2. run each app"
+	echo -e "\t3. if run cur app failed, try run app in backup dir"
+	echo -e "Usage: $PROGRAM [start/stop/restart] "
+	echo -e "Example: ./$PROGRAM restart\n"
+}
 
 # Get process PID:
 # @ Name -- process name
@@ -40,7 +43,7 @@ CheckAppStatus()
 		APP="$2/$1"
 		if [ -f "$APP" ]; then
 			echo -e "Running backup app: $APP.\n"
-			$APP
+			$APP &
 		else
 			echo -e "Can't find backup: $APP\n"
 		fi
@@ -60,37 +63,81 @@ CheckUpdate()
 	# Check update dir exist and update app file exist
 	if [ -d "$DIR" ] && [ -f "$DIR/$APP" ]; then
 		mv "$DIR/$APP" .
+		chmod +x $APP
 		echo "updating $APP done ..."
 	fi
 }
 
-# Check if dir and file exits
-if [ ! -d "$1" ]; then
-	echo -e "$1 is not a dir\n"
-	exit 1
-fi
-
-# Go to app dir
+# Application list and install dir define
 INSTALL_DIR="/home/root"
 UPDATE_DIR="update"
 BACKUP_DIR="backup"
 APP_LIST="iCamera camCtrlSrv"
 
-cd $1
+# StopApp -- Check app process and kill it
+# @ Name -- Process name
+# If current app is not killed by SIG_INT, this fuction will kill it by SIG_ABORT
+StopApp()
+{
+	for APP in $APP_LIST; do
+		PID=`GetPID $APP`
+		if [ "-$PID" != "-" ]; then
+			echo "Killing process $APP ..."
+			kill -2 $PID
+			sleep 1
+		fi
 
-UPDATE_DIR="$2"
-BACKUP_DIR="$3"
+		PID=`GetPID $APP`
+		if [ "-$PID" != "-" ]; then
+			echo "Killing process $APP by SIG_ABORT"
+			kill -9 $PID
+		fi
+	done
+}
 
-# Check update, run each app and check status
-for APP in $*; do
-	if [ ! -d "$APP" ]; then
-		echo -e "\n Run app $APP"
+
+# StartApp -- Start running app process
+# @ Name -- Process name
+# @ UpdateDir -- Dir for update
+# @ BackupDir -- Dir for backup
+# If current app is not killed by SIG_INT, this fuction will kill it by SIG_ABORT
+StartApp()
+{
+	for APP in $APP_LIST; do
+		echo -e "\n----- Run app $APP -----"
 		CheckUpdate "$APP" "$UPDATE_DIR";
-		./$APP &
-		sleep 1
+		if [ -e "$APP" ]; then
+			./$APP &
+			sleep 1
+		fi
 		CheckAppStatus "$APP" "$BACKUP_DIR";
-	fi
-done
+	done
+}
+
+# Go to app install dir
+if [ ! -d $INSTALL_DIR ]; then
+	echo -e "install dir: $INSTALL_DIR not exist..."
+	exit 1
+fi
+
+cd $INSTALL_DIR
+
+# Operate by arguments
+case "$1" in
+      start) 
+            StartApp
+             ;;
+       stop) 
+            StopApp           
+             ;;
+       restart) 
+            StopApp           
+            StartApp
+             ;;
+        *)
+            Usage $0
+             ;;
+esac
 
 exit 0
 

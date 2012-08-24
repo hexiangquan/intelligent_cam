@@ -71,6 +71,8 @@ extern const AppParams c_appParamsDef;
 #define PM_FLAG_NET_CFG_DONE	(1 << 1)		// only config once for net info
 #define PM_CMD_MASK				(0xFFFF0000)
 #define PM_CONFIG_NET
+#define PM_CNT_TO_SAVE			10
+#define PM_SAVE_PRD				10				// seconds
 
 #define IMG_CTRL_DEV			"/dev/imgctrl"
 #define IMG_EXTIO_DEV			"/dev/extio"
@@ -100,9 +102,9 @@ struct ParamsMngObj {
 	CamWorkStatus	workStatus;		//current work status
 	pthread_mutex_t	mutex;			//mutex for lock
 	const char		*cfgFile;		//name of cfg file
-	FILE			*fp;			//file for read/write params
 	int				fdImgCtrl;		//fd for img ctrl dev
 	int				fdExtIo;		//fd for ext io dev
+	FILE 			*fpCfg;			//fp for cfg file write
 };
 
 /* internal fxn for init hardware */
@@ -140,13 +142,15 @@ ParamsMngHandle params_mng_create(const char *cfgFile)
 
 	Bool useDefault = TRUE;
 	
+	hParamsMng->cfgFile = cfgFile;
+	
 	/* read file */
 	FILE *fp = fopen(cfgFile, "rb");
 	if(!fp) {
 		ERRSTR("open %s failed:", cfgFile);
-	} else {
+	} else {		
 		Int32 len = fread(&hParamsMng->appParams, sizeof(AppParams), 1, fp);
-		if(len != 1) {
+		if(len < 0) {
 			ERR("Read %d, needed: %d", len, sizeof(AppParams));
 		} else {
 			/* validate data */
@@ -161,11 +165,12 @@ ParamsMngHandle params_mng_create(const char *cfgFile)
 				} else {
 					/* everything is good, use this param */
 					useDefault = FALSE;
-					//DBG("reading cfg file success...");
+					DBG("\rreading cfg file success...\n");
 				}
-			}
-			
+			}	
 		}
+
+		fclose(fp);
 	}
 
 	if(useDefault) {
@@ -190,9 +195,6 @@ ParamsMngHandle params_mng_create(const char *cfgFile)
 		ERRSTR("can't open %s", IMG_EXTIO_DEV);
 	
 	
-	hParamsMng->fp = fp;
-	hParamsMng->cfgFile = cfgFile;
-
 	/* init hardware */
 	params_mng_init_sys(hParamsMng);
 
@@ -230,12 +232,12 @@ Int32 params_mng_delete(ParamsMngHandle hParamsMng)
 	if(!hParamsMng)
 		return E_INVAL;
 	
-	if(hParamsMng->fp)
-		fclose(hParamsMng->fp);
-	
 	pthread_mutex_destroy(&hParamsMng->mutex);
 
-	
+	/* close cfg file */
+	if(hParamsMng->fpCfg)
+		fclose(hParamsMng->fpCfg);
+
 	/* close img ctrl dev */
 	if(hParamsMng->fdImgCtrl > 0)
 		close(hParamsMng->fdImgCtrl);
@@ -266,10 +268,9 @@ Int32 params_mng_delete(ParamsMngHandle hParamsMng)
 Int32 params_mng_write_back(ParamsMngHandle hParamsMng)
 {
 	if(!hParamsMng)
-		return E_INVAL;
-
+		return E_INVAL;	
+	
 	Int32 ret = E_NO;
-
 	pthread_mutex_lock(&hParamsMng->mutex);
 	
 	/* write back current params */
@@ -278,20 +279,25 @@ Int32 params_mng_write_back(ParamsMngHandle hParamsMng)
 	hParamsMng->appParams.dataLen = sizeof(AppParams) - 3 * sizeof(Uint32);
 	hParamsMng->appParams.crc = crc16(buf, hParamsMng->appParams.dataLen);
 
-	if(!hParamsMng->fp) {
-		hParamsMng->fp = fopen(hParamsMng->cfgFile, "wb+");
-		if(!hParamsMng->fp) {
+	if(hParamsMng->fpCfg)
+		fseek(hParamsMng->fpCfg, 0, SEEK_SET);
+	else {
+		hParamsMng->fpCfg = fopen(hParamsMng->cfgFile, "wb+");
+		if(!hParamsMng->fpCfg) {
 			ERRSTR("open cfg file failed");
 			ret = E_IO;
 			goto exit;
-		}	
+		}
 	}
-
+	
 	//DBG("writing cfg to %s...", hParamsMng->cfgFile);
-	ret = fwrite(&hParamsMng->appParams, sizeof(AppParams), 1, hParamsMng->fp);
+	ret = fwrite(&hParamsMng->appParams, sizeof(AppParams), 1, hParamsMng->fpCfg);
 	if(ret < 0) {
 		ERRSTR("write cfg file err");
 		ret = E_IO;
+	} else  {
+		//DBG("params mng, writing cfg file done.");
+		ret = E_NO;
 	}
 
 exit:
@@ -3169,7 +3175,7 @@ static const PmCtrlInfo g_paramsConfig[] = {
 	{.cmd = PMCMD_S_DAYNIGHTCFG, .fxn = set_day_night_params, .flags = PM_CTRL_INFO_SAVE,},
 	{.cmd = PMCMD_G_DAYNIGHTCFG, .fxn = get_day_night_params, .flags = 0,},
 	{.cmd = PMCMD_G_VERSION, .fxn = get_version_info, .flags = 0,},
-	{.cmd = PMCMD_S_WORKSTATUS, .fxn = set_work_status, .flags = PM_CTRL_INFO_SAVE,},
+	{.cmd = PMCMD_S_WORKSTATUS, .fxn = set_work_status, .flags = 0,},
 	{.cmd = PMCMD_G_WORKSTATUS, .fxn = get_work_status, .flags = 0,},
 	{.cmd = PMCMD_S_AVPARAMS, .fxn = set_av_params, .flags = PM_CTRL_INFO_SAVE,},
 	{.cmd = PMCMD_G_AVPARAMS, .fxn = get_av_params, .flags = 0,},
@@ -3254,8 +3260,10 @@ Int32 params_mng_control(ParamsMngHandle hParamsMng, ParamsMngCtrlCmd cmd, void 
 	pthread_mutex_unlock(&hParamsMng->mutex);
 
 	/* write back params if cfg changed */
-	if(!ret && (ctrlInfo->flags & PM_CTRL_INFO_SAVE))
+	if(!ret && (ctrlInfo->flags & PM_CTRL_INFO_SAVE)) {
+		//DBG("saving cfg for cmd: 0x%X", ctrlInfo->cmd);
 		ret = params_mng_write_back(hParamsMng);
+	}
 
 	return ret;
 }

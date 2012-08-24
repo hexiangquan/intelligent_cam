@@ -225,10 +225,12 @@ Int32 strobe_ctrl_set_cfg(StrobeHandle hStrobe, const CamStrobeCtrlParam *params
 	hStrobe->params = *params;
 	/* record which strobes need to auto switch */
 	hStrobe->autoSwitchMask = (params->ctrlFlags & 0x0F); 
-	hStrobe->outputEnable = FALSE;
 	/* disable if need auto switch */
-	if(params->switchMode != CAM_STROBE_SWITCH_OFF) 
-		hStrobe->params.status &= ~(hStrobe->autoSwitchMask);
+	if(params->switchMode != CAM_STROBE_SWITCH_OFF) {
+		hStrobe->params.status &= ~(hStrobe->autoSwitchMask);		
+		hStrobe->outputEnable = FALSE;
+	} else
+		hStrobe->outputEnable = TRUE;
 	
 	/* check auto switch enable num */
 	hStrobe->enableCnt = 0;

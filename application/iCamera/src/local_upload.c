@@ -282,7 +282,7 @@ static Int32 single_file_send(LocalUploadHandle hLocalUpload, const char *fileNa
 	/* read header */
 	ret = read(fd, &img, sizeof(img));
 	if(ret != sizeof(img)) {
-		ERRSTR("read header err");
+		//ERRSTR("read header err");
 		goto exit;
 	}
 

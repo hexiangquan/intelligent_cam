@@ -246,6 +246,15 @@ int socket_tcp_server(Uint16 port, Int32 listenBacklog)
 		return sockfd;
 	}
 
+
+	/* set ip as reusable so we can rebind it */
+	int opt = 1; 
+	int ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)); 
+	if(ret < 0)
+		_ES("set opt for addr reuse failed!");
+	else
+		_D("set opt for addr reuse ok.");
+
 	struct sockaddr_in servAddr;
 
 	bzero(&servAddr, sizeof(servAddr));
