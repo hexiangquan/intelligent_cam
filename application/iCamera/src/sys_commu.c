@@ -2,9 +2,6 @@
 #include "log.h"
 #include "sys_commu.h"
 
-#define SYS_MSG_MAGIC	0xC0DECAFEu		
-#define SYS_MSG_ALIGN	(256)
-
 /*****************************************************************************
  Prototype    : sys_commu_read
  Description  : read from target cpu
@@ -62,9 +59,9 @@ int sys_commu_write(int fd, SysMsg *msg)
 	int len;
 	
 	msg->magic = SYS_MSG_MAGIC;
-	msg->trans_len = ROUND_UP(msg->data_len, SYS_MSG_ALIGN);
+	msg->transLen = ROUND_UP(msg->dataLen, SYS_MSG_ALIGN);
 
-	len = sizeof(*msg) + msg->trans_len;
+	len = sizeof(*msg) + msg->transLen;
 
 	int ret = write(fd, msg, len);
 
@@ -107,7 +104,7 @@ int sys_commu_test()
 
 	assert(buf_in && buf_out);
 	msg_out->cmd = 0;
-	msg_out->data_len = len;
+	msg_out->dataLen = len;
 
 	for(i = 0; i < len; ++i) 
 		data_out[i] = i;
@@ -168,16 +165,16 @@ int sys_commu_test()
 		gettimeofday(&tmEnd,NULL);
 		timeRd = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
 		
-		if( msg_in->data_len != msg_out->data_len || 
-			memcmp(data_in, data_out, msg_in->data_len) ) {
+		if( msg_in->dataLen != msg_out->dataLen || 
+			memcmp(data_in, data_out, msg_in->dataLen) ) {
 			ERR("\n<%d> **len diff: %d-%d, or mem cmp diff!**\n", 
-				i, msg_out->data_len, msg_in->data_len);
+				i, msg_out->dataLen, msg_in->dataLen);
 			errCnt++;
 		} else
 			DBG("<%d> rw success, len: %d/%d, time cost: %.2f-%.2f ms", 
-				i, msg_out->data_len, msg_in->trans_len, timeWr/1000, timeRd/1000);
+				i, msg_out->dataLen, msg_in->transLen, timeWr/1000, timeRd/1000);
 		msg_out->cmd = i;
-		//msg_out->data_len = RAND(0, len);
+		//msg_out->dataLen = RAND(0, len);
 
 		usleep(20000);
 	}

@@ -624,7 +624,7 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 		cmdHdr->dataLen = 0;
 		break;
 	case TC_FUN_UPDATE_DSP:
-		ret = E_NO;
+		ret = dsp_update(data, cmdHdr->dataLen, cmdHdr->checkSum);
 		cmdHdr->dataLen = 0;
 		break;
 	case TC_FUN_UPDATE_ARM: {

@@ -27,7 +27,7 @@ $(INSTALL_SUBDIRS):
 	@cd $(basename $@) ; $(MAKE) install
 
 clean:	$(CLEAN_SUBDIRS)
-	@rm *~
+	@-rm *~
 
 $(CLEAN_SUBDIRS):
 	@cd $(basename $@) ; $(MAKE) clean

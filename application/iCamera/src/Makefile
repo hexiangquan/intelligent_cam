@@ -57,6 +57,7 @@ APP_INC = ../include
 HEADERS = $(wildcard *.h) $(wildcard $(APP_INC)/*.h) $(wildcard $(SDK_INC_DIR)/*.h)
 INC_DIR := -I. -I$(SDK_INC_DIR) -I$(APP_INC) -I$(APP_INC_DIR)
 COMMON_HEADER = $(APP_INC)/cam_*.h
+COMMON_HEADER += $(APP_INC)/sys_commu.h
 
 # Complie options
 C_FLAGS += -Wall -DDM365 -O2 $(INC_DIR)
