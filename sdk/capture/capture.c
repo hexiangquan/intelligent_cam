@@ -725,8 +725,7 @@ static Int32 capture_free_buf(CapHandle hCap)
 
 	if(!hCap->userAlloc) {
 		capture_unmap_buf(hCap);
-	}
-	else {
+	} else {
 		for(i = 0; i < hCap->bufNum; i++) {
 			if(hCap->capBufs[i].userAddr) {
 				CMEM_free(hCap->capBufs[i].userAddr, &hCap->memAllocParams);

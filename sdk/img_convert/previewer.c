@@ -838,7 +838,7 @@ Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
     Modification : Created function
 
 *****************************************************************************/
-Int32 previewer_convert(int fd, AlgBuf *inBuf, AlgBuf *outBuf)
+Int32 previewer_convert(int fd, AlgBuf *inBuf, AlgBuf *outBuf, Bool enChanB)
 {
 	struct imp_convert convert;
 
@@ -852,6 +852,13 @@ Int32 previewer_convert(int fd, AlgBuf *inBuf, AlgBuf *outBuf)
 	convert.out_buff1.index = -1;	/* user ptr */
 	convert.out_buff1.offset = (unsigned long)outBuf->buf;
 	convert.out_buff1.size = outBuf->bufSize;
+
+	if(enChanB && outBuf[1].buf) {
+		convert.out_buff2.buf_type = IMP_BUF_OUT2;
+		convert.out_buff2.index = -1;	/* user ptr */
+		convert.out_buff2.offset = (unsigned long)outBuf[1].buf;
+		convert.out_buff2.size = outBuf[1].bufSize;
+	}
 
 	if(ioctl(fd, PREV_PREVIEW, &convert) < 0) {
 	//if(ioctl(fd, RSZ_RESIZE, &convert) < 0) {

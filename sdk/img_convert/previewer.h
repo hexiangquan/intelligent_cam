@@ -132,7 +132,7 @@ extern Int32 previewer_ss_config(int fdPrev, PreviewAttrs *params);
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 previewer_convert(int fd, AlgBuf *inBuf, AlgBuf *outBuf);
+extern Int32 previewer_convert(int fd, AlgBuf *inBuf, AlgBuf *outBuf, Bool enChanB);
 
 /*****************************************************************************
  Prototype    : ipipe_update

@@ -408,10 +408,8 @@ static Int32 img_convert_exit(Ptr handle)
     Modification : Created function
 
 *****************************************************************************/
-static Int32 img_convert_process2(Ptr algHandle, AlgBuf *inBuf, Ptr inArgsPtr, AlgBuf *outBuf, Ptr outArgsPtr)
+static Int32 img_convert_large_frame(ImgConvHandle hConv, AlgBuf *inBuf, ImgConvInArgs *inArgs, AlgBuf *outBuf, ImgConvOutArgs *outArgs)
 {
-	ImgConvHandle 		hConv = (ImgConvHandle)algHandle; 
-	ImgConvInArgs		*inArgs = (ImgConvInArgs *)inArgsPtr;
     Int32 				ret;
     RszAttrs 			rszAttrs;
     PreviewAttrs 		prevAttrs;
@@ -419,9 +417,6 @@ static Int32 img_convert_process2(Ptr algHandle, AlgBuf *inBuf, Ptr inArgsPtr, A
     AlgBuf 				src;
     AlgBuf				dst;
 	Uint32 				lineLength;
-
-	if(!hConv || !inBuf || !outBuf || !inArgs || inArgs->size != sizeof(ImgConvInArgs))
-		return E_INVAL;
 	
 	if(FMT_YUV_422ILE == inArgs->outAttrs[0].pixFmt) {
 		if(inArgs->outAttrs[0].width&0x1f) 
@@ -467,9 +462,11 @@ static Int32 img_convert_process2(Ptr algHandle, AlgBuf *inBuf, Ptr inArgsPtr, A
 	if(rszAttrs.outAttrs[0].hFlip) {
 		src.buf += dynParams->inputWidth/2;
 	}
+	
+	Bool enChanB = inArgs->outAttrs[1].enbale;
 
 	/* convert for the left half of the image */	
-	ret = previewer_convert(hConv->fdPrev, &src, &dst);
+	ret = previewer_convert(hConv->fdPrev, &src, &dst, enChanB);
 	if(ret) {
 		goto exit;
 	}
@@ -487,7 +484,7 @@ static Int32 img_convert_process2(Ptr algHandle, AlgBuf *inBuf, Ptr inArgsPtr, A
 	//ret = previewer_ss_config(hConv->fdPrev, &prevAttrs);
 
 	/* convert the right half of the image */
-	ret = previewer_convert(hConv->fdPrev, &src, &dst);
+	ret = previewer_convert(hConv->fdPrev, &src, &dst, FALSE);
 
 exit:
 	
@@ -495,6 +492,44 @@ exit:
 	return ret;
 }
 
+/*****************************************************************************
+ Prototype    : img_convert_normal_frame
+ Description  : Process normal frame
+ Input        : ImgConvHandle hConv      
+                ImgConvInArgs inArgs     
+                ImgConvOutArgs *outArgs  
+                AlgBuf *inBuf            
+                AlgBuf *outBuf           
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/28
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 img_convert_normal_frame(ImgConvHandle hConv, AlgBuf *inBuf, ImgConvInArgs *inArgs, AlgBuf *outBuf, ImgConvOutArgs *outArgs)
+{
+	/* only convert once for normal frame */
+	pthread_mutex_lock(&hConv->mutex);
+	
+	Int32 ret = img_convert_set_out_attrs(hConv, inArgs);
+	if(ret) {
+		goto exit;
+	}
+
+	Bool enChanB = inArgs->outAttrs[1].enbale;
+
+	ret = previewer_convert(hConv->fdPrev, inBuf, outBuf, enChanB);
+
+exit:
+	
+	pthread_mutex_unlock(&hConv->mutex);
+	return ret;
+}
 /*****************************************************************************
  Prototype    : img_convert_process
  Description  : run process
@@ -518,6 +553,7 @@ static Int32 img_convert_process(Ptr algHandle, AlgBuf *inBuf, Ptr inArgsPtr, Al
 {
 	ImgConvHandle 	hConv = (ImgConvHandle)algHandle; 
 	ImgConvInArgs	*inArgs = (ImgConvInArgs *)inArgsPtr;
+	ImgConvOutArgs	*outArgs = (ImgConvOutArgs *)outArgsPtr; 
 
 	if(!hConv || !inBuf || !outBuf || !inArgs || inArgs->size != sizeof(ImgConvInArgs))
 		return E_INVAL;
@@ -531,22 +567,13 @@ static Int32 img_convert_process(Ptr algHandle, AlgBuf *inBuf, Ptr inArgsPtr, Al
 
 	if( hConv->largeFrame ||
 		inArgs->outAttrs[0].width > IPIPE_MAX_OUTPUT1_WIDTH_NORMAL) {
-		ret = img_convert_process2(algHandle, inBuf, inArgsPtr, outBuf, outArgsPtr);
-		return ret;
+		/* convert large frames */
+		ret = img_convert_large_frame(hConv, inBuf, inArgs, outBuf, outArgs);
+	} else {
+		/* convert normal frames */
+		ret = img_convert_normal_frame(hConv, inBuf, inArgs, outBuf, outArgs);
 	}
-
-	/* only convert once for normal frame */
-	pthread_mutex_lock(&hConv->mutex);
-	ret = img_convert_set_out_attrs(hConv, inArgs);
-	if(ret) {
-		goto exit;
-	}
-
-	ret = previewer_convert(hConv->fdPrev, inBuf, outBuf);
-
-exit:
 	
-	pthread_mutex_unlock(&hConv->mutex);
 	return ret;
 }
 
