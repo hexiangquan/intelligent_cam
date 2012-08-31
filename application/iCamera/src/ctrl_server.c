@@ -343,6 +343,9 @@ static void *ctrl_server_thread(void *arg)
 			ret = params_mng_control(hParamsMng, PMCMD_G_VERSION, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamVersionInfo);
 			break;
+		case ICAMCMD_S_RESET:
+			ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_MAIN, APPCMD_REBOOT, 0, 0);
+			break;
 		case ICAMCMD_G_WORKSTATUS:
 			ret = params_mng_control(hParamsMng, PMCMD_G_WORKSTATUS, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamWorkStatus); 
@@ -505,6 +508,8 @@ static void *ctrl_server_thread(void *arg)
 			break;
 		case ICAMCMD_S_AVPARAMS:
 			ret = params_mng_control(hParamsMng, PMCMD_S_AVPARAMS, data, msgHdr->dataLen);
+			if(!ret)
+				ret = conv_params_update(hCtrlSrv);
 			break;
 		case ICAMCMD_G_AVPARAMS:
 			ret = params_mng_control(hParamsMng, PMCMD_G_AVPARAMS, data, CTRL_MSG_BUF_LEN);

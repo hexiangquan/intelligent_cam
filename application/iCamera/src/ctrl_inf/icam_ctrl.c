@@ -2172,6 +2172,21 @@ Int32 icam_capture_ctrl(ICamCtrlHandle hCtrl, CamCapCtrl ctrl)
 	return hdr.param[0];
 }
 
+/*****************************************************************************
+ Prototype    : icam_restore_cfg
+ Description  : restore cfg data
+ Input        : ICamCtrlHandle hCtrl  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/30
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
 Int32 icam_restore_cfg(ICamCtrlHandle hCtrl)
 {
 	MsgHeader 	hdr;
@@ -2190,6 +2205,38 @@ Int32 icam_restore_cfg(ICamCtrlHandle hCtrl)
 	return hdr.param[0];
 }
 
+/*****************************************************************************
+ Prototype    : icam_sys_reset
+ Description  : reset icamera and system
+ Input        : ICamCtrlHandle hCtrl  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/30
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 icam_sys_reset(ICamCtrlHandle hCtrl)
+{
+	MsgHeader 	hdr;
+
+	Int32 ret;
+
+	if(!hCtrl)
+		return E_INVAL;
+
+	hdr.param[0] = 0;
+	ret = icam_send_cmd(hCtrl, ICAMCMD_S_RESET, &hdr, sizeof(hdr), sizeof(hdr));
+	if(ret)
+		return ret;
+
+	/* result of this cmd */
+	return hdr.param[0];
+}
 
 /*****************************************************************************
  Prototype    : icam_snd_dir

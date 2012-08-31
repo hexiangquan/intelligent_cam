@@ -36,6 +36,7 @@
 #include "img_ctrl.h"
 #include <sys/ioctl.h>
 #include "net_utils.h"
+#include "display.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -907,7 +908,6 @@ static Int32 get_img_conv_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 
 	/* Set output params */
 	params->outAttrs[0].enbale = TRUE;
-	params->outAttrs[1].enbale = FALSE;
 	params->outAttrs[0].pixFmt = FMT_YUV_420SP;
 	if( appCfg->workMode.format == CAM_FMT_H264 || 
 		appCfg->workMode.format == CAM_FMT_JPEG_H264) {
@@ -926,6 +926,25 @@ static Int32 get_img_conv_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 	} else {
 		/* raw output, disable convert */
 		params->outAttrs[0].enbale = FALSE;
+	}
+
+	/* set AV out params, using channel B of resize */
+	switch(appCfg->avParams.avType) {
+	case AV_TYPE_PAL:
+		params->outAttrs[1].enbale = TRUE;
+		params->outAttrs[1].width = PAL_WIDTH;
+		params->outAttrs[1].height = PAL_HEIGHT;
+		params->outAttrs[1].pixFmt = FMT_YUV_422ILE;
+		break;
+	case AV_TYPE_NTSC:
+		params->outAttrs[1].enbale = TRUE;
+		params->outAttrs[1].width = NTSC_WIDTH;
+		params->outAttrs[1].height = NTSC_HEIGHT;
+		params->outAttrs[1].pixFmt = FMT_YUV_422ILE;
+		break;
+	default:
+		params->outAttrs[1].enbale = FALSE;
+		break;
 	}
 
 	return E_NO;
@@ -1010,7 +1029,10 @@ static Int32 get_converter_params(ParamsMngHandle hParamsMng, void *data, Int32 
 
 	/* set same params */
 	params->convDyn[1] = params->convDyn[0];
+	params->convDyn[1].outAttrs[1].enbale = FALSE;
 	err = get_stream2_out_attrs(hParamsMng, &params->convDyn[1].outAttrs[0], sizeof(ConvOutAttrs));
+
+	params->avParams = hParamsMng->appParams.avParams;
 
 	return err;
 }

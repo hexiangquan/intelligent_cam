@@ -22,6 +22,7 @@
 #include "img_convert.h"
 #include "capture.h"
 #include "app_msg.h"
+#include "cam_encode.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -65,6 +66,7 @@ typedef struct {
 
 typedef struct {
 	ImgConvDynParams	convDyn[2];
+	CamAVParam			avParams;
 }ConverterParams;
 
 #ifdef __cplusplus

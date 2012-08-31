@@ -686,6 +686,40 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 }
 
 /*****************************************************************************
+ Prototype    : thread_clean_up
+ Description  : clean up thread
+ Input        : ICamCtrlHandle hCamCtrl  
+                Bool reboot              
+                int sock                 
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/30
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static void thread_clean_up(ICamCtrlHandle hCamCtrl, Bool reboot, int sock)
+{
+	if(sock > 0)
+		close(sock);
+
+	if(reboot) {
+		sleep(3);
+		
+		Int32 ret = icam_sys_reset(hCamCtrl);
+		if(ret != E_NO) {
+			ERR("call icamera to reset failed, call sys cmd to reset...");
+			sync();
+			system("shutdown -r now\n");
+		}
+	}
+}
+
+/*****************************************************************************
  Prototype    : cam_ctrl_thread
  Description  : thread for ctrl cam
  Input        : void *arg  
@@ -750,14 +784,7 @@ void *cam_ctrl_thread(void *arg)
 
 exit:
 
-	if(params->reboot)
-		sleep(3);
-	
-	close(sock);
-
-	if(params->reboot)
-		system("shutdown -r now\n");
-
+	thread_clean_up(params->hCamCtrl, params->reboot, sock);
 	free(arg);
 
 	DBG("<%u> cam ctrl thread exit...", (__u32)pthread_self());

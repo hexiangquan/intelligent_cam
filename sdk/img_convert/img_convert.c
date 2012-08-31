@@ -63,7 +63,7 @@ typedef struct _ImgConvObj {
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
-
+//#define RSZ_B_FOR_LARGE_IMG		0
 /*----------------------------------------------*
  * routines' implementations                    *
  *----------------------------------------------*/
@@ -411,12 +411,7 @@ static Int32 img_convert_exit(Ptr handle)
 static Int32 img_convert_large_frame(ImgConvHandle hConv, AlgBuf *inBuf, ImgConvInArgs *inArgs, AlgBuf *outBuf, ImgConvOutArgs *outArgs)
 {
     Int32 				ret;
-    RszAttrs 			rszAttrs;
-    PreviewAttrs 		prevAttrs;
     ImgConvDynParams	*dynParams = &hConv->dynParams;
-    AlgBuf 				src;
-    AlgBuf				dst;
-	Uint32 				lineLength;
 	
 	if(FMT_YUV_422ILE == inArgs->outAttrs[0].pixFmt) {
 		if(inArgs->outAttrs[0].width&0x1f) 
@@ -430,22 +425,47 @@ static Int32 img_convert_large_frame(ImgConvHandle hConv, AlgBuf *inBuf, ImgConv
 	DBG("img conv process2 %dx%d -> %dx%d", dynParams->inputWidth, dynParams->inputHeight,
 		inArgs->outAttrs[0].width, inArgs->outAttrs[0].height);
 #endif
-	
+
+#ifndef RSZ_B_FOR_LARGE_IMG
+	if(inArgs->outAttrs[1].enbale) {
+		ERR("can't resize using channel B.");
+		return E_UNSUPT;
+	}
+#endif
+
 	pthread_mutex_lock(&hConv->mutex);
 
-	/* skip half of line for convert twice */
+	/* skip half of line for convert twice */	
+	Uint32 	lineLength;
 	if(FMT_YUV_422ILE == inArgs->outAttrs[0].pixFmt) {
 		lineLength = ROUND_UP(dynParams->outAttrs[0].width * 2, 32);
 	} else {
 		lineLength = ROUND_UP(dynParams->outAttrs[0].width, 32);
 	}
 
+	RszAttrs rszAttrs;
 	convert_rsz_attrs(dynParams, &rszAttrs);
 	rszAttrs.inWidth = dynParams->inputWidth >> 1;
 	rszAttrs.inVStart = 0;
 	rszAttrs.outAttrs[0].lineLength = lineLength;
 	rszAttrs.outAttrs[0].width /= 2;
 
+	Bool enChanB = FALSE;
+#ifdef RSZ_B_FOR_LARGE_IMG
+	enChanB = inArgs->outAttrs[1].enbale;
+	/* update params for channel 2 */
+	if(enChanB) {
+		/* skip half of line for convert twice */
+		if(FMT_YUV_422ILE == inArgs->outAttrs[1].pixFmt) {
+			rszAttrs.outAttrs[1].lineLength = ROUND_UP(dynParams->outAttrs[1].width * 2, 32);
+		} else {
+			rszAttrs.outAttrs[1].lineLength = ROUND_UP(dynParams->outAttrs[1].width, 32);
+		}
+		rszAttrs.outAttrs[1].width /= 2;
+	}
+#endif
+
+    PreviewAttrs prevAttrs;
 	convert_previewer_attrs(&hConv->dynParams, &prevAttrs);
 	prevAttrs.inputPitch = dynParams->inputWidth;
 	prevAttrs.inputHStart = 0;
@@ -455,36 +475,47 @@ static Int32 img_convert_large_frame(ImgConvHandle hConv, AlgBuf *inBuf, ImgConv
 	/* update params for single shot mode */
     ret = resize_ss_config(hConv->fdRsz, &rszAttrs);
 	ret = previewer_ss_config(hConv->fdPrev, &prevAttrs);
+
+	AlgBuf 	src;
+    AlgBuf	dst[2];
 	memcpy(&src, inBuf, sizeof(src));
-	memcpy(&dst, outBuf, sizeof(dst));
+	memcpy(&dst[0], &outBuf[0], sizeof(dst[0]));
+#ifdef RSZ_B_FOR_LARGE_IMG
+	if(enChanB)
+		memcpy(&dst[1], &outBuf[1], sizeof(dst[1]));
+#endif
 
 	/* skip */
 	if(rszAttrs.outAttrs[0].hFlip) {
 		src.buf += dynParams->inputWidth/2;
 	}
 	
-	Bool enChanB = inArgs->outAttrs[1].enbale;
 
 	/* convert for the left half of the image */	
-	ret = previewer_convert(hConv->fdPrev, &src, &dst, enChanB);
+	ret = previewer_convert(hConv->fdPrev, &src, dst, enChanB);
 	if(ret) {
 		goto exit;
 	}
 
 	memcpy(&src, inBuf, sizeof(src));
-	memcpy(&dst, outBuf, sizeof(dst));
+	memcpy(&dst[0], &outBuf[0], sizeof(dst[0]));
+#ifdef RSZ_B_FOR_LARGE_IMG
+	if(enChanB)
+		memcpy(&dst[1], &outBuf[1], sizeof(dst[1]));
+#endif
 	if(!rszAttrs.outAttrs[0].hFlip) {
 		src.buf += dynParams->inputWidth/2;
 	}
 
 	/* start from next half frame */
-	dst.buf += lineLength/2;
-	//ret = resize_ss_config(hConv->fdRsz, &rszAttrs);
- 
-	//ret = previewer_ss_config(hConv->fdPrev, &prevAttrs);
-
+	dst[0].buf += lineLength/2;
+#ifdef RSZ_B_FOR_LARGE_IMG
+	if(enChanB)
+		dst[1].buf += rszAttrs.outAttrs[1].lineLength/2;
+#endif
+	
 	/* convert the right half of the image */
-	ret = previewer_convert(hConv->fdPrev, &src, &dst, FALSE);
+	ret = previewer_convert(hConv->fdPrev, &src, dst, enChanB);
 
 exit:
 	

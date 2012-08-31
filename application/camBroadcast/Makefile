@@ -1,14 +1,14 @@
 # Sun @ 2011.10.11
 
-include Rules.make
+include ../Rules.make
 
-SUBDIRS = iCamera camCtrlSrv camBroadcast
+SUBDIRS = src
 
 CLEAN_SUBDIRS = $(addsuffix .clean, $(SUBDIRS))
 INSTALL_SUBDIRS = $(addsuffix .install, $(SUBDIRS))
 EXE_SUBDIRS = $(addsuffix .exe, $(SUBDIRS))
 
-.PHONY: $(SUBDIRS) $(CLEAN_SUBDIRS) $(INSTALL_SUBDIRS) $(EXE_SUBDIRS) exe tags ctags cscope
+.PHONY: $(SUBDIRS) $(CLEAN_SUBDIRS) $(INSTALL_SUBDIRS) $(EXE_SUBDIRS)
 
 all: $(SUBDIRS)
 
@@ -27,7 +27,6 @@ $(INSTALL_SUBDIRS):
 	@cd $(basename $@) ; $(MAKE) install
 
 clean:	$(CLEAN_SUBDIRS)
-	-rm -f *~ *.o *.dep
 
 $(CLEAN_SUBDIRS):
 	@cd $(basename $@) ; $(MAKE) clean

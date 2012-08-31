@@ -263,6 +263,8 @@ Int32 display_delete(DisplayHanlde hDisplay)
 
 	if(hDisplay->isStreamOn)
 		display_stop(hDisplay);
+
+	close(hDisplay->fdDisplay);
 	
 	display_buf_free(hDisplay);
 	free(hDisplay);
@@ -344,6 +346,11 @@ Int32 display_config(DisplayHanlde hDisplay, const DisplayAttrs *attrs)
 	err = display_dev_open(hDisplay, attrs->chanId);
 	if(err)
 		return err;
+
+	if(hDisplay->isStreamOn) {
+		ERR("stop stream before config this module.");
+		return E_MODE;
+	}
 
 	/* set attrs  */
 	const char *output, *mode;

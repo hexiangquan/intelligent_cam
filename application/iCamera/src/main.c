@@ -64,8 +64,8 @@
  * macros                                       *
  *----------------------------------------------*/
 #define PROGRAM_NAME			"iCamera"
-#define CONFIG_FILE				"/home/root/cam.cfg"
-#define FPGA_ROM_FILE			"/home/root/fpga.rbf"
+#define CONFIG_FILE				"cam.cfg"
+#define FPGA_ROM_FILE			"fpga.rbf"
 #define WDT_DEV					"/dev/watchdog"
 
 #define MAIN_FLAG_TEST_EN		(1 << 0)
@@ -337,16 +337,17 @@ static Int32 main_loop(MainEnv *envp)
 		close(fdWdt);
 		fdWdt = -1;
 	}
-
-	if(envp->reboot) {
-		INFO("we are going to reboot system");
-		system("shutdown -r now\n");
-	}
 	
 exit:
 
 	/* exit modules */
 	app_exit(envp, hMsg);
+
+	/* system reset */
+	if(envp->reboot) {
+		INFO("we are going to reboot system");
+		system("shutdown -r now\n");
+	}
 
 	return E_NO;
 	

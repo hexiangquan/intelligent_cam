@@ -131,8 +131,9 @@ Int32 jpg_encoder_save_frame(IN const ImgMsg *msg, IN const char *path)
 	if(!path || !msg)
 		return E_INVAL;
 
-	/* only save jpeg */
-	if(msg->dimension.colorSpace != FMT_JPG) {
+	/* only save jpeg and ignore continously frame */
+	if(msg->dimension.colorSpace != FMT_JPG || 
+		msg->rawInfo.capMode == RCI_CAP_TYPE_CONT) {
 		//ERR("not a jpeg file");
 		return E_UNSUPT;
 	}

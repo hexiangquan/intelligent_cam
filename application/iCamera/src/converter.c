@@ -25,6 +25,7 @@
 #include "log.h"
 #include "app_msg.h"
 #include "buffer.h"
+#include "display.h"
 #include <pthread.h>
 
 /*----------------------------------------------*
@@ -68,7 +69,69 @@ struct ConverterObj {
 	ImgDimension		outDim[CONV_MAX_STREAM_NUM];
 	BufPoolHandle		hBufPool;
 	Int32				flags;
+	DisplayHanlde		hDisplay;
+	CamAVParam			avParams;
 };
+
+/*****************************************************************************
+ Prototype    : converter_display_cfg
+ Description  : cfg display module
+ Input        : ConverterHandle hConverter  
+                CamAVParam *params          
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/8/29
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 converter_display_cfg(ConverterHandle hConverter, CamAVParam *params)
+{
+	//DBG("converter display cfg, type: %d", params->avType);
+	
+	if(params->avType == AV_TYPE_NONE) {
+		/* stop display, delete this object */
+		display_delete(hConverter->hDisplay);
+		hConverter->hDisplay = NULL;	
+		/* disable rsz B out */
+		hConverter->convInArgs[0].outAttrs[1].enbale = FALSE;
+		hConverter->convInArgs[1].outAttrs[1].enbale = FALSE;
+		//DBG("delete display handle");
+		return E_NO;
+	}
+	
+	DisplayAttrs attrs;
+	attrs.chanId = 0;
+	attrs.mode = (params->avType == AV_TYPE_PAL) ? DISPLAY_MODE_PAL : DISPLAY_MODE_NTSC;
+	attrs.outputFmt = FMT_YUV_422ILE;
+
+	Int32 err = E_NO;
+		
+	if(!hConverter->hDisplay) {
+		/* first time used, create display object */
+		hConverter->hDisplay = display_create(&attrs);
+		if(!hConverter->hDisplay) {
+			ERR("create display handle failed.");
+			err = E_IO;
+		}
+	} else {
+		display_stop(hConverter->hDisplay);
+		/* cfg params of display obj */
+		err = display_config(hConverter->hDisplay, &attrs);
+	}
+
+	/* start display */
+	if(!err)
+		err = display_start(hConverter->hDisplay);
+
+	hConverter->avParams = *params;
+
+	return err;
+}
 
 /*****************************************************************************
  Prototype    : converter_params_update
@@ -145,6 +208,9 @@ Int32 converter_params_update(ConverterHandle hConverter, ConverterParams *param
 	ConvOutAttrs *pConvOut = &hConverter->convInArgs[1].outAttrs[0];
 
 	inArgs = &hConverter->convInArgs[1];
+	convDynParams = &params->convDyn[1];
+	inArgs->outAttrs[0] = convDynParams->outAttrs[0];
+	inArgs->outAttrs[1] = convDynParams->outAttrs[1];
 	inArgs->size = sizeof(ImgConvInArgs);
 
 	/* set convert out dimisions  for stream2 */
@@ -154,9 +220,14 @@ Int32 converter_params_update(ConverterHandle hConverter, ConverterParams *param
 	hConverter->outDim[1].bytesPerLine = hConverter->outDim[1].width;
 	hConverter->outDim[1].colorSpace = pConvOut->pixFmt;
 
+	/* cfg display */
+	ret = converter_display_cfg(hConverter, &params->avParams);
+
 	DBG("\nstream1 size: %u X %u", hConverter->outDim[0].width, hConverter->outDim[0].height);
 	DBG("stream2 size: %u X %u\n", hConverter->outDim[1].width, hConverter->outDim[1].height);
 
+	if(!hConverter->hDisplay)
+		assert(hConverter->convInArgs[0].outAttrs[1].enbale == FALSE);
 	return ret;
 }
 
@@ -180,7 +251,7 @@ Int32 converter_params_update(ConverterHandle hConverter, ConverterParams *param
 *****************************************************************************/
 Int32 converter_run(ConverterHandle hConverter, FrameBuf *rawBuf, Int32 streamId, ImgMsg *imgMsg)
 {
-	AlgBuf 			inBuf, outBuf;
+	AlgBuf 			inBuf, outBuf[2];
 	ImgConvInArgs 	*inArgs;
 	BufHandle		hBufOut = NULL;
 	Int32			err = E_NO;
@@ -196,22 +267,51 @@ Int32 converter_run(ConverterHandle hConverter, FrameBuf *rawBuf, Int32 streamId
 	/* do image convert */
 	inBuf.buf = rawBuf->dataBuf;
 	inBuf.bufSize = rawBuf->bufSize;
-	outBuf.buf = buffer_get_user_addr(hBufOut);
-	outBuf.bufSize = buffer_get_size(hBufOut);
-
+	outBuf[0].buf = buffer_get_user_addr(hBufOut);
+	outBuf[0].bufSize = buffer_get_size(hBufOut);
+	
 	if(hConverter->flags & CONVERTER_FLAG_EN) {
 		/* convert for stream */
 		inArgs = &hConverter->convInArgs[streamId];
-		//if(streamId == 1)
-		err = img_conv_process(hConverter->hImgConv, &inBuf, inArgs, &outBuf, NULL);
+
+		DisplayBuf dispBuf;
+		Bool needDisplay;
+		if(streamId == 0 && hConverter->hDisplay) 
+			needDisplay = TRUE;
+		else {
+			needDisplay = FALSE;
+			if(inArgs->outAttrs[1].enbale == TRUE)
+				ERR("enable chan B, handle: %d, stream id: %d", hConverter->hDisplay, streamId);
+		}
+
+		/* get buf for analog display */
+		if(needDisplay) {		
+			err = display_get_free_buf(hConverter->hDisplay, &dispBuf);
+			if(!err) {
+				outBuf[1].buf = dispBuf.userAddr;
+				outBuf[1].bufSize = dispBuf.bufSize;
+			} else
+				needDisplay = FALSE; // need not display because get buffer failed
+		}
+
+		/* process convert */
+		err = img_conv_process(hConverter->hImgConv, &inBuf, inArgs, outBuf, NULL);
+
+		/* put for display */
+		if(needDisplay)
+			display_put_buf(hConverter->hDisplay, &dispBuf);
+
+		/* check convert error */
 		if(err) {
 			ERR("imgConv err: %s.", str_err(err));
 			goto free_buf;
 		}
-		imgMsg->dimension = hConverter->outDim[streamId];
+		
+		imgMsg->dimension = hConverter->outDim[streamId];		
+		
 	} else {
 		/* no convert, just copy */
-		buffer_copy(outBuf.buf, inBuf.buf, inBuf.bufSize);
+		buffer_copy(outBuf[0].buf, inBuf.buf, inBuf.bufSize);
 	}
 	
 	/* send out buffer to next module */
@@ -313,6 +413,9 @@ Int32 converter_delete(ConverterHandle hConverter)
 	if(hConverter->hImgConv) {
 		img_conv_delete(hConverter->hImgConv);
 	}
+
+	if(hConverter->hDisplay)
+		display_delete(hConverter->hDisplay);
 
 	if(hConverter->hBufPool)
 		buf_pool_delete(hConverter->hBufPool);

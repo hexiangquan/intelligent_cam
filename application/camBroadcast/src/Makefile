@@ -38,49 +38,38 @@ APP_ROOT = ../..
 -include $(APP_ROOT)/Rules.make
 
 TARGET = $(notdir $(CURDIR))
-STATIC ?= 0
 
 # Executable target name and src
 OBJ_DIR ?= ../build/obj
 BIN_DIR ?= ../build
 
-EXEC ?= $(BIN_DIR)/iCamera 
+EXEC ?= $(BIN_DIR)/camBroadcast 
 EXEC_SRC = $(wildcard *.c)
 EXEC_OBJ = $(addprefix $(OBJ_DIR)/, $(addsuffix .o, $(basename $(EXEC_SRC))))
 EXEC_INSTALL_PATH := $(TARGET_EXEC_DIR)
-
-# dirs for libs
-LIB_DIR = ./ctrl_inf
 
 # Headers depended
 APP_INC = ../include
 HEADERS = $(wildcard *.h) $(wildcard $(APP_INC)/*.h) $(wildcard $(SDK_INC_DIR)/*.h)
 INC_DIR := -I. -I$(SDK_INC_DIR) -I$(APP_INC) -I$(APP_INC_DIR)
-COMMON_HEADER = $(APP_INC)/cam_*.h
-COMMON_HEADER += $(APP_INC)/sys_commu.h
 
 # Complie options
 C_FLAGS += -Wall -DDM365 -O2 $(INC_DIR)
 CPP_FLAGS ?= 
 
 # Link libs and options
-LD_FLAGS += -L$(SDK_LIB_DIR)
-LD_LIBS := -lpthread -lm -lbuf -lalg -lcapture -lcrc -lmsg -limgconv
-LD_LIBS += -ljpgenc -llog -losd -lh264enc -lnetproto -lnetutils -lftp
-LD_LIBS += -lmediasrv -lcirbuf -ldisplay
-ifeq ($(STATIC), 1)
-LD_LIBS += $(XDC_LFILE)
-endif
+LD_FLAGS += -L$(SDK_LIB_DIR) -L$(APP_LIB_DIR)
+LD_LIBS := -lpthread -lm -lcamctrl -llog -lnetutils -lmsg
 
 # Comment this out if you want to see full compiler and linker output.
 #override VERBOSE = @
 
 # Complier, archive and link commands
 COMPILE = $(VERBOSE) $(CSTOOL_PREFIX)gcc $(CPP_FLAGS) $(C_FLAGS) $(CPP_FLAGS) -c
-LINK = $(VERBOSE) $(CSTOOL_PREFIX)g++ $(LD_FLAGS)
+LINK = $(VERBOSE) $(CSTOOL_PREFIX)gcc $(LD_FLAGS)
 AR = $(VERBOSE) $(CSTOOL_PREFIX)ar
 
-.PHONY: clean install exe rebuild
+.PHONY: clean install exe rebuild 
 
 all: exe install
 
@@ -95,19 +84,9 @@ $(EXEC_OBJ): $(OBJ_DIR)/%.o: %.c $(HEADERS)
 	@-mkdir -p $(OBJ_DIR)
 	$(COMPILE) -o $@ $<
 
-lib:
-	make -C $(LIB_DIR)
-
-lib_install:
-	make -C $(LIB_DIR) install
-
-lib_clean:
-	make -C $(LIB_DIR) clean
-
-install: 
+install:
 	-cp -p $(EXEC) $(EXEC_INSTALL_PATH)
-	-cp -p $(COMMON_HEADER) $(APP_INC_DIR)
 
-clean: 
+clean:
 	@echo Removing generated files..
 	$(VERBOSE) -rm -rf $(EXEC) $(OBJ_DIR) *~ *.d .dep

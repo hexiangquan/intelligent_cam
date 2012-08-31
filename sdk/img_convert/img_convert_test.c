@@ -14,6 +14,8 @@
 
 #define DEF_LOOP_CNT	10
 #define DEF_OUT_FILE	"convOut.jpg"
+#define DEF_OUT_FILE2	"convOut2.jpg"
+
 #define IMG_MAX_WIDTH	4096
 #define IMG_MAX_HEIGHT	4096
 #define DEF_GAIN		512
@@ -24,6 +26,8 @@
 #define DEF_IN_WIDTH	2560
 #define DEF_IN_HEIGHT	2048
 #define DEF_GAMMA		220
+#define RSZ_B_WIDTH		768
+#define RSZ_B_HEIGHT	480
 
 #define THR_MSG_NAME0	"/tmp/convThr0"
 #define THR_MSG_NAME1	"/tmp/convThr1"
@@ -56,6 +60,7 @@ typedef struct _TestParams {
 	Uint8	flip;
 	Uint8	outFmt;
 	Uint16	gamma;
+	Bool	rszBEn;
 }TestParams;
 
 typedef struct {
@@ -367,8 +372,16 @@ static Bool fake_in_test(TestParams *params)
 		convDynParams.outAttrs[0].height = params->outHeight;
 	}
 	convDynParams.outAttrs[0].pixFmt = params->outFmt ? FMT_YUV_420SP: FMT_YUV_422ILE;
+	convDynParams.outAttrs[1] = convDynParams.outAttrs[0];
 	convDynParams.outAttrs[1].enbale = FALSE;
 
+	if(params->rszBEn) {		
+		/* using fixed width and height */
+		convDynParams.outAttrs[1].enbale = TRUE;
+		convDynParams.outAttrs[1].width = RSZ_B_WIDTH;
+		convDynParams.outAttrs[1].height = RSZ_B_WIDTH;
+	}
+	
 	convDynParams.outAttrs[0].lineLength = 0;
     convDynParams.outAttrs[0].hFlip = params->flip&0x1;
     convDynParams.outAttrs[0].vFlip = (params->flip>>1)&0x1;
@@ -390,17 +403,21 @@ static Bool fake_in_test(TestParams *params)
 	Uint32 size = convDynParams.outAttrs[0].width * convDynParams.outAttrs[0].height * 2;
 	hConvOutBuf = buffer_alloc(size, NULL);
 	assert(hConvOutBuf);
+	BufHandle hConvOutBuf2 = buffer_alloc(RSZ_B_WIDTH * RSZ_B_HEIGHT * 2, NULL);
+	assert(hConvOutBuf2);
 
 	size = params->inWidth * params->inHeight;
 	hConvInBuf = buffer_alloc(size, NULL);
 	assert(hConvInBuf);
 
-	AlgBuf inBuf, outBuf;
+	AlgBuf inBuf, outBuf[2];
 	struct timeval tmStart,tmEnd; 
 	float   timeUse;
 
-	outBuf.buf = buffer_get_user_addr(hConvOutBuf);
-	outBuf.bufSize = buffer_get_size(hConvOutBuf);
+	outBuf[0].buf = buffer_get_user_addr(hConvOutBuf);
+	outBuf[0].bufSize = buffer_get_size(hConvOutBuf);
+	outBuf[1].buf = buffer_get_user_addr(hConvOutBuf2);
+	outBuf[1].bufSize = buffer_get_size(hConvOutBuf2);
 
 	inBuf.buf = buffer_get_user_addr(hConvInBuf);
 	inBuf.bufSize = buffer_get_size(hConvInBuf);
@@ -415,7 +432,7 @@ static Bool fake_in_test(TestParams *params)
 	while(1) {
 		//DBG("%s start conv", params->msgName);
 		gettimeofday(&tmStart,NULL);
-		err = alg_process(hImgConv, &inBuf, &convInArgs, &outBuf, NULL);
+		err = alg_process(hImgConv, &inBuf, &convInArgs, outBuf, NULL);
 		gettimeofday(&tmEnd,NULL); 
 
 		timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
@@ -477,8 +494,12 @@ static Bool fake_in_test(TestParams *params)
 
 	}
 
-	err = jpg_save( outBuf.buf, convInArgs.outAttrs[0].pixFmt, convInArgs.outAttrs[0].width,
+	err = jpg_save( outBuf[0].buf, convInArgs.outAttrs[0].pixFmt, convInArgs.outAttrs[0].width,
 					convInArgs.outAttrs[0].height, params->outFileName);
+	if(params->rszBEn) {
+		err = jpg_save( outBuf[1].buf, convInArgs.outAttrs[1].pixFmt, convInArgs.outAttrs[1].width,
+					convInArgs.outAttrs[1].height, DEF_OUT_FILE2);
+	}
 
 	ret = TRUE;
 
@@ -568,11 +589,18 @@ static Bool main_loop(TestParams *params)
 		convDynParams.outAttrs[0].height = params->outHeight;
 	}
 	convDynParams.outAttrs[0].pixFmt = params->outFmt ? FMT_YUV_420SP: FMT_YUV_422ILE;
-	convDynParams.outAttrs[1].enbale = FALSE;
-
 	convDynParams.outAttrs[0].lineLength = 0;
     convDynParams.outAttrs[0].hFlip = params->flip&0x1;
     convDynParams.outAttrs[0].vFlip = (params->flip>>1)&0x1;
+	convDynParams.outAttrs[1] = convDynParams.outAttrs[0];
+	convDynParams.outAttrs[1].enbale = FALSE;
+
+	if(params->rszBEn) {		
+		/* using fixed width and height */
+		convDynParams.outAttrs[1].enbale = TRUE;
+		convDynParams.outAttrs[1].width = RSZ_B_WIDTH;
+		convDynParams.outAttrs[1].height = RSZ_B_HEIGHT;
+	}
 
 	hImgConv = alg_create(&IMGCONV_ALG_FXNS, &convInitParams, &convDynParams);
 	if(!hImgConv) {
@@ -619,13 +647,17 @@ static Bool main_loop(TestParams *params)
 	hConvOutBuf = buffer_alloc(size, NULL);
 	assert(hConvOutBuf);
 	assert(((Uint32)buffer_get_user_addr(hConvOutBuf) % 32) == 0);
+	BufHandle hConvOutBuf2 = buffer_alloc(RSZ_B_WIDTH * RSZ_B_HEIGHT * 2, NULL);
+	assert(hConvOutBuf2);
 
-	AlgBuf inBuf, outBuf;
+	AlgBuf inBuf, outBuf[2];
 	struct timeval tmStart,tmEnd; 
 	float   timeUse;
 
-	outBuf.buf = buffer_get_user_addr(hConvOutBuf);
-	outBuf.bufSize = buffer_get_size(hConvOutBuf);
+	outBuf[0].buf = buffer_get_user_addr(hConvOutBuf);
+	outBuf[0].bufSize = buffer_get_size(hConvOutBuf);
+	outBuf[1].buf = buffer_get_user_addr(hConvOutBuf2);
+	outBuf[1].bufSize = buffer_get_size(hConvOutBuf2);
 
 	convInArgs.outAttrs[0] = convDynParams.outAttrs[0];
 	convInArgs.outAttrs[1] = convDynParams.outAttrs[1];
@@ -710,7 +742,7 @@ static Bool main_loop(TestParams *params)
 			inBuf.bufSize = frameBuf.bufSize;
 			//DBG("%s start conv", params->msgName);
 			gettimeofday(&tmStart,NULL);
-			err = alg_process(hImgConv, &inBuf, &convInArgs, &outBuf, NULL);
+			err = alg_process(hImgConv, &inBuf, &convInArgs, outBuf, NULL);
 			gettimeofday(&tmEnd,NULL); 
 
 			timeUse = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
@@ -815,8 +847,14 @@ static Bool main_loop(TestParams *params)
 	
 	pthread_mutex_destroy(&mutex);
 #else
-	err = jpg_save( outBuf.buf, convInArgs.outAttrs[0].pixFmt, convInArgs.outAttrs[0].width,
+	if(params->rszBEn) {
+		err = jpg_save( outBuf[1].buf, convInArgs.outAttrs[1].pixFmt, convInArgs.outAttrs[1].width,
+					convInArgs.outAttrs[1].height, DEF_OUT_FILE2);
+	}
+	
+	err = jpg_save( outBuf[0].buf, convInArgs.outAttrs[0].pixFmt, convInArgs.outAttrs[0].width,
 					convInArgs.outAttrs[0].height, params->outFileName);
+
 	
 #endif
 
@@ -866,6 +904,7 @@ static void usage(void)
 	INFO(" -L input height, ignored when using capture dev, default %d", DEF_IN_HEIGHT);
 	INFO(" -F flip, 1-hflip,2-vflip,3-hflip and vflip, default: 0");
 	INFO(" -f output format, 0-YUV422ILE,1-YUV420SP, default: 1");
+	INFO(" -r resize chan B output enable, using fixed resolution");
 	
     INFO("Example:");
     INFO(" use default params: ./captureTest");
@@ -876,9 +915,10 @@ static void usage(void)
 int main(int argc, char **argv)
 {
 	int c;
-    char *options = "n:o:w:l:g:b:c:hyNeam:iW:L:F:f:";
+    char *options = "n:o:w:l:g:b:c:hyNeam:iW:L:F:f:r";
 	TestParams params;
-	
+
+	bzero(&params, sizeof(params));
 	params.loopCnt = DEF_LOOP_CNT;
 	params.outFileName = DEF_OUT_FILE;
 	params.outWidth = params.outHeight = 0;
@@ -946,6 +986,9 @@ int main(int argc, char **argv)
 			break;
 		case 'y':
 			params.flags |= CONV_FLAG_LUMA_EN;
+			break;	
+		case 'r':
+			params.rszBEn = TRUE;
 			break;	
 		case 'h':
 		default:

@@ -171,6 +171,8 @@ typedef enum {
 	ICAMCMD_S_UPDATE_DSP,
 	ICAMCMD_S_UPDATE_ARM,
 	ICAMCMD_S_UPDATE_FPGA,
+	/* reset icam process and system */
+	ICAMCMD_S_RESET,
 }ICamCtrlCmd;
 
 typedef struct {
@@ -375,6 +377,9 @@ extern Int32 icam_snd_dir(IN ICamCtrlHandle hCtrl, IN const char *dirPath);
 
 /* restore to default config */
 extern Int32 icam_restore_cfg(IN ICamCtrlHandle hCtrl);
+
+/* reset process and system */
+extern Int32 icam_sys_reset(IN ICamCtrlHandle hCtrl);
 
 /* general API for cam ctrl */
 extern Int32 icam_ctrl_run(IN ICamCtrlHandle hCtrl, INOUT MsgHeader *data, IN Uint32 bufLen);

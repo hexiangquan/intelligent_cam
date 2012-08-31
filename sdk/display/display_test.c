@@ -135,6 +135,9 @@ static Bool main_loop(TestParams *params)
 	Int32 i = 0;
 	DisplayBuf dispBuf;
 
+	struct timeval tmStart,tmEnd; 
+	float   getBufTime, putBufTime, convTime;
+	
 	while(1) {
 
 		err = capture_get_frame(hCapture, &frameBuf);
@@ -143,9 +146,12 @@ static Bool main_loop(TestParams *params)
 			break;
 		}
 
-		/* alloc buf for display */		
+		/* alloc buf for display */
+		gettimeofday(&tmStart, NULL);
 		err = display_get_free_buf(hDisplay, &dispBuf);
 		assert(err == E_NO);
+		gettimeofday(&tmEnd, NULL);
+		getBufTime =  1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
 
 		/* do resize */
 		AlgBuf inBuf, outBuf[2];
@@ -156,8 +162,11 @@ static Bool main_loop(TestParams *params)
 		outBuf[1].buf = dispBuf.userAddr;
 		outBuf[1].bufSize = dispBuf.bufSize;
 
+		gettimeofday(&tmStart, NULL);
 		err = img_conv_process(hImgConv, &inBuf, &convInArgs, outBuf, NULL);
 		assert(err == E_NO);
+		gettimeofday(&tmEnd, NULL);
+		convTime = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
 		
 		err = capture_free_frame(hCapture, &frameBuf);
 		if(err < 0) {
@@ -166,12 +175,30 @@ static Bool main_loop(TestParams *params)
 		}
 
 		/* put to display */
+		gettimeofday(&tmStart, NULL);
 		err = display_put_buf(hDisplay, &dispBuf);
 		assert(err == E_NO);
+		gettimeofday(&tmEnd, NULL);
+		putBufTime =  1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+
+		DBG("<%d> display time, get buf: %.3f us, put buf: %.3f us, conv: %.3f ms", 
+			i, getBufTime, putBufTime, convTime/1000.0);
+
+		if((i%10) == 0) {
+			// change cfg 
+			err = display_stop(hDisplay);
+			assert(err == E_NO);
+			attrs.mode = rand()%DISPLAY_MODE_MAX;
+			err = display_config(hDisplay, &attrs);
+			assert(err == E_NO);
+			err = display_start(hDisplay);
+			assert(err == E_NO);
+		}
 		
 		i++;
 		if(params->loopCnt > 0 && i > params->loopCnt)
 			break;
+
 
 		usleep(70000);
 	}
