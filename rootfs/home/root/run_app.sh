@@ -63,7 +63,7 @@ CheckUpdate()
 	# Check update dir exist and update app file exist
 	if [ -d "$DIR" ] && [ -f "$DIR/$APP" ]; then
 		mv "$DIR/$APP" .
-		chmod +x $APP
+		chmod +wx $APP
 		echo "updating $APP done ..."
 	fi
 }

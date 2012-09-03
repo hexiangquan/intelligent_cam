@@ -127,6 +127,28 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 		inArgs.startY += yStep;
 	}
 
+	/* Add lum info */
+	if(osdInfo->flags & CAM_OSD_FLAG_LUM_INFO_EN) {
+		sprintf( buf, "Exposure time: %u us, Global Gain: %u, Avg Lum: %u", 
+			 imgMsg->rawInfo.exposure, imgMsg->rawInfo.globalGain,
+			 imgMsg->rawInfo.avgLum);
+		err = osd_process(hOsd, &inBuf, &inArgs, NULL, NULL);
+		if(err)
+			return err;
+		inArgs.startY += yStep;
+	}
+
+	/* Add RGB gains */
+	if(osdInfo->flags & CAM_OSD_FLAG_RGB_GAIN_EN) {
+		sprintf( buf, "RGB Gains: %u, %u, %u", 
+			 imgMsg->rawInfo.redGain, imgMsg->rawInfo.greenGain, 
+			 imgMsg->rawInfo.blueGain);
+		err = osd_process(hOsd, &inBuf, &inArgs, NULL, NULL);
+		if(err)
+			return err;
+		inArgs.startY += yStep;
+	}
+
 #if 1
 	CaptureInfo	*capInfo = &imgMsg->capInfo;
 	Int32 		offset, i;

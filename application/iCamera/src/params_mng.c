@@ -901,7 +901,7 @@ static Int32 get_img_conv_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 		params->ctrlFlags |= CONV_FLAG_NF_EN;
 	if(adjCfg->flags & CAM_IMG_MED_FILTER_EN)
 		params->ctrlFlags |= CONV_FLAG_AVG_EN;
-	if(adjCfg->flags & CAM_IMG_BRIGHTNESS_EN)
+	if(adjCfg->flags & CAM_IMG_BRIGHTNESS_EN || adjCfg->brightness)
 		params->ctrlFlags |= CONV_FLAG_LUMA_EN;
 	if(adjCfg->flags & CAM_IMG_CONTRAST_EN)
 		params->ctrlFlags |= CONV_FLAG_CONTRAST_EN;

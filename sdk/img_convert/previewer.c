@@ -73,6 +73,7 @@
 #define GAMMA_TBL_MAX_SIZE	512
 #define RGB2YUV_Y_ADJ(x)	((x)-128)
 #define CONTRAST_ADJ(x)		((x)>>3)
+#define DIGITAL_GAIN_ADJ(x)	((x)+256)
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -151,7 +152,7 @@ Int32 previewer_ss_config(int fd, PreviewAttrs *attrs)
 	prev_ss_config.input.ppln = attrs->inputWidth + 8;
 	prev_ss_config.input.lpfr = attrs->inputHeight + 10;
 	prev_ss_config.input.pix_fmt = pix_format_convert(attrs->inputFmt);
-	prev_ss_config.input.gain = attrs->digiGain;
+	prev_ss_config.input.gain = DIGITAL_GAIN_ADJ(attrs->digiGain);
 	prev_ss_config.input.avg_filter_en = (attrs->ctrlFlags & CONV_FLAG_AVG_EN) ? 1 : 0;
     prev_ss_config.input.frame_div_mode_en = 0;
 
@@ -556,6 +557,7 @@ static Int32 previewer_set_nf(struct prev_module_param *modParam, struct prev_nf
 static Int32 previewer_set_lum(struct prev_module_param *modParam, struct prev_lum_adj *lum, PreviewAttrs *attrs)
 {
 	if(attrs->ctrlFlags & CONV_FLAG_CONTRAST_EN) {
+		DBG("set contrast: %u, hw value: %u", attrs->contrast, CONTRAST_ADJ(attrs->contrast));
 		lum->brightness = 0;
 		lum->contrast = CONTRAST_ADJ(attrs->contrast);
 		modParam->param = lum;
@@ -588,13 +590,29 @@ static Int32 previewer_set_lum(struct prev_module_param *modParam, struct prev_l
 *****************************************************************************/
 static Int32 previewer_set_y_offset(int fd, struct prev_module_param *modParam, struct prev_rgb2yuv *rgb2yuv, PreviewAttrs *attrs)
 {
-	Int32 err = -1;
+	Int32 err = 0;
+	const struct prev_rgb2yuv rgb2yuvDefault = {
+		.coef_ry = {0, 0x4D},
+		.coef_gy = {0, 0x96},
+		.coef_by = {0, 0x1D},
+		.coef_rcb = {0xF, 0xD5},
+		.coef_gcb = {0xF, 0xAB},
+		.coef_bcb = {0, 0x80},
+		.coef_rcr = {0, 0x80},
+		.coef_gcr = {0xF, 0x95},
+		.coef_bcr = {0xF, 0xEB},
+		.out_ofst_y = 0,
+		.out_ofst_cb = 0x80,
+		.out_ofst_cr = 0x80
+	};
 	
 	if(attrs->ctrlFlags & CONV_FLAG_LUMA_EN) {
+		DBG("set brightness %u, hw value: %u", attrs->brightness, RGB2YUV_Y_ADJ(attrs->brightness));
 		/* get current params */
+		*rgb2yuv = rgb2yuvDefault;
 		modParam->param = rgb2yuv;
 		modParam->len = sizeof(*rgb2yuv);
-		err = ioctl(fd, PREV_G_PARAM, modParam);
+		//err = ioctl(fd, PREV_G_PARAM, modParam);
 		if(err == 0) {
 			rgb2yuv->out_ofst_y = RGB2YUV_Y_ADJ(attrs->brightness);
 		} else {
