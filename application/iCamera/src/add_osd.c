@@ -206,7 +206,7 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 			err = osd_process(hOsd, &inBuf, &inArgs, NULL, NULL);
 			if(err)
 				break;
-			inArgs.startY += yStep;		
+			inArgs.startY += yStep;
 		}
 	}			
 #endif

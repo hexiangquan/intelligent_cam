@@ -23,6 +23,9 @@
 #include <asm/types.h>
 #include <linux/videodev2.h>
 #include <media/davinci/videohd.h>
+#include <video/davincifb_ioctl.h>
+#include <video/davinci_osd.h>
+#include <linux/fb.h>
 
 /*----------------------------------------------*
  * external variables                           *
@@ -66,6 +69,10 @@
 /* Standards and output information */
 #define ATTRIB_MODE					"mode"
 #define ATTRIB_OUTPUT				"output"
+#define OSD0_DEV					"/dev/fb0"
+#define OSD1_DEV					"/dev/fb2"
+#define FBVID0_DEV					"/dev/fb1"
+#define FBVID1_DEV					"/dev/fb3"
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -196,6 +203,44 @@ static Int32 display_dev_open(DisplayHanlde hDisplay, Uint32 chanId)
 }
 
 /*****************************************************************************
+ Prototype    : display_osd_disable
+ Description  : disable osd layer
+ Input        : None
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/9/5
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 display_osd_disable()
+{
+	int fd;
+	const char *devName[] = {OSD0_DEV, OSD1_DEV, FBVID0_DEV, FBVID1_DEV};
+	int i, err = E_NO;
+
+	for(i = 0; i < ARRAY_SIZE(devName); ++i) {
+		fd = open(devName[i], O_RDWR);
+		if(fd < 0) {
+			//ERRSTR("open %s failed", devName[i]);
+			err =  E_IO;
+			continue;
+		}
+		if(ioctl(fd, FBIOBLANK, 1) < 0) {
+			ERRSTR("disable window %s failed.", devName[i]);
+			err =  E_IO;
+		}
+		close(fd);
+	}
+
+	return err;
+}
+
+/*****************************************************************************
  Prototype    : display_create
  Description  : create display module
  Input        : const DisplayAttrs *attrs  
@@ -225,6 +270,9 @@ DisplayHanlde display_create(const DisplayAttrs *attrs)
 		return NULL;
 	}
 
+	/* disable osd first */
+	display_osd_disable();
+	
 	Int32 err = display_dev_open(hDisplay, attrs->chanId);
 	err |= display_config(hDisplay, attrs);
 	if(err)

@@ -72,7 +72,7 @@ CheckUpdate()
 INSTALL_DIR="/home/root"
 UPDATE_DIR="update"
 BACKUP_DIR="backup"
-APP_LIST="iCamera camCtrlSrv"
+APP_LIST="iCamera camCtrlSrv camBroadcast"
 
 # StopApp -- Check app process and kill it
 # @ Name -- Process name

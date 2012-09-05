@@ -19,6 +19,7 @@ typedef struct _TestParams {
 	int chanId;
 	int mode;
 	const char *fname;
+	Bool autoSwitch;
 }TestParams;
 
 static CapHandle capture_init(CapInputInfo *info)
@@ -184,7 +185,7 @@ static Bool main_loop(TestParams *params)
 		DBG("<%d> display time, get buf: %.3f us, put buf: %.3f us, conv: %.3f ms", 
 			i, getBufTime, putBufTime, convTime/1000.0);
 
-		if((i%10) == 0) {
+		if((i%10) == 0 && params->autoSwitch) {
 			// change cfg 
 			err = display_stop(hDisplay);
 			assert(err == E_NO);
@@ -253,6 +254,7 @@ static void usage(void)
 	INFO(" -c display chan id, 0-1, defualt: 0");
 	INFO(" -m display mode, 0-PAL, 1-NTSC, default: %d", DEF_DISP_MODE);
 	INFO(" -f save file name for output image, defualt: %s", DEF_OUT_FILE);
+	INFO(" -s enable output mode auto switch");
     INFO("Example:");
     INFO(" use default params: ./%s", PROG_NAME);
     INFO(" use specific params: ./%s -n 10 -f 1", PROG_NAME);
@@ -261,13 +263,14 @@ static void usage(void)
 int main(int argc, char **argv)
 {
 	int c;
-    char *options = "n:m:c:f:h";
+    char *options = "n:m:c:f:sh";
 	TestParams params;
 	
 	params.loopCnt = DEF_LOOP_CNT;
 	params.chanId = 0;
 	params.mode = DEF_DISP_MODE;
 	params.fname = DEF_OUT_FILE;
+	params.autoSwitch = FALSE;
 
 	while ((c = getopt(argc, argv, options)) != -1) {
 		switch (c) {
@@ -282,6 +285,9 @@ int main(int argc, char **argv)
 			break;
 		case 'f':
 			params.fname = optarg;
+			break;
+		case 's':
+			params.autoSwitch = TRUE;
 			break;
 		case 'h':
 		default:

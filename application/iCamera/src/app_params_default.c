@@ -179,6 +179,10 @@ const AppParams c_appParamsDef = {
 		.mode = CAM_DAY_MODE,
 		.switchMethod = CAM_DN_SWT_OFF,
 	},
+	.avParams = {
+		.avType = AV_TYPE_PAL,
+		.flags = 0,
+	},
 	.specCapParams = {
 		.expTime = 4000,
 		.globalGain = 100,

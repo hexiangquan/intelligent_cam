@@ -14,7 +14,7 @@ mount -t ubifs ubi0:rootfs $MNT
 # Copy application
 echo -e "\nInstall applications..."
 INSTALL_DIR="/home/root"
-APP_LIST="run_app.sh iCamera camCtrlSrv"
+APP_LIST="run_app.sh iCamera camCtrlSrv camBroadcast"
 MNT="/mnt"
 
 for APP in $APP_LIST; do
@@ -25,8 +25,8 @@ for APP in $APP_LIST; do
 done
 
 # Mkdir for update and backup
-UPDATE_DIR="INSTALL_DIR/update"
-BACKUP_DIR="INSTALL_DIR/backup"
+UPDATE_DIR="$INSTALL_DIR/update"
+BACKUP_DIR="$INSTALL_DIR/backup"
 if [ ! -d $UPDATE_DIR ]; then
 	echo -e "make dir $UPDATE_DIR"
 	mkdir -p $UPDATE_DIR

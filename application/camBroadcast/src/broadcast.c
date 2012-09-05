@@ -225,7 +225,6 @@ static Int32 main_loop(CamBroadcastParams *params)
 		}
 
 		/* send broadcast info */
-		DBG("send broadcast info...");
 		ret = sendto(sock, &info, sizeof(info), 0, (struct sockaddr *)&addr, sizeof(addr)); 
 		if(ret < 0)
 			DBG("send broadcast failed");
