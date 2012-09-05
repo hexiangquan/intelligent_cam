@@ -60,6 +60,7 @@
 #define MSG_TRANS_TIMEOUT	6
 #define DEST_PORT			(9800)
 #define ERR_CNT_TO_EXIT		5
+#define INFO_SND_TIMEOUT	10		// second
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -193,6 +194,9 @@ static Int32 main_loop(CamBroadcastParams *params)
 		ret = E_IO;
 		goto exit;
 	}
+
+	/* set send timeout */
+	set_sock_send_timeout(sock, INFO_SND_TIMEOUT);
 
 	/* set dest addr & port */
 	struct sockaddr_in addr; 
