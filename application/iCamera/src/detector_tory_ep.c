@@ -234,8 +234,8 @@ static void tory_ep_pre_parse(DetectorUart *dev, const CamDetectorParam *params)
 	if(!dev || !params)
 		return;
 
-	DBG("tory ep pre parse: red: 0x%04X, green: 0x%04X, retro: 0x%04X", 
-		params->redLightCapFlag, params->greenLightCapFlag, params->retrogradeCapFlag);
+	//DBG("tory ep pre parse: red: 0x%04X, green: 0x%04X, retro: 0x%04X", 
+		//params->redLightCapFlag, params->greenLightCapFlag, params->retrogradeCapFlag);
 	tory_ep_cap_pre_parse(params->redLightCapFlag, dev->epCapTable, &dev->lastFrameCode[TRIG_EP]);
 	tory_retrograde_cap_pre_parse(params->retrogradeCapFlag, dev->reCapTable, &dev->lastFrameCode[TRIG_RE]);
 }

@@ -20,7 +20,6 @@ typedef struct {
 	Uint8	limitSpeed;				//nominal limited speed, Uint: km/h
 	Uint8	calcSpeed;				//actual speed limitation that triggers a capture, Uint: km/h
 	Uint8	speedModifyRatio[APP_MAX_CAP_CNT]; //Ratio for speed modification
-	Uint32	trigVideoLen;			//How much time to trigger H264 video, unit: Second, if set to 0, not trigger
 	Int8	reserved[8];			//Reserved for future use
 } CamDetectorParam;
 

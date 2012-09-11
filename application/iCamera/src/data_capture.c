@@ -291,7 +291,7 @@ static Int32 detector_config(DataCapHandle hDataCap)
 		ret = detector_control(hDataCap->hDetector, DETECTOR_CMD_SET_PARAMS, 
 				detectorParams, sizeof(CamDetectorParam));
 		if(ret) {
-			ERR("set detector params failed");
+			ERR("set detector params failed: %s", str_err(ret));
 		}
 	}
 	

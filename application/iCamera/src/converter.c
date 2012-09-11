@@ -280,8 +280,6 @@ Int32 converter_run(ConverterHandle hConverter, FrameBuf *rawBuf, Int32 streamId
 			needDisplay = TRUE;
 		else {
 			needDisplay = FALSE;
-			if(inArgs->outAttrs[1].enbale == TRUE)
-				ERR("enable chan B, handle: %d, stream id: %d", hConverter->hDisplay, streamId);
 		}
 
 		/* get buf for analog display */

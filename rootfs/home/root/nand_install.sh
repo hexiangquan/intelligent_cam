@@ -14,19 +14,21 @@ mount -t ubifs ubi0:rootfs $MNT
 # Copy application
 echo -e "\nInstall applications..."
 INSTALL_DIR="/home/root"
-APP_LIST="run_app.sh iCamera camCtrlSrv camBroadcast"
+APP_LIST="iCamera camCtrlSrv camBroadcast"
+MISC_LIST="run_app.sh fpga.rbf"
+LIST_ALL="$APP_LIST $MISC_LIST"
 MNT="/mnt"
 
-for APP in $APP_LIST; do
+for APP in $LIST_ALL; do
 	if [ -e "$INSTALL_DIR/$APP" ] ; then
-		echo -e "Copy app $APP to $MNT/$INSTALL_DIR"
+		echo -e "Install [$APP] to $MNT/$INSTALL_DIR"
 		cp "$INSTALL_DIR/$APP" "$MNT/$INSTALL_DIR"
 	fi
 done
 
 # Mkdir for update and backup
-UPDATE_DIR="$INSTALL_DIR/update"
-BACKUP_DIR="$INSTALL_DIR/backup"
+UPDATE_DIR="$MNT/$INSTALL_DIR/update"
+BACKUP_DIR="$MNT/$INSTALL_DIR/backup"
 if [ ! -d $UPDATE_DIR ]; then
 	echo -e "make dir $UPDATE_DIR"
 	mkdir -p $UPDATE_DIR
@@ -36,6 +38,13 @@ if [ ! -d $BACKUP_DIR ]; then
 	echo -e "make dir $BACKUP_DIR"
 	mkdir -p $BACKUP_DIR
 fi
+
+for APP in $APP_LIST; do
+	if [ ! -e "$BACKUP_DIR/$APP" ]; then
+		echo -e "Copy [$APP] to $BACKUP_DIR"
+		cp -p "$APP" "$BACKUP_DIR"
+	fi
+done
 
 # Copy kernel modules
 echo -e "\nInstall kernel modules..."
@@ -54,7 +63,7 @@ for SH in $SH_LIST; do
 	fi
 done
 
-echo -e "\nln rc.local..."
+echo -e "\nlink rc.local..."
 cd "$MNT/etc/rc5.d"
 LN_FILE="S99rclocal"
 if [ -e $LN_FILE ]; then

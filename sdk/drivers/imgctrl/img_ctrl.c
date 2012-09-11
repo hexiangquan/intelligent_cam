@@ -186,10 +186,10 @@ static int ab_hw_setup(struct img_ctrl_dev *dev, struct hdcam_ab_cfg *cfg)
 	/* get lock first */
 	spin_lock(&imgctrl_lock);
 
-	/* stop AB first */
+	/* get AB flags first */
 	data = fpga_read(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL);
 	data &= ~(0x000B);
-	fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
+	//fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
 
 	if(cfg->flags) {
 		/* set target value */
@@ -266,8 +266,10 @@ static int ab_hw_setup(struct img_ctrl_dev *dev, struct hdcam_ab_cfg *cfg)
 			data |= BIT(1);
 		if(cfg->flags & HDCAM_AB_FLAG_AA_EN)
 			data |= BIT(3);
-		fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
 	}
+
+	/* set ctrl flags */
+	fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
 
 	/* release lock */
 	spin_unlock(&imgctrl_lock);

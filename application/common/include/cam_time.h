@@ -66,6 +66,24 @@ extern "C"{
 #endif /* __cplusplus */
 
 /*****************************************************************************
+ Prototype    : cam_time_sync
+ Description  : sync rtc time with system time
+ Input        : None
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/9/11
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 cam_time_sync();
+
+
+/*****************************************************************************
  Prototype    : cam_convert_time
  Description  : Convert from timeval to CamDateTime
  Input        : struct timeval *tv     
@@ -81,7 +99,7 @@ extern "C"{
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 cam_convert_time(IN struct timeval *tv, OUT CamDateTime *dateTime);
+extern Int32 cam_convert_time(IN const struct timeval *tv, OUT CamDateTime *dateTime);
 
 /*****************************************************************************
  Prototype    : cam_get_time

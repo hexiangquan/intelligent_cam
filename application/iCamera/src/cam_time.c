@@ -22,6 +22,8 @@
 #include "cam_time.h"
 #include "log.h"
 #include <linux/types.h>
+#include "ext_io.h"
+#include <sys/ioctl.h>
 
 /*----------------------------------------------*
  * external variables                           *
@@ -55,6 +57,110 @@
  * routines' implementations                    *
  *----------------------------------------------*/
 
+/*****************************************************************************
+ Prototype    : cam_time_sync
+ Description  : sync rtc time with system time
+ Input        : None
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/9/11
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 cam_time_sync()
+{
+	int fd = open(EXTIO_DEV_NAME, O_RDWR);
+
+	if(fd < 0) {
+		ERRSTR("open %s failed.", EXTIO_DEV_NAME);
+		return E_IO;
+	}
+
+	struct hdcam_rtc_time rtcTime;
+	int err = ioctl(fd, EXTIO_G_RTC, &rtcTime);
+	
+	close(fd);
+	if(err < 0) {
+		ERRSTR("get rtc time failed");
+		return E_IO;
+	}
+
+	/* convert time */
+	time_t			newTime;
+	struct tm		tm;
+	struct timeval 	tv;
+	tm.tm_sec = rtcTime.second;
+	tm.tm_min = rtcTime.minute;
+	tm.tm_hour = rtcTime.hour;
+	tm.tm_mday = rtcTime.day;
+	tm.tm_mon = rtcTime.month - 1;
+	tm.tm_year = rtcTime.year - 1900;
+
+	newTime = mktime(&tm);
+
+	tv.tv_sec = newTime;
+	tv.tv_usec = rtcTime.millisec << 10;
+
+	/* sync with system time */
+	err = settimeofday(&tv, NULL);
+	if(err < 0) {
+		ERRSTR("set time failed");
+		return E_REFUSED;
+	}
+	
+	return E_NO;
+}
+ 
+/*****************************************************************************
+ Prototype    : cam_hw_clock_set
+ Description  : Sync time to hardware rtc 
+ Input        : const CamDateTime *dateTime  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/9/11
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 cam_hw_clock_set(const CamDateTime *dateTime)
+{
+	int fd = open(EXTIO_DEV_NAME, O_RDWR);
+
+	if(fd < 0) {
+		ERRSTR("open %s failed.", EXTIO_DEV_NAME);
+		return E_IO;
+	}
+
+	struct hdcam_rtc_time rtcTime;
+	rtcTime.year = dateTime->year;
+	rtcTime.month = dateTime->month;
+	rtcTime.day = dateTime->day;
+	rtcTime.hour = dateTime->hour;
+	rtcTime.minute = dateTime->minute;
+	rtcTime.second = dateTime->second;
+	rtcTime.millisec = dateTime->ms;
+	rtcTime.weekday = dateTime->weekDay;
+	rtcTime.flags = 0;
+
+	int err = ioctl(fd, EXTIO_S_RTC, &rtcTime);
+	close(fd);
+	
+	if(err < 0) {
+		ERRSTR("set rtc time failed");
+		return E_INVAL;
+	}
+	
+	return E_NO;
+}
 
 
 /*****************************************************************************
@@ -82,6 +188,11 @@ Int32 cam_set_time(const CamDateTime *dateTime)
 	if(!dateTime)
 		return E_INVAL;
 
+	/* sync time with hw clock */
+	result = cam_hw_clock_set(dateTime);
+	if(result != E_NO)
+		return result;
+
 	tm.tm_sec = dateTime->second;
 	tm.tm_min = dateTime->minute;
 	tm.tm_hour = dateTime->hour;
@@ -92,7 +203,7 @@ Int32 cam_set_time(const CamDateTime *dateTime)
 	newTime = mktime(&tm);
 
 	tv.tv_sec = newTime;
-	tv.tv_usec = 0;
+	tv.tv_usec = (dateTime->ms << 10) + dateTime->us;
 
 	result = settimeofday(&tv, NULL);
 
@@ -106,7 +217,7 @@ Int32 cam_set_time(const CamDateTime *dateTime)
 		(__u32)dateTime->hour, (__u32)dateTime->minute, (__u32)dateTime->second);
 	//system("date");
 
-	return E_NO;
+	return result;
 }
 
 /*****************************************************************************
@@ -149,7 +260,7 @@ Int32 cam_get_time(CamDateTime *dateTime)
     Modification : Created function
 
 *****************************************************************************/
-Int32 cam_convert_time(struct timeval *tv, CamDateTime *dateTime)
+Int32 cam_convert_time(const struct timeval *tv, CamDateTime *dateTime)
 {
 	struct tm 		tm;
 	

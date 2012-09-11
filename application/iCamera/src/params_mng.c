@@ -2095,12 +2095,12 @@ static Int32 get_rgb_gains(ParamsMngHandle hParamsMng, void *data, Int32 size)
     Modification : Created function
 
 *****************************************************************************/
-static Int32 validate_region(ParamsMngHandle hParamsMng, CamRect *rect)
+static Int32 validate_region(ParamsMngHandle hParamsMng, const CamRect *rect)
 {
 	if( rect->startX > rect->endX || 
 		rect->startY > rect->endY ||
-		rect->startX > hParamsMng->capInputInfo.width || 
-		rect->startY > hParamsMng->capInputInfo.height) {
+		rect->endX > hParamsMng->capInputInfo.width || 
+		rect->endY > hParamsMng->capInputInfo.height) {
 		ERR("invalid region");
 			return E_INVAL;
 	}

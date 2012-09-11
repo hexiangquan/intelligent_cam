@@ -28,6 +28,7 @@
 #include "net_cmds.h"
 #include "crc16.h"
 #include "sd_ctrl.h"
+#include "dsp_update.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -616,7 +617,8 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 
 	switch(cmdHdr->cmd) {
 	case TC_FUN_CAMERARESET:
-		ret = E_REBOOT;
+		ret = E_NO;
+		params->reboot = TRUE;
 		cmdHdr->dataLen = 0;
 		break;
 	case TC_FUN_HEARTBEATSINGAL:
@@ -629,23 +631,24 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 		break;
 	case TC_FUN_UPDATE_ARM: {
 		char fname[128];
-		if(strncmp(data, "lib", 3))	
-			snprintf(fname, sizeof(fname), "/home/root/update/%s", data + UPDATE_NAME_OFFSET);
-		else {
+		if(strncmp(data, "lib", 3) == 0) {
+			/* update shared libs */
 			snprintf(fname, sizeof(fname), "/usr/lib/%s", data + UPDATE_NAME_OFFSET);
+		} else if(strncmp(data + strlen(data) - 2, "ko", 2) == 0) {
+			/* update kernel modules */
+			snprintf(fname, sizeof(fname), "/lib/modules/2.6.32.17-davici1/kernel/drivers/dsp/%s", data + UPDATE_NAME_OFFSET);
+		} else {
+			/* update applications */
+			snprintf(fname, sizeof(fname), "/home/root/update/%s", data + UPDATE_NAME_OFFSET);						
 		}
 		ret = firmware_update(fname, data, cmdHdr->dataLen, cmdHdr->checkSum);
 		cmdHdr->dataLen = 0;
-		if(ret == E_NO)
-			params->reboot = TRUE;
+		/* Not reboot, wait client's cmd */
 		break;
 	}
 	case TC_FUN_UPDATE_FPGA:
 		ret = firmware_update(params->fpgaFirmware, data, cmdHdr->dataLen, cmdHdr->checkSum);
 		cmdHdr->dataLen = 0;
-		/* if file update ok, tell icam prog to reload */
-		if(ret == E_NO)
-			params->reboot = TRUE;
 		break;
 	case TC_GET_SD_ROOT_PATH:
 		/* get path of sd mount dir */
@@ -703,13 +706,9 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 
 *****************************************************************************/
 static void thread_clean_up(ICamCtrlHandle hCamCtrl, Bool reboot, int sock)
-{
-	if(sock > 0)
-		close(sock);
-
+{	
 	if(reboot) {
 		sleep(3);
-		
 		Int32 ret = icam_sys_reset(hCamCtrl);
 		if(ret != E_NO) {
 			ERR("call icamera to reset failed, call sys cmd to reset...");
@@ -717,6 +716,9 @@ static void thread_clean_up(ICamCtrlHandle hCamCtrl, Bool reboot, int sock)
 			system("shutdown -r now\n");
 		}
 	}
+
+	if(sock > 0)
+		close(sock);
 }
 
 /*****************************************************************************

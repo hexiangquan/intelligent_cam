@@ -12,6 +12,9 @@
 #define PROG_NAME		"displayTest"
 #define DEF_DISP_MODE	DISPLAY_MODE_PAL
 #define DEF_OUT_FILE	"displayOut.yuv"
+#define DEF_IN_FILE		"colorful_toys_cif_5frms_420p.yuv"
+#define DEF_IN_WIDTH	352
+#define DEF_IN_HEIGHT	288
 
 
 typedef struct _TestParams {
@@ -20,6 +23,7 @@ typedef struct _TestParams {
 	int mode;
 	const char *fname;
 	Bool autoSwitch;
+	Bool inputByFile;
 }TestParams;
 
 static CapHandle capture_init(CapInputInfo *info)
@@ -63,8 +67,8 @@ static AlgHandle img_conv_init(const CapInputInfo *info,  DisplayMode mode, ImgC
 	convDynParams.inputWidth = info->width;
 	convDynParams.inputHeight = info->height;
 	convDynParams.ctrlFlags = 0;
-	convDynParams.digiGain = 512;
-	convDynParams.brigtness = 0;
+	convDynParams.digiGain = 16;
+	convDynParams.brigtness = 50;
 	convDynParams.contrast = 128;
 	convDynParams.eeTable = NULL;
 	convDynParams.eeTabSize = 0;
@@ -102,6 +106,131 @@ static AlgHandle img_conv_init(const CapInputInfo *info,  DisplayMode mode, ImgC
 	return hImgConv;
 }
 
+static Bool read_file_and_display(TestParams *params)
+{
+	Bool ret = FALSE;
+
+	int err = buffer_init();
+	err |= alg_init();
+	if(err)
+		goto exit;
+	
+	FILE *fpIn = NULL;
+	/* read from file */
+	fpIn = fopen(DEF_IN_FILE, "rb");
+	assert(fpIn != NULL);
+
+	DisplayAttrs attrs;
+	attrs.chanId = params->chanId;
+	attrs.mode = params->mode;
+	attrs.outputFmt = FMT_YUV_422ILE;
+	
+	DisplayHanlde hDisplay = display_create(&attrs);
+	assert(hDisplay);
+	err = display_start(hDisplay);
+	assert(err == E_NO);
+
+	/* alloc buf for read input */
+	size_t size = DEF_IN_WIDTH * DEF_IN_HEIGHT * 3/2;
+	BufHandle hBufIn = buffer_alloc(size, NULL);
+	Uint8 *buf = buffer_get_user_addr(hBufIn);
+	assert(hBufIn);
+
+	ImgConvInArgs convInArgs;
+	CapInputInfo capInfo;
+	capInfo.width = DEF_IN_WIDTH, capInfo.height = DEF_IN_HEIGHT;
+	capInfo.colorSpace = FMT_YUV_420P;
+	capInfo.size = size;
+	capInfo.bytesPerLine = capInfo.width;
+	AlgHandle hImgConv = img_conv_init(&capInfo, params->mode, &convInArgs);
+	assert(hImgConv);
+
+	BufHandle hBufOut = buffer_alloc(capInfo.width * capInfo.height * 2, NULL);
+	assert(hBufOut);
+
+	Int32 i = 0;
+	DisplayBuf dispBuf;
+
+	struct timeval tmStart,tmEnd; 
+	float   getBufTime, putBufTime, convTime;
+	
+	while(1) {
+
+		err = fread(buf, size, 1, fpIn);
+		if(err < 0) {
+			ERR("read file failed");
+			break;
+		}
+
+		/* alloc buf for display */
+		gettimeofday(&tmStart, NULL);
+		err = display_get_free_buf(hDisplay, &dispBuf);
+		assert(err == E_NO);
+		gettimeofday(&tmEnd, NULL);
+		getBufTime =  1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+
+		/* do resize */
+		AlgBuf inBuf, outBuf[2];
+		inBuf.buf = buf;
+		inBuf.bufSize = size;
+		outBuf[0].buf = buffer_get_user_addr(hBufOut);
+		outBuf[0].bufSize = buffer_get_size(hBufOut);
+		outBuf[1].buf = dispBuf.userAddr;
+		outBuf[1].bufSize = dispBuf.bufSize;
+
+		gettimeofday(&tmStart, NULL);
+		err = img_conv_process(hImgConv, &inBuf, &convInArgs, outBuf, NULL);
+		assert(err == E_NO);
+		gettimeofday(&tmEnd, NULL);
+		convTime = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+
+		/* put to display */
+		gettimeofday(&tmStart, NULL);
+		err = display_put_buf(hDisplay, &dispBuf);
+		assert(err == E_NO);
+		gettimeofday(&tmEnd, NULL);
+		putBufTime =  1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+
+		DBG("<%d> display time, get buf: %.3f us, put buf: %.3f us, conv: %.3f ms", 
+			i, getBufTime, putBufTime, convTime/1000.0);
+
+		i++;
+		if(params->loopCnt > 0 && i > params->loopCnt)
+			break;
+
+		if((i%5) == 0) {
+			// back to the beginning of input file
+			fseek(fpIn, 0, SEEK_SET);
+		}
+
+		usleep(70000);
+	}
+
+	err = display_stop(hDisplay);
+	assert(err == E_NO);
+
+	/* writing display image to file */
+	FILE *fpSave = fopen(params->fname, "wb");
+	if(!fpSave) {
+		ERRSTR("open %s failed", params->fname);
+		goto exit;
+	}
+	
+	DBG("writing display out data(%u bytes) to %s...", 
+		dispBuf.bufSize, params->fname);
+	fwrite(dispBuf.userAddr, dispBuf.bufSize, 1, fpSave);
+	fclose(fpSave);
+	
+exit:
+	fclose(fpIn);
+	buffer_free(hBufIn);
+	buffer_free(hBufOut);
+	display_delete(hDisplay);
+	
+	return ret;
+	
+}
+
 static Bool main_loop(TestParams *params)
 {
 	Bool ret = FALSE;
@@ -112,7 +241,9 @@ static Bool main_loop(TestParams *params)
 		goto exit;
 
 	CapInputInfo capInfo;
-	CapHandle hCapture = capture_init(&capInfo);
+	CapHandle hCapture = NULL;
+	
+ 	hCapture = capture_init(&capInfo);
 	assert(hCapture);
 
 	ImgConvInArgs convInArgs;
@@ -194,6 +325,13 @@ static Bool main_loop(TestParams *params)
 			assert(err == E_NO);
 			err = display_start(hDisplay);
 			assert(err == E_NO);
+			if(attrs.mode == DISPLAY_MODE_PAL) {
+				convInArgs.outAttrs[1].width = PAL_WIDTH;
+				convInArgs.outAttrs[1].height = PAL_HEIGHT;
+			} else {
+				convInArgs.outAttrs[1].width = NTSC_WIDTH;
+				convInArgs.outAttrs[1].height = NTSC_HEIGHT;
+			}
 		}
 		
 		i++;
@@ -255,6 +393,7 @@ static void usage(void)
 	INFO(" -m display mode, 0-PAL, 1-NTSC, default: %d", DEF_DISP_MODE);
 	INFO(" -f save file name for output image, defualt: %s", DEF_OUT_FILE);
 	INFO(" -s enable output mode auto switch");
+	INFO(" -i using input file rather than capture device, .");
     INFO("Example:");
     INFO(" use default params: ./%s", PROG_NAME);
     INFO(" use specific params: ./%s -n 10 -f 1", PROG_NAME);
@@ -263,14 +402,16 @@ static void usage(void)
 int main(int argc, char **argv)
 {
 	int c;
-    char *options = "n:m:c:f:sh";
+    char *options = "n:m:c:if:sh";
 	TestParams params;
-	
+
+	bzero(&params, sizeof(params));
 	params.loopCnt = DEF_LOOP_CNT;
 	params.chanId = 0;
 	params.mode = DEF_DISP_MODE;
 	params.fname = DEF_OUT_FILE;
 	params.autoSwitch = FALSE;
+	params.inputByFile = FALSE;
 
 	while ((c = getopt(argc, argv, options)) != -1) {
 		switch (c) {
@@ -289,6 +430,9 @@ int main(int argc, char **argv)
 		case 's':
 			params.autoSwitch = TRUE;
 			break;
+		case 'i':
+			params.inputByFile = TRUE;
+			break;
 		case 'h':
 		default:
 			usage();
@@ -296,7 +440,11 @@ int main(int argc, char **argv)
 		}
 	}
 
-	Bool ret = main_loop(&params);
+	Bool ret = FALSE;
+	if(params.inputByFile)
+		ret = read_file_and_display(&params);
+	else
+		ret = main_loop(&params);
 	if(ret)
 		INFO("test success!");
 	else

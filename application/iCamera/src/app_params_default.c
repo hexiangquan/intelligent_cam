@@ -95,11 +95,11 @@ const AppParams c_appParamsDef = {
 	.imgAdjParams = {
 		.dayCfg = {
 			.flags = CAM_IMG_SHARP_EN | CAM_IMG_GAMMA_EN,
-			.contrast = 16,
-			.sharpness = 16,
+			.contrast = 128,
+			.sharpness = 100,
 			.brightness = 0,
 			.saturation = 0,
-			.digiGain = 64,
+			.digiGain = 32,
 			.drcStrength = 16,
 			.gamma = 200,
 		},

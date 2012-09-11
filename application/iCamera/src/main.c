@@ -120,6 +120,9 @@ static Int32 app_init(MainEnv *envp)
 	/* load fpga rom */
 	ret = fpga_firmware_load(envp->fpgaRomFile);
 
+	/* sync hw clock with system time */
+	cam_time_sync();
+
 	/* create obj for day/night switch */
 	envp->hDayNight = day_night_create(NULL);
 	

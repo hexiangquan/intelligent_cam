@@ -404,7 +404,7 @@ static Int32 detector_uart_control(DetectorHandle hDetector, DetectorCmd cmd, vo
 			if(dev->opts->capPreParse)
 				dev->opts->capPreParse(dev, (CamDetectorParam *)arg);
 			status = E_NO;
-		}
+		}		
 		break;
 	case DETECTOR_CMD_SET_TIMEOUT:
 		if(len == sizeof(Uint32)) {
