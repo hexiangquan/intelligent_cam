@@ -223,7 +223,7 @@ Int32 converter_params_update(ConverterHandle hConverter, ConverterParams *param
 	/* cfg display */
 	ret = converter_display_cfg(hConverter, &params->avParams);
 
-	DBG("\nstream1 size: %u X %u", hConverter->outDim[0].width, hConverter->outDim[0].height);
+	DBG("\nstream1 size: %u X %u", hConverter->convInArgs[0].outAttrs[0].width, hConverter->convInArgs[0].outAttrs[0].height);
 	DBG("stream2 size: %u X %u\n", hConverter->outDim[1].width, hConverter->outDim[1].height);
 
 	if(!hConverter->hDisplay)

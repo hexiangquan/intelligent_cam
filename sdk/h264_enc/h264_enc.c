@@ -193,8 +193,7 @@ static Int32 h264_enc_set_dyn_params(H264EncAlgHandle hH264Enc, H264EncDynParams
 	}
 
 	/* Init buffer descriptor */
-	if(!ALIGNED(dynParams->width, FRAME_SIZE_ALIGN) || 
-		!ALIGNED(dynParams->height, FRAME_SIZE_ALIGN))
+	if(!ALIGNED(dynParams->width, FRAME_SIZE_ALIGN))
 		WARN("frame width %d, height: %d not multiple of %d", 
 				(int)dynParams->width, (int)dynParams->height, FRAME_SIZE_ALIGN);
 	
@@ -232,7 +231,7 @@ static Int32 h264_enc_set_dyn_params(H264EncAlgHandle hH264Enc, H264EncDynParams
 
 
 /*****************************************************************************
- Prototype    : jpg_enc_init
+ Prototype    : h264_enc_init
  Description  : init alg module
  Input        : Ptr *init  
                 Ptr *dyn   

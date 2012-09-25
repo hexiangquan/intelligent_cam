@@ -695,7 +695,7 @@ static Int32 set_h264_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 	if( params->resolution >= H264_RES_MAX || 
 		params->frameRate > 60 ||
 		params->rateControl >= CAM_H264_RC_MAX ||
-		params->QPMin > params->QPMax ||
+		params->QPMin > params->QPMax || params->QPInit > 51 || 
 		params->QPMin > 51 || params->QPMax > 51) {
 		ERR("invalid h264 params");
 		return E_INVAL;
@@ -913,7 +913,7 @@ static Int32 get_img_conv_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 		/* 1st stream is h.264 */
 		get_video_out_attrs(hParamsMng, &params->outAttrs[0], sizeof(params->outAttrs[0]));
 	}else if(appCfg->workMode.format == CAM_FMT_JPEG){
-		/* Out0 is jpeg */
+		/* 1st stream is jpeg */
 		params->outAttrs[0].width = appCfg->imgEncParams.width;
 		params->outAttrs[0].height = appCfg->imgEncParams.height;
 		if( params->outAttrs[0].width == 0 || 
@@ -1133,7 +1133,9 @@ static Int32 get_h264_enc_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 	if(dynParams->maxBitrateCVBR > CAM_H264_MAX_BIT_RATE * 1000) 
 		dynParams->maxBitrateCVBR = CAM_H264_MAX_BIT_RATE * 1000;
 
-	DBG("bit rate: %d, max %d", dynParams->targetBitRate, dynParams->maxBitrateCVBR);
+	DBG("bit rate: %d, max %d, res: %d X %d", 
+		dynParams->targetBitRate, dynParams->maxBitrateCVBR,
+		dynParams->width, dynParams->height);
 	
 	return E_NO;
 }
@@ -2610,7 +2612,13 @@ static Int32 set_awb_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 	/* validate data */
 	if( params->minValueR > params->maxValueR || 
 		params->minValueG > params->maxValueG ||
-		params->minValueB > params->maxValueB ) {
+		params->minValueB > params->maxValueB || 
+		params->initValueR[0] > HDCAM_MAX_RED_GAIN || 
+		params->initValueR[1] > HDCAM_MAX_RED_GAIN ||
+		params->initValueG[0] > HDCAM_MAX_GREEN_GAIN ||
+		params->initValueG[1] > HDCAM_MAX_GREEN_GAIN ||
+		params->initValueB[0] > HDCAM_MAX_BLUE_GAIN ||
+		params->initValueB[1] > HDCAM_MAX_BLUE_GAIN) {
 		ERR("invalid awb params");
 		return E_INVAL;
 	}

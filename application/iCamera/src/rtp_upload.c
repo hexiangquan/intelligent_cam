@@ -601,7 +601,8 @@ static Int32 rtp_upload_process_frame(RtpTransObj *rtpTrans, MediaFrame *frame)
 
 	if(!rtpTrans->fpSave) {
 		if( (rtpTrans->flags & RTP_FLAG_SAVE_ONLY) ||
-			((rtpTrans->flags & RTP_FLAG_SAVE_EN) && !media_get_link_status(rtpTrans->hSubSession))) {
+			(rtpTrans->cacheBuf && (rtpTrans->flags & RTP_FLAG_SAVE_EN) && 
+			  !media_get_link_status(rtpTrans->hSubSession))) {
 			/* open file for save */
 			rtp_upload_open_save_file(rtpTrans, frame);
 		}
