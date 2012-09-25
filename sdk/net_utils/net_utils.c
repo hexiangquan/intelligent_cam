@@ -30,7 +30,8 @@
 #include <ifaddrs.h>
 #include <netinet/in.h> 
 #include <arpa/inet.h>
-
+#include <netinet/if_ether.h>
+#include <net/if.h>
 
 /*----------------------------------------------*
  * external variables                           *
@@ -541,4 +542,44 @@ Int32 sys_set_domain_info(const char *hostname, const char *dns)
 	return E_NO;
 }
 
+/*****************************************************************************
+ Prototype    : sys_get_mac
+ Description  : get system mac addr
+ Input        : const char *ethName  
+                Uint8 *buf           
+                size_t len           
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/9/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 sys_get_mac(const char *ethName, Uint8 *buf, size_t len)
+{
+	if(!ethName || !buf || len < ETH_ALEN)
+		return E_INVAL;
+	
+	int s = socket(AF_INET, SOCK_DGRAM, 0);
+	struct ifreq req;
+	int err;
+
+	/* copy device name */
+	strncpy(req.ifr_name, ethName, sizeof(req.ifr_name));
+	err = ioctl(s, SIOCGIFHWADDR, &req);
+
+	close(s);
+	if(err < 0) {
+		ERRSTR("get mac addr failed");
+		return E_IO;
+	}
+
+	/* copy mac out */
+	memcpy(buf, req.ifr_hwaddr.sa_data, ETH_ALEN);
+	return E_NO;
+}
 

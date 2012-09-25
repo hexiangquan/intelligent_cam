@@ -85,7 +85,7 @@ $(EXEC_OBJ): $(OBJ_DIR)/%.o: %.c $(HEADERS)
 	$(COMPILE) -o $@ $<
 
 install:
-	-cp -p $(EXEC) $(EXEC_INSTALL_PATH)
+	-cp -f $(EXEC) $(EXEC_INSTALL_PATH)
 
 clean:
 	@echo Removing generated files..

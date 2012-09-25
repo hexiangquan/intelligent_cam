@@ -283,8 +283,14 @@ Int32 detector_run(DetectorHandle hDetector, CaptureInfo *capInfo)
 	if(!hDetector || !capInfo)
 		return E_INVAL;
 
+	Int32 ret = E_UNSUPT;
 	if(hDetector->fxns && hDetector->fxns->detect)
-		return hDetector->fxns->detect(hDetector, capInfo);
+		ret = hDetector->fxns->detect(hDetector, capInfo);
+
+	if(!ret && (capInfo->flags & CAPINFO_FLAG_DELAY_CAP)) {
+		/* need delay for capture next frame */
+		usleep(hDetector->params.capDelayTime * 1000);
+	}
 
 	return E_UNSUPT;
 }

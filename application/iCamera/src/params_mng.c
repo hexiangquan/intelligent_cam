@@ -77,7 +77,7 @@ extern const AppParams c_appParamsDef;
 
 #define IMG_CTRL_DEV			"/dev/imgctrl"
 #define IMG_EXTIO_DEV			"/dev/extio"
-
+#define ETH_NAME				"eth0"
 
 typedef Int32 (*PmCtrlFxn)(ParamsMngHandle hParamsMng, void *data, Int32 size);
 
@@ -89,7 +89,6 @@ typedef struct {
 
 /* flags for save cfg params */
 #define PM_CTRL_INFO_SAVE		(1 << 0)
-
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -1430,7 +1429,10 @@ static Int32 set_network_info(ParamsMngHandle hParamsMng, void *data, Int32 size
 		!strlen(info->gatewayIP) || !strlen(info->domainName) || 
 		strlen(info->hostName) + 1 > sizeof(info->hostName) || 
 		strlen(info->dnsServer) + 1 > sizeof(info->dnsServer) || 
-		!strlen(info->hostName) || !strlen(info->dnsServer)) {
+		!strlen(info->hostName) || !strlen(info->dnsServer) || 
+		inet_addr(info->ipAddr) == 0 || 
+		inet_addr(info->gatewayIP) == 0 || 
+		inet_addr(info->dnsServer) == 0) {
 		ERR("invalid string for network info.");
 		return E_INVAL;
 	}
@@ -2009,8 +2011,10 @@ static Int32 set_rgb_gains(ParamsMngHandle hParamsMng, void *data, Int32 size)
 	AppParams *appCfg = &hParamsMng->appParams;
 
 	/* validate data */
-	if(params->redGain > 512 || params->blueGain > 512) {
-		ERR("invalid exposure params");
+	if( params->redGain > HDCAM_MAX_RED_GAIN || 
+		params->blueGain > HDCAM_MAX_BLUE_GAIN || 
+		params->greenGain[0] > HDCAM_MAX_GREEN_GAIN ) {
+		ERR("invalid rgb params");
 		return E_INVAL;
 	}
 	
@@ -3074,10 +3078,14 @@ static Int32 get_vid_upload_params(ParamsMngHandle hParamsMng, void *data, Int32
 		rtpParams->frameRate = appCfg->h264EncParams.frameRate;
 		rtpParams->flags = 0;
 		rtpParams->savePath = SD1_MNT_PATH;
-		if(appCfg->rtpParams.flags & CAM_RTP_SAVE_ONLY)
+		if(appCfg->rtpParams.flags & CAM_RTP_SAVE_ONLY) {
 			rtpParams->flags |= RTP_FLAG_SAVE_ONLY;
-		if(appCfg->rtpParams.flags & CAM_RTP_SAVE_EN)
+			DBG("rtp enable save only.");
+		}
+		if(appCfg->rtpParams.flags & CAM_RTP_SAVE_EN) {
 			rtpParams->flags |= RTP_FLAG_SAVE_EN;
+			DBG("rtp enable save");
+		}
 	} else {
 		/* not send */
 		params->protol = CAM_UPLOAD_PROTO_NONE;
@@ -3117,6 +3125,20 @@ static Int32 day_night_switch(ParamsMngHandle hParamsMng, void *data, Int32 size
 	CamDayNightModeCfg *dayNight = &appCfg->dayNightCfg;
 	
 	dayNight->mode = (Uint16)mode;
+
+	/* switch AWB params */
+	if(appCfg->awbParams.flags & AWB_FLAG_EN) {
+		int initIndex = (mode == CAM_DAY_MODE) ? 0 : 1;
+		CamAWBParam *awbParams = &appCfg->awbParams;
+		struct hdcam_chroma_info rgbGains;
+
+		rgbGains.redGain = awbParams->initValueR[initIndex];
+		rgbGains.greenGain = awbParams->initValueG[initIndex];
+		rgbGains.blueGain = awbParams->initValueB[initIndex];
+		rgbGains.reserved = 0;
+		/* set to hardware */
+		ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_CHROMA, &rgbGains);
+	}
 	
 	return E_NO;
 }
@@ -3320,6 +3342,9 @@ static Int32 params_mng_init_sys(ParamsMngHandle hParamsMng)
 	err |= set_ae_params(hParamsMng, &appCfg->aeParams, sizeof(appCfg->aeParams));
 	err |= set_awb_params(hParamsMng, &appCfg->awbParams, sizeof(appCfg->awbParams));
 	err |= set_spec_cap_params(hParamsMng, &appCfg->specCapParams, sizeof(appCfg->specCapParams));
+
+	/* Only get system mac addr once */
+	err |= sys_get_mac(ETH_NAME, appCfg->devInfo.macAddr, sizeof(appCfg->devInfo.macAddr));
 
 	if(err) {
 		ERR("init hardware error!");

@@ -54,6 +54,8 @@
 #define EXTIO_G_REG			_IOWR(EXTIO_MAGIC_NO, 10, struct hdcam_reg *)
 #define EXTIO_S_RESET		_IO(EXTIO_MAGIC_NO, 11)
 #define EXTIO_S_UART		_IOW(EXTIO_MAGIC_NO, 12, struct hdcam_uart_cfg *)
+#define EXTIO_G_BACKIO		_IOR(EXTIO_MAGIC_NO, 13, int *)
+#define EXTIO_G_ENCRYPT		_IOR(EXTIO_MAGIC_NO, 14, int *)
 #pragma  pack()
 
 /* 

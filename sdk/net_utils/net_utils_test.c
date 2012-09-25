@@ -62,6 +62,12 @@ static void main_loop(const char *serverIp, Uint16 port)
 	assert(err == E_NO);
 	DBG("get local ip: %s", ipBuf);
 
+	Uint8 macAddr[6];
+	err = sys_get_mac("eth0", macAddr, sizeof(macAddr));
+	assert(err == E_NO);
+	DBG("get mac addr: %02X-%02X-%02X-%02X-%02X-%02X", 
+		macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
+
 exit:
 
 	if(sockTcp > 0)

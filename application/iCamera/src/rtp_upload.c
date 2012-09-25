@@ -600,9 +600,8 @@ static Int32 rtp_upload_process_frame(RtpTransObj *rtpTrans, MediaFrame *frame)
 	Int32 ret;
 
 	if(!rtpTrans->fpSave) {
-		if( rtpTrans->flags & RTP_FLAG_SAVE_ONLY ||
-			((rtpTrans->flags & RTP_FLAG_SAVE_EN) && 
-			 !media_get_link_status(rtpTrans->hSubSession)) ) {
+		if( (rtpTrans->flags & RTP_FLAG_SAVE_ONLY) ||
+			((rtpTrans->flags & RTP_FLAG_SAVE_EN) && !media_get_link_status(rtpTrans->hSubSession))) {
 			/* open file for save */
 			rtp_upload_open_save_file(rtpTrans, frame);
 		}
@@ -730,6 +729,7 @@ static Int32 rtp_upload_set_params(void *handle, const void *params)
 
 	rtpTrans->savePath = rtpParams->savePath;
 	rtpTrans->flags = rtpParams->flags;
+	DBG("\nrtp trans flags: 0x%X\n", rtpTrans->flags);
 	
 	return E_NO;
 }

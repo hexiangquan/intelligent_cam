@@ -433,6 +433,25 @@ extern Int32 sys_set_gateway(const char *gateway, const char *netmask);
 *****************************************************************************/
 extern Int32 sys_set_domain_info(const char *hostname, const char *dns);
 
+/*****************************************************************************
+ Prototype    : sys_get_mac
+ Description  : get system mac addr
+ Input        : const char *ethName  
+                Uint8 *buf           
+                size_t len           
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/9/12
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 sys_get_mac(const char *ethName, Uint8 *buf, size_t len);
+
 #ifdef __cplusplus
 #if __cplusplus
 }

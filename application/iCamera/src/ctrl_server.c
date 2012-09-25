@@ -339,6 +339,13 @@ static void *ctrl_server_thread(void *arg)
 			if(!ret)
 				ret = conv_params_update(hCtrlSrv);
 			break;
+		case APPCMD_RESTORE_CFG:
+			ret = params_mng_control(hParamsMng, PMCMD_S_RESTOREDEFAULT, data, msgHdr->dataLen);
+			/* we should reboot after restore params */
+			if(!ret)
+				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_MAIN, APPCMD_REBOOT, 0, 0);
+			needResp = FALSE;
+			break;
 		case ICAMCMD_G_VERSION:
 			ret = params_mng_control(hParamsMng, PMCMD_G_VERSION, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamVersionInfo);
@@ -495,8 +502,9 @@ static void *ctrl_server_thread(void *arg)
 		case ICAMCMD_S_H264PARAMS:
 			ret = params_mng_control(hParamsMng, PMCMD_S_H264ENCPARAMS, data, msgHdr->dataLen);
 			if(!ret) {
-				/* update img encoder */
+				/* update video encode & upload params */
 				ret = encoder_params_update(hCtrlSrv, ENCODER_VID);
+				ret |= encoder_upload_update(hCtrlSrv, ENCODER_VID);
 				/* capture update convert params */
 				if(!ret)
 					ret = conv_params_update(hCtrlSrv);
@@ -523,6 +531,7 @@ static void *ctrl_server_thread(void *arg)
 				usleep(100000);
 				ret = encoder_params_update(hCtrlSrv, ENCODER_IMG);
 				ret = encoder_params_update(hCtrlSrv, ENCODER_VID);
+				ret = conv_params_update(hCtrlSrv);
 			}
 			break;
 		case ICAMCMD_G_WORKMODE:
@@ -593,8 +602,9 @@ static void *ctrl_server_thread(void *arg)
 			break;
 		case ICAMCMD_S_DAYNIGHTMODE:
 			ret = params_mng_control(hParamsMng, PMCMD_S_DAYNIGHTCFG, data, msgHdr->dataLen);
-			/* cfg data capture module */
+			/* update switch params & cfg data capture module */
 			if(!ret) {
+				ret = day_night_cfg_params(hCtrlSrv->hDayNight, (CamDayNightModeCfg *)data);
 				ret = conv_params_update(hCtrlSrv);
 			}
 			break;

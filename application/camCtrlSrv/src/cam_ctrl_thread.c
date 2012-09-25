@@ -636,7 +636,7 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 			snprintf(fname, sizeof(fname), "/usr/lib/%s", data + UPDATE_NAME_OFFSET);
 		} else if(strncmp(data + strlen(data) - 2, "ko", 2) == 0) {
 			/* update kernel modules */
-			snprintf(fname, sizeof(fname), "/lib/modules/2.6.32.17-davici1/kernel/drivers/dsp/%s", data + UPDATE_NAME_OFFSET);
+			snprintf(fname, sizeof(fname), "/lib/modules/2.6.32.17-davinci1/kernel/drivers/dsp/%s", data + UPDATE_NAME_OFFSET);
 		} else {
 			/* update applications */
 			snprintf(fname, sizeof(fname), "/home/root/update/%s", data + UPDATE_NAME_OFFSET);						
@@ -772,9 +772,10 @@ void *cam_ctrl_thread(void *arg)
 				errCnt++;
 			else 
 				errCnt = 0;
-		} else if(ret == E_CONNECT)
+		} else if(ret == E_CONNECT) {
+			//DBG("client closed the connection...");
 			break;	//connection error directly break
-		else
+		} else
 			errCnt++;
 		
 	}

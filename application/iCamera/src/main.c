@@ -35,6 +35,8 @@
 #include "icam_ctrl.h"
 #include "fpga_load.h"
 #include "self_test.h"
+#include "ext_io.h"
+#include <sys/ioctl.h>
 
 /*----------------------------------------------*
  * external variables                           *
@@ -199,6 +201,7 @@ static void app_exit(MainEnv *envp, MsgHandle hMsg)
 		msg_delete(hMsg);
 
 	alg_exit();
+	buffer_exit();
 
 	DBG("app exit...");
 
@@ -263,6 +266,66 @@ static void sig_handler(int sig)
 } 
 
 /*****************************************************************************
+ Prototype    : back_button_detect
+ Description  : detect back button status
+ Input        : int fdExtIo     
+                MsgHandle hMsg  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/9/11
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static void back_button_detect(int fdExtIo, MsgHandle hMsg)
+{
+	if(fdExtIo < 0)
+		return;
+	
+	int isPushed;
+	Int32 err;
+	
+	err = ioctl(fdExtIo, EXTIO_G_BACKIO, &isPushed);
+	if(err < 0) {
+		return;
+	}
+
+	if(isPushed)
+		app_hdr_msg_send(hMsg, MSG_CTRL, APPCMD_RESTORE_CFG, 0, 0);
+}
+
+/*****************************************************************************
+ Prototype    : system_reset
+ Description  : reset whole system
+ Input        : int fdExtIo  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/9/11
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static void system_reset(int fdExtIO)
+{
+	INFO("we are going to reboot system");
+	if(fdExtIO > 0) {
+		sync();
+		ioctl(fdExtIO, EXTIO_S_RESET, NULL);
+	} 
+
+	/* if we not reset by hardware, try software reset */
+	system("shutdown -r now\n");
+}
+
+/*****************************************************************************
  Prototype    : main_loop
  Description  : main loop
  Input        : SetupParams *params  
@@ -282,7 +345,7 @@ static Int32 main_loop(MainEnv *envp)
 	Int32 			status;
 	MsgHandle 		hMsg = NULL;
 	CommonMsg		msgBuf;
-	//CamDateTime		curTime;
+	Int32			fdExtIO = -1;
 
 	/* init and create modules for application */
 	status = app_init(envp);
@@ -318,6 +381,11 @@ static Int32 main_loop(MainEnv *envp)
 		}
 	}
 
+	/* open ext id device */
+	fdExtIO = open(EXTIO_DEV_NAME, O_RDWR);
+	if(fdExtIO < 0)
+		ERRSTR("open extio dev failed.");
+
 	/* start main loop */
 	while(!s_exit && !envp->exit) {
 		/* feed dog */
@@ -332,6 +400,9 @@ static Int32 main_loop(MainEnv *envp)
 			
 		/* check day/night switch */
 		status = day_night_check_by_time(envp->hDayNight, hMsg);
+
+		/* detect back button status */
+		back_button_detect(fdExtIO, hMsg);
 	}
 
 	/* close watch dog */
@@ -348,12 +419,13 @@ exit:
 
 	/* system reset */
 	if(envp->reboot) {
-		INFO("we are going to reboot system");
-		system("shutdown -r now\n");
+		system_reset(fdExtIO);
 	}
 
+	if(fdExtIO > 0)
+		close(fdExtIO);
+
 	return E_NO;
-	
 }
 
 /*****************************************************************************

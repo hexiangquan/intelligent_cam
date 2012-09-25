@@ -241,6 +241,8 @@ Int32 strobe_ctrl_set_cfg(StrobeHandle hStrobe, const CamStrobeCtrlParam *params
 	if(params->ctrlFlags & 0x04)
 		hStrobe->enableCnt++;
 
+	DBG("strobe set switch mode: %d, enable flag: 0x%x", params->switchMode, params->ctrlFlags);
+
 	return strobe_ctrl_sync_hw(hStrobe);
 }
 
@@ -281,6 +283,8 @@ Int32 strobe_ctrl_get_cfg(StrobeHandle hStrobe, CamStrobeCtrlParam *params)
 	}
 
 	*params = hStrobe->params;
+	DBG("strobe get cfg: time: %u:%u - %u:%u", params->enStartHour, params->enStartMin,
+		params->enEndHour, params->enEndMin);
 	return E_NO;
 }
 

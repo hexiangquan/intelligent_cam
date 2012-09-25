@@ -28,6 +28,7 @@
 #include "ftp_client.h"
 #include "path_name.h"
 #include "cam_time.h"
+#include "cap_info_parse.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -240,8 +241,10 @@ static Int32 ftp_upload_send(void *handle, const ImgMsg *frame)
 	if(!handle || !frame)
 		return E_INVAL;
 
-	if(frame->dimension.colorSpace != FMT_JPG) {
-		WARN("ftp upload only support jpeg format!");
+	/* Only upload trigger frame */
+	if( frame->dimension.colorSpace != FMT_JPG || 
+		frame->rawInfo.capMode == RCI_CAP_TYPE_CONT ) {
+		//WARN("ftp upload only support jpeg format!");
 		return E_NO;
 	}
 

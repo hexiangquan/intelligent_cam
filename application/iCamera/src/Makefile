@@ -105,8 +105,8 @@ lib_clean:
 	make -C $(LIB_DIR) clean
 
 install: 
-	-cp -p $(EXEC) $(EXEC_INSTALL_PATH)
-	-cp -p $(COMMON_HEADER) $(APP_INC_DIR)
+	-cp -f $(EXEC) $(EXEC_INSTALL_PATH)
+	-cp -f $(COMMON_HEADER) $(APP_INC_DIR)
 
 clean: 
 	@echo Removing generated files..

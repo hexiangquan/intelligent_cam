@@ -58,7 +58,7 @@ const AppParams c_appParamsDef = {
 	.rtpParams = {
 		.streamName = {"h264"},
 		.rtspSrvPort = RTSP_PORT,
-		.flags = CAM_RTP_FLAG_EN | CAM_RTP_SAVE_ONLY | CAM_RTP_SAVE_EN,
+		.flags = CAM_RTP_FLAG_EN | CAM_RTP_SAVE_EN,
 	},
 	.uploadCfg = {
 		.protocol = CAM_UPLOAD_PROTO_TCP,
@@ -130,7 +130,7 @@ const AppParams c_appParamsDef = {
 		.flags = 0,
 	},
 	.workMode = {
-		.format = CAM_FMT_JPEG,
+		.format = CAM_FMT_JPEG_H264,
 		.resType = CAM_RES_FULL_FRAME,
 		.capMode = CAM_CAP_MODE_CONTINUE,
 		.flags = 0,
@@ -180,7 +180,7 @@ const AppParams c_appParamsDef = {
 		.switchMethod = CAM_DN_SWT_OFF,
 	},
 	.avParams = {
-		.avType = AV_TYPE_PAL,
+		.avType = AV_TYPE_NONE,
 		.flags = 0,
 	},
 	.specCapParams = {
