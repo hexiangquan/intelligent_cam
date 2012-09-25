@@ -126,10 +126,10 @@ $(EXEC_OBJ): $(OBJ_DIR)/%.o: %.c $(HEADERS)
 
 #install_$(TARGET):
 install:
-	-cp -p $(LIB) $(LIB_INSTALL_DIR)
-	-cp -p $(LIB) $(APP_LIB_DIR)
-	-cp -p $(LIB_HEADER) $(APP_INC_DIR)
-	-cp -p $(EXEC) $(EXEC_INSTALL_PATH)
+	-cp -f $(LIB) $(LIB_INSTALL_DIR)
+	-cp -f $(LIB) $(APP_LIB_DIR)
+	-cp -f $(LIB_HEADER) $(APP_INC_DIR)
+	-cp -f $(EXEC) $(EXEC_INSTALL_PATH)
 
 clean:
 	@echo Removing generated files..
