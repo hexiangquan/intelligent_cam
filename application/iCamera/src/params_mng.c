@@ -1717,7 +1717,7 @@ static Int32 set_tcp_srv_info(ParamsMngHandle hParamsMng, void *data, Int32 size
 
 	/* validate data */
 	if(!params->serverPort) {
-		ERR("invalid server port: %d", (int)params->serverPort);
+		ERR("invalid server ip or port: %d", (int)params->serverPort);
 		return E_INVAL;
 	}
 	
@@ -2712,6 +2712,7 @@ static Int32 set_day_night_params(ParamsMngHandle hParamsMng, void *data, Int32 
 
 	/* validate data */
 	if( params->switchMethod >= CAM_DN_SWT_MAX || 
+		params->mode >= CAM_DN_MODE_MAX || 
 		params->dayModeStartHour > 23 ||
 		params->dayModeStartMin > 59 ||
 		params->nightModeStartHour > 23 || 

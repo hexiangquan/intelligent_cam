@@ -674,6 +674,11 @@ Int32 ftp_make_dir(FtpHandle hFtp, const Int8 *ftpDir)
 
 	if(err == E_NO)
 		err = ftp_get_working_dir(hFtp, NULL, 0); //update current dir
+
+	/* this means dir already exist */
+	if(err == E_REFUSED)
+		err = E_NO;
+
 	return err;
 }
 
@@ -1116,9 +1121,9 @@ transfer:
 		}
 	
 		if(sendn(dataSocket, fileBuf, fileSize, 0) != fileSize) {			
-				ERR("send file failed.");
-				err = E_TRANS;
-				goto err_quit;
+			ERR("send file failed.");
+			err = E_TRANS;
+			goto err_quit;
 		}
 
 		//DBG("send file %s, %d bytes transfered.", ftpPathName, fileSize);
@@ -1570,12 +1575,13 @@ static inline Int32 ftp_enter_passive_mode(FtpHandle hFtp)
 	err = connect_nonblock(dataSocket, (struct sockaddr *)&srvAddr, sizeof(srvAddr), FTP_RECONNECT_TIMEOUT << 2);		
 	if(err < 0) {
 		close(dataSocket);
+		DBG("connect ftp server data sock failed.");
 		return E_CONNECT;
 	}
 	
 	hFtp->dataSock = dataSocket;
-	//err = set_sock_send_timeout(dataSocket, FTP_SEND_TIMEOUT);
-	//err |= set_sock_recv_timeout(dataSocket, FTP_RECV_TIMEOUT);
+	err = set_sock_send_timeout(dataSocket, FTP_SEND_TIMEOUT);
+	err |= set_sock_recv_timeout(dataSocket, FTP_RECV_TIMEOUT);
 	
 	return E_NO;
 }
@@ -1689,6 +1695,7 @@ static Int32 ftp_enter_transfer_mode(FtpHandle hFtp)
 	}
 
 	//DBG("enter transfer set linger");
+#if 0
 	if(!err) {
 		/* Set linger */
 		err = set_sock_linger(hFtp->dataSock, TRUE, 1);
@@ -1698,7 +1705,7 @@ static Int32 ftp_enter_transfer_mode(FtpHandle hFtp)
 			return E_IO;
 		}
 	}
-
+#endif
 	//DBG("enter transfer returns");
 	return err;
 }

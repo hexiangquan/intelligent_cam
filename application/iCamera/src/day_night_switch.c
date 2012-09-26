@@ -91,7 +91,9 @@ Int32 day_night_cfg_params(DayNightHandle hDayNight, const CamDayNightModeCfg *c
 	pthread_mutex_lock(&hDayNight->mutex);
 	hDayNight->cfg = *cfg;
 	pthread_mutex_unlock(&hDayNight->mutex);
-	
+
+	DBG("day night switch time: %u:%u - %u:%u", cfg->dayModeStartHour, cfg->dayModeStartMin,
+		cfg->nightModeStartHour, cfg->nightModeStartMin);
 	return E_NO;
 }
 

@@ -357,7 +357,10 @@ Int32 path_name_generate(PathNameHandle hPathName, const ImgMsg *imgBuf, PathNam
 			strBuf[1] = 'A' + capInfo->triggerInfo[i].frameId - FRAME_TRIG_BASE;
 			strBuf[2] = '\0';
 		} else {
-			strBuf[0] = 'A' + capInfo->triggerInfo[i].frameId - FRAME_TRIG_BASE;
+			if(capInfo->triggerInfo[i].frameId >= FRAME_CONTINUE)
+				strBuf[0] = 'M';
+			else
+				strBuf[0] = 'A' + capInfo->triggerInfo[i].frameId - FRAME_TRIG_BASE;
 			strBuf[1] = '\0';
 		}
 		

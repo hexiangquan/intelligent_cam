@@ -266,13 +266,14 @@ static Int32 ftp_upload_send(void *handle, const ImgMsg *frame)
 	while(index-- > 0) {
 		if(*(nameInfo.path[index]) != '\0') {
 			snprintf(fileNameBuf, sizeof(fileNameBuf), "%s/%s", nameInfo.path[index], nameInfo.fileName[index]);
-			//printf("%s\n", cPathFile);
+			//DBG("ftp file name: %s", fileNameBuf);
 			ret = ftp_upload_file(hUpload->hFtp, fileData, fileSize, fileNameBuf);
 			if(ret == E_INVPATH) {
 				//make dir and upload again
 				ret = ftp_make_dir(hUpload->hFtp, nameInfo.path[index]);
-				if(!ret)
+				if(!ret) {
 					ret = ftp_upload_file(hUpload->hFtp, fileData, fileSize, fileNameBuf);
+				}
 			}
 		}
 		else
