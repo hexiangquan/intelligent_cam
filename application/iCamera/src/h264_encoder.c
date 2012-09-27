@@ -91,7 +91,7 @@ EncoderHandle h264_encoder_create(IN EncoderParams *encParams, IN UploadParams *
 	encAttrs.encInitParams = &encInitParams;
 	encAttrs.encOps = &c_h264EncOps;
 	encAttrs.poolBufNum = VID_ENC_POOL_BUF_NUM;
-	encAttrs.saveRootPath = SD0_MNT_PATH;
+	encAttrs.saveRootPath = SD1_MNT_PATH;
 	encAttrs.encBufSize = encInitParams.maxWidth * encInitParams.maxHeight * 8 / 10;
 	encAttrs.mutex = mutex;
 

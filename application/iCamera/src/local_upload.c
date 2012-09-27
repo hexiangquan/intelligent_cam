@@ -57,6 +57,8 @@
  *----------------------------------------------*/
 #define LOCAL_UPLOAD_CONNECT_TIMEOUT	30000	//timeout for connect
 #define PRINT_FILE_INFO
+#define IMG_FILE_SUFFIX					".jpg"
+#define VID_FILE_SUFFIX					".h264"
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -264,6 +266,12 @@ static Int32 single_file_send(LocalUploadHandle hLocalUpload, const char *fileNa
 		return E_NO;
 	}
 
+	/* ignore file that has suffix is not *.jpg */
+	size_t nameLen = strlen(fileName);
+	size_t suffixLen = strlen(IMG_FILE_SUFFIX);
+	if(strncmp(fileName + nameLen - suffixLen, IMG_FILE_SUFFIX, suffixLen) != 0)
+		return E_NO;
+	
 	fd = open(fileName, O_RDONLY);
 	if(fd < 0) {
 	    ERRSTR("open <%s> err", fileName);
@@ -285,6 +293,11 @@ static Int32 single_file_send(LocalUploadHandle hLocalUpload, const char *fileNa
 		//ERRSTR("read header err");
 		goto exit;
 	}
+
+	/* validate header */
+	dataLen = img.dimension.size;
+	if(img.header.type != MSG_TYPE_REQU || dataLen > hLocalUpload->bufSize)
+		goto exit;
 
 	/* read data */
 	ret = read(fd, buf, dataLen);

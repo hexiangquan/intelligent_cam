@@ -34,8 +34,8 @@
 #define IMG_ENC_POOL_BUF_NUM	2
 #define VID_ENC_POOL_BUF_NUM	0
 
-#define SD0_MNT_PATH			"/media/mmcblk0p1"
-#define SD1_MNT_PATH			"/media/mmcblk1p1"
+#define SD0_MNT_PATH			"/media/mmcblk0"
+#define SD1_MNT_PATH			"/media/mmcblk1"
 
 /* Cmd of this application */
 typedef enum _AppCmd {
