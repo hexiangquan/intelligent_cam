@@ -150,7 +150,7 @@ Int32 write_file(const char *dirName, const char *fileName, const Int8 *header, 
 		wrLen = write(fd, header, hdrLen);
 		if(wrLen != hdrLen) {
 			ERRSTR("write header failed.");
-			ret = E_IO;
+			ret = (errno == ENOSPC) ? E_NOSPC : E_IO;
 			goto exit;
 		}
 	}
@@ -159,7 +159,7 @@ Int32 write_file(const char *dirName, const char *fileName, const Int8 *header, 
 	    wrLen = write(fd, data, len);
 	    if(wrLen < 0) {
 	        ERRSTR("write <%s> err", fileName);
-			ret = E_IO;
+			ret = (errno == ENOSPC) ? E_NOSPC : E_IO;
 			break;
 	    } else {
 			data += wrLen;

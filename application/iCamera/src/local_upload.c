@@ -306,9 +306,6 @@ static Int32 single_file_send(LocalUploadHandle hLocalUpload, const char *fileNa
 		goto exit;
 	} 
 	
-#ifdef PRINT_FILE_INFO
-	DBG("send file <%s> %d bytes", fileName, (int)fstat.st_size);
-#endif
 	img.hBuf = hLocalUpload->hBuf;
 
 	/* send file */
@@ -317,6 +314,11 @@ static Int32 single_file_send(LocalUploadHandle hLocalUpload, const char *fileNa
 	/* delete file if success */
 	if(!ret && (hLocalUpload->flags & LOCAL_FLAG_DEL_AFTER_SND))
 		unlink(fileName);	
+	
+#ifdef PRINT_FILE_INFO
+	if(!ret)
+		DBG("local upload, send file <%s>, %d bytes", fileName, (int)fstat.st_size);
+#endif
 	
 exit:		
 	

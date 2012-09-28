@@ -6,6 +6,7 @@
 #include "app_msg.h"
 #include "img_trans.h"
 
+#define DEV_SD0		"/dev/mmcblk0"
 //#define TEST_SAVE_TIME	
 //#define NO_SAVE_FILE
 
@@ -130,6 +131,12 @@ Int32 jpg_encoder_save_frame(IN const ImgMsg *msg, IN const char *path)
 	
 	if(!path || !msg)
 		return E_INVAL;
+	
+	/* check whether sd card has been inserted */
+	int fd = open(DEV_SD0, O_RDONLY);
+	if(fd < 0)
+		return E_NOTEXIST;
+	close(fd);
 
 	/* only save jpeg and ignore continously frame */
 	if(msg->dimension.colorSpace != FMT_JPG || 

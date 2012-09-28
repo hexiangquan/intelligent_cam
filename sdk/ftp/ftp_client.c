@@ -1567,6 +1567,8 @@ static inline Int32 ftp_enter_passive_mode(FtpHandle hFtp)
 		return E_IO;
 	}
 
+	usleep(3000);
+	
 	struct  sockaddr_in srvAddr;
 	srvAddr.sin_addr.s_addr = hFtp->serverIP;
 	srvAddr.sin_family = AF_INET;

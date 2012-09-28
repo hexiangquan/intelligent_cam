@@ -781,6 +781,9 @@ static Int32 get_video_out_attrs(ParamsMngHandle hParamsMng, void *data, Int32 s
 		outAttrs->height = 1200;
 		break;
 	case H264_RES_720X480:
+		outAttrs->width = 800;
+		outAttrs->height = 600;
+		break;
 	default:
 		outAttrs->width = 720;
 		outAttrs->height = 480;

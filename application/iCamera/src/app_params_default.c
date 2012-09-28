@@ -7,6 +7,7 @@
 #define HOST_NAME		"dm36x-ipnc"
 #define DNS_SERVER		"192.168.0.1"
 #define SERVER_IP		"192.168.0.25"
+#define NTP_SRV_IP		"192.168.0.11"
 #define TCP_SRV_PORT	9300
 #define OSD_STRING		"HDCAM"
 #define ROAD_NAME		OSD_STRING
@@ -79,8 +80,8 @@ const AppParams c_appParamsDef = {
 		.pathNamePattern = {0},
 	},
 	.ntpSrvInfo = {
-		.serverIP = {SERVER_IP},
-		.serverPort = 11,
+		.serverIP = {NTP_SRV_IP},
+		.serverPort = 0,
 		.syncPrd = 24,
 	},
 	.exposureParams = {

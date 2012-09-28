@@ -166,7 +166,9 @@ typedef struct _DateTime {
 }DateTime;
 
 /* Macro for convert hour to mintues */
-#define HOUR_TO_MIN(h, m) ((h)*(60) + (m))
+#define HOUR_TO_MIN(h, m) 		((h)*(60) + (m))
+#define HOUR_TO_SEC(h, m, s)	((h)*60*60 + (m)*60 + (s))
+
 
 /* Common APIs */
 #ifdef __cplusplus

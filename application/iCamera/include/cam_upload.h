@@ -67,7 +67,7 @@ typedef struct {
   * NTP info for sync
   */
 typedef struct {
-	Uint8	serverIP[16];	//NTP server IP
+	Int8	serverIP[16];	//NTP server IP
 	Uint16	serverPort;		//Listen port
 	Uint16	syncPrd;		//sync interval period, unit: hour, set to 0 to disable sync
 } CamNtpServerInfo;

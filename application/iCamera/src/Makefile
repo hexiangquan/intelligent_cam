@@ -67,7 +67,7 @@ CPP_FLAGS ?=
 LD_FLAGS += -L$(SDK_LIB_DIR)
 LD_LIBS := -lpthread -lm -lbuf -lalg -lcapture -lcrc -lmsg -limgconv
 LD_LIBS += -ljpgenc -llog -losd -lh264enc -lnetproto -lnetutils -lftp
-LD_LIBS += -lmediasrv -lcirbuf -ldisplay
+LD_LIBS += -lmediasrv -lcirbuf -ldisplay -lntp
 ifeq ($(STATIC), 1)
 LD_LIBS += $(XDC_LFILE)
 endif

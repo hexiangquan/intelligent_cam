@@ -34,6 +34,7 @@
 #include "ext_io.h"
 #include <sys/ioctl.h>
 #include "strobe_ctrl.h"
+#include "ntp_sync.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -91,6 +92,7 @@ struct CtrlSrvObj{
 	const char			*msgName;		//our msg name for IPC
 	DayNightHandle		hDayNight;		//day night  switch obj
 	StrobeHandle		hStrobe;		//strobe ctrl obj
+	NtpSyncHandle		hNtpSync;		//Ntp time sync obj
 };
 
 typedef enum {
@@ -463,6 +465,8 @@ static void *ctrl_server_thread(void *arg)
 			break;
 		case ICAMCMD_S_NTPSRVINFO:
 			ret = params_mng_control(hParamsMng, PMCMD_S_NTPSRVINFO, data, msgHdr->dataLen);
+			if(!ret)
+				ret = ntp_sync_config(hCtrlSrv->hNtpSync, (CamNtpServerInfo *)data, hCtrlSrv->hMsg);
 			break;
 		case ICAMCMD_G_NTPSRVINFO:
 			ret = params_mng_control(hParamsMng, PMCMD_G_NTPSRVINFO, data, CTRL_MSG_BUF_LEN);
@@ -836,6 +840,16 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	if(!hCtrlSrv->hH264Encoder) {
 		goto exit;
 	}	
+
+	/* create ntp sync module */
+	CamNtpServerInfo ntpSrvInfo;
+	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_NTPSRVINFO, 
+			&ntpSrvInfo, sizeof(ntpSrvInfo));
+	assert(ret == E_NO);
+	hCtrlSrv->hNtpSync = ntp_sync_create(&ntpSrvInfo);
+	if(!hCtrlSrv->hNtpSync) {
+		goto exit;
+	}
 	
 	return hCtrlSrv;
 
@@ -909,6 +923,13 @@ Int32 ctrl_server_run(CtrlSrvHandle hCtrlSrv)
 		}
 	}
 
+	/* run ntp sync */
+	if(hCtrlSrv->hNtpSync) {
+		err = ntp_sync_run(hCtrlSrv->hNtpSync);
+		if(err)
+			ERR("ntp sync running failed...");
+	}
+
 	/* set current status to working */
 	CamWorkStatus workStatus = WORK_STATUS_RUNNING;
 	params_mng_control(hCtrlSrv->hParamsMng, PMCMD_S_WORKSTATUS, 
@@ -979,6 +1000,10 @@ Int32 ctrl_server_delete(CtrlSrvHandle hCtrlSrv, MsgHandle hCurMsg)
 	/* delete strobe module */
 	if(hCtrlSrv->hStrobe)
 		strobe_ctrl_delete(hCtrlSrv->hStrobe);
+
+	/* delete ntp module */
+	if(hCtrlSrv->hNtpSync)
+		ntp_sync_delete(hCtrlSrv->hNtpSync, hCurMsg);
 
 	pthread_mutex_destroy(&hCtrlSrv->encMutex);
 

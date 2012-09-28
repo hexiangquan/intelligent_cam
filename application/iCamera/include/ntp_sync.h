@@ -3,23 +3,25 @@
   Copyright (C), 2001-2011, DCN Co., Ltd.
 
  ******************************************************************************
-  File Name     : sd_ctrl.h
+  File Name     : ntp_time_sync.h
   Version       : Initial Draft
   Author        : Sun
-  Created       : 2012/5/7
+  Created       : 2012/9/28
   Last Modified :
-  Description   : sd_ctrl.c header file
+  Description   : ntp_time_sync.c header file
   Function List :
   History       :
-  1.Date        : 2012/5/7
+  1.Date        : 2012/9/28
     Author      : Sun
     Modification: Created file
 
 ******************************************************************************/
-#ifndef __SD_CTRL_H__
-#define __SD_CTRL_H__
+#ifndef __NTP_SYNC_H__
+#define __NTP_SYNC_H__
 
 #include "common.h"
+#include "cam_upload.h"
+#include "msg.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -48,15 +50,12 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
-#define SD_MNT_FMT		"/media/mmcblk%u"	//mount format for sd card
-#define SD_MAX_ID		1					//max number of sd id
 
 /*----------------------------------------------*
  * routines' implementations                    *
  *----------------------------------------------*/
 
-
-
+typedef struct _NtpSync *NtpSyncHandle;
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -65,77 +64,74 @@ extern "C"{
 #endif /* __cplusplus */
 
 /*****************************************************************************
- Prototype    : sd_get_root_path
- Description  : get sd root path name
- Input        : Int32 id    
-                void *buf   
-                Int32 size  
+ Prototype    : ntp_sync_create
+ Description  : create ntp sync module
+ Input        : CamNtpServerInfo *info  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/5/7
+  1.Date         : 2012/9/28
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 sd_get_root_path(Int32 id, void *buf, Int32 size);
+extern NtpSyncHandle ntp_sync_create(CamNtpServerInfo *info);
 
 /*****************************************************************************
- Prototype    : sd_get_dir_info
- Description  : get sd dir info
- Input        : const char *pathName  
-                Int8 *buf             
-                Int32 size            
+ Prototype    : ntp_sync_delete
+ Description  : delete ntp sync module
+ Input        : NtpSyncHandle hNtpSync  
+                MsgHandle hCurMsg       
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/5/7
+  1.Date         : 2012/9/28
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 sd_get_dir_info(const char *pathName, Int8 *buf, Int32 size);
+extern Int32 ntp_sync_delete(NtpSyncHandle hNtpSync, MsgHandle hCurMsg);
 
 /*****************************************************************************
- Prototype    : sd_del_dir
- Description  : delete a dir and all the files in it
- Input        : const char *pathName  
+ Prototype    : ntp_sync_run
+ Description  : start running ntp sync
+ Input        : NtpSyncHandle hNtpSync  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/5/7
+  1.Date         : 2012/9/28
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 sd_del_dir(const char *pathName);
+extern Int32 ntp_sync_run(NtpSyncHandle hNtpSync);
 
 /*****************************************************************************
- Prototype    : sd_format
- Description  : format sd card
- Input        : Int32 id  
+ Prototype    : ntp_sync_config
+ Description  : config this module
+ Input        : NtpSyncHandle hNtpSync        
+                const CamNtpServerInfo *info  
  Output       : None
  Return Value : 
  Calls        : 
  Called By    : 
  
   History        :
-  1.Date         : 2012/5/7
+  1.Date         : 2012/9/28
     Author       : Sun
     Modification : Created function
 
 *****************************************************************************/
-extern Int32 sd_format(Int32 id);
-
+extern Int32 ntp_sync_config(NtpSyncHandle hNtpSync, const CamNtpServerInfo *info, MsgHandle hCurMsg);
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -144,4 +140,4 @@ extern Int32 sd_format(Int32 id);
 #endif /* __cplusplus */
 
 
-#endif /* __SD_CTRL_H__ */
+#endif /* __NTP_TIME_SYNC_H__ */

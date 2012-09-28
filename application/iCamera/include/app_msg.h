@@ -60,6 +60,7 @@ typedef enum _AppCmd {
 	APPCMD_UPLOAD_CTRL,			//upload ctrl cmds
 	APPCMD_DAY_NIGHT_SWITCH,	//switch day/night mode
 	APPCMD_RESTORE_CFG,			//restore cfg to default value
+	APPCMD_NTP_SYNC,			//sync ntp time
 	APPCMD_MAX
 }AppCmd;
 

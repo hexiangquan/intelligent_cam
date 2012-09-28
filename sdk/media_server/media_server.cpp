@@ -37,6 +37,8 @@
 #include "log.h"
 #include <pthread.h>
 
+#define MEDIA_AUDIO_EN		1
+
 /* Objects used for multicast streaming: */
 typedef struct {
 	Groupsock* 		rtpGroupsockAudio;
@@ -165,12 +167,14 @@ static Int32 multicast_sub_session_delete(MediaSubSessionHandle media)
 	if(!multicast) {
 		return E_INVAL;
 	}
-	
+
+#ifdef MEDIA_AUDIO_EN
 	Medium::close(multicast->rtcpAudio);
 	Medium::close(multicast->sinkAudio);
 	Medium::close(multicast->sourceAudio);
 	delete multicast->rtpGroupsockAudio;
 	delete multicast->rtcpGroupsockAudio;
+#endif
 
 	Medium::close(multicast->rtcpVideo);
 	Medium::close(multicast->sinkVideo);
@@ -459,6 +463,7 @@ static Int32 media_srv_add_multicast_sub_session(MediaSessionHandle hSession, IC
 	// Start streaming:
 	multicast->sinkVideo->startPlaying(*multicast->sourceVideo, NULL, NULL);
 
+#ifdef MEDIA_AUDIO_EN
 	/* AUDIO Channel initial */
 
 	// there's a separate RTP stream for audio
@@ -491,6 +496,7 @@ static Int32 media_srv_add_multicast_sub_session(MediaSessionHandle hSession, IC
 
 	// Start streaming:
 	multicast->sinkAudio->startPlaying(*multicast->sourceAudio, NULL, NULL);
+#endif
 
 	return E_NO;
 	

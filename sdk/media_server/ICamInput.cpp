@@ -487,7 +487,7 @@ int AudioOpenFileSource::readFromFile() {
 
 	fPresentationTime.tv_usec -= timeinc;
 #endif
-	return 1;
+	return 0;
 }
 
 void AudioOpenFileSource::freeSource() {

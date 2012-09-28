@@ -151,10 +151,10 @@ Int32 sd_del_dir(const char *pathName)
 	}
 	close(fd);
 
-    snprintf(cmdLine, sizeof(cmdLine), "rm -rf %s\r\n", pathName);
+    snprintf(cmdLine, sizeof(cmdLine), "rm -rf %s \r\n", pathName);
     ret = system(cmdLine);
     if(0 == ret) {
-        DBG("dir <%s> deleted", pathName);
+        DBG("sd: <%s> deleted", pathName);
     } else {
         ERRSTR("del dir <%s> err", pathName);
 		ret = E_IO;
@@ -186,7 +186,7 @@ Int32 sd_format(Int32 id)
 		return E_INVAL;
 
 	/* generate dir path */
-	snprintf(cmdLine, sizeof(cmdLine), "rm -rf "SD_MNT_FMT"/*\r\n", id);
+	snprintf(cmdLine, sizeof(cmdLine), "rm -rf "SD_MNT_FMT"/* \r\n", id);
 
 	Int32 ret = system(cmdLine);
     if(0 == ret) {
