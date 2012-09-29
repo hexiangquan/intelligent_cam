@@ -74,7 +74,6 @@
 Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 {
 	Int32 		err;
-	Uint16 		yStep = 40;
 	Int8   		buf[128];
 	AlgBuf		inBuf;
 	OsdInArgs	inArgs;
@@ -91,6 +90,9 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 	inArgs.startX = 10;
 	inArgs.startY = 10;
 	inArgs.strOsd = buf;
+
+	/* determine height of one line */	
+	Uint16 	yStep = (osdInfo->size == CAM_OSD_SIZE_32x16) ? 20 : 36;
 	
 #ifdef DISP_CNT_NUM
 	sprintf(buf, "The %d th picture ", imgMsg->index);
@@ -149,7 +151,6 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 		inArgs.startY += yStep;
 	}
 
-#if 1
 	CaptureInfo	*capInfo = &imgMsg->capInfo;
 	Int32 		offset, i;
 
@@ -209,7 +210,6 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 			inArgs.startY += yStep;
 		}
 	}			
-#endif
 		
 	return err;
 }
