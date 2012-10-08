@@ -54,6 +54,9 @@
  *----------------------------------------------*/
 
 typedef struct _RawInfoBytes {
+	Uint8	blueGain[10];
+	Uint8	greenGain[10];
+	Uint8	redGain[10];
 	Uint8	globalGain[10];
 	Uint8	exposure[32];		
 	Uint8	avgLum[12];
@@ -124,9 +127,9 @@ Int32 cap_info_parse(const Uint8 *imgBuf, const ImgDimension *dim, RawCapInfo *i
 	info->strobeStat = (Uint8)bytes_convert(rawInfo->strobe, sizeof(rawInfo->strobe));
 	info->index = (Uint16)bytes_convert(rawInfo->frameCnt, sizeof(rawInfo->frameCnt));
 	info->capMode = (Uint8)bytes_convert(rawInfo->capMode, sizeof(rawInfo->capMode));
-	info->redGain = 0;
-	info->greenGain = 0;
-	info->blueGain = 0;
+	info->redGain = (Uint16)bytes_convert(rawInfo->redGain, sizeof(rawInfo->redGain));
+	info->greenGain = (Uint16)bytes_convert(rawInfo->greenGain, sizeof(rawInfo->greenGain));
+	info->blueGain = (Uint16)bytes_convert(rawInfo->blueGain, sizeof(rawInfo->blueGain));
 
 	return E_NO;
 }

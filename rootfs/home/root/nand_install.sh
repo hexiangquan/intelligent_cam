@@ -4,20 +4,53 @@
 # History:
 # 2012/08/18	Sun		Created
 
+# Show usage of this program
+Usage() 
+{
+	PROGRAM=`basename $0`
+	echo -e "$PROGRAM -- srcipts for install rootfs and applications" 
+	echo -e  "\tuse [all] for erase flash and install rootfs and apps"
+	echo -e  "\tuse [app] for only install applications"
+	echo -e "Usage: $PROGRAM [all/app] "
+	echo -e "Example: ./$PROGRAM restart\n"
+	exit 0
+}
+
+# Operate by arguments
+if [ "$1" != "all" ] && [ "$1" != "app" ]; then
+	Usage $0
+fi
+
 MNT="/mnt"
+ROOTFS="/boot/rootfs.tar.gz"
 
-# Mount flash
-echo -e "\nMount nand flash..."
-ubiattach -m 3
-mount -t ubifs ubi0:rootfs $MNT
-
+if [ "$1" == "all" ]; then
+	echo -e "Erase mtd block"
+	flash_eraseall /dev/mtd3
+	echo -e "Making UBI filesystem..."
+	ubiattach -m 3
+	ubimkvol /dev/ubi0 -s 50MiB -N rootfs
+	mount -t ubifs ubi0:rootfs $MNT
+	if [ -e "$ROOTFS" ]; then
+		echo -e "Extracting rootfs to $MNT..."
+		tar zxf $ROOTFS -C $MNT
+	else
+		echo -e "Can't find rootfs file: [$ROOTFS], abort!"
+		exit 1
+	fi
+else 
+	# Mount flash
+	echo -e "\nMount nand flash..."
+	ubiattach -m 3
+	mount -t ubifs ubi0:rootfs $MNT
+fi
+           
 # Copy application
 echo -e "\nInstall applications..."
 INSTALL_DIR="/home/root"
 APP_LIST="iCamera camCtrlSrv camBroadcast"
 MISC_LIST="run_app.sh fpga.rbf"
 LIST_ALL="$APP_LIST $MISC_LIST"
-MNT="/mnt"
 
 for APP in $LIST_ALL; do
 	if [ -e "$INSTALL_DIR/$APP" ] ; then
@@ -42,7 +75,7 @@ fi
 for APP in $APP_LIST; do
 	if [ ! -e "$BACKUP_DIR/$APP" ]; then
 		echo -e "Copy [$APP] to $BACKUP_DIR"
-		cp -p "$APP" "$BACKUP_DIR"
+		cp -p "$INSTALL_DIR/$APP" "$BACKUP_DIR"
 	fi
 done
 

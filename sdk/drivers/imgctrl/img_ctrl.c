@@ -370,7 +370,7 @@ static int awb_hw_setup(struct img_ctrl_dev *dev, struct hdcam_awb_cfg *cfg)
 	/* stop AWB first */
 	data = fpga_read(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL);
 	data &= ~BIT(2);
-	fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
+	//fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
 
 	if(cfg->flags) {
 		/* set init value */
@@ -386,18 +386,20 @@ static int awb_hw_setup(struct img_ctrl_dev *dev, struct hdcam_awb_cfg *cfg)
 			cfg->maxRedGain);
 		fpga_write(dev->fpga_base, FPGA_REG_AWB_MAX_BLUE_GAIN, 
 			cfg->maxBlueGain);
+		fpga_write(dev->fpga_base, FPGA_REG_AWB_BASE_GREEN_GAIN, 
+			cfg->minGreenGain);
 
 		/* set adjust rotio */
-		fpga_write(dev->fpga_base, FPGA_REG_AWB_RED_MODIFY_RATIO, 
-			cfg->redModifyRatio);
-		fpga_write(dev->fpga_base, FPGA_REG_AWB_BLUE_MODIFY_RATIO, 
-			cfg->blueModifyRatio);
+		fpga_write(dev->fpga_base, FPGA_REG_AWB_MODIFY_RATIO, 
+			(cfg->redModifyRatio & 0xFF) | ((cfg->blueModifyRatio & 0xFF) << 8));
 
 		/* set enable flags */
 		if(cfg->flags & HDCAM_AWB_FLAG_EN)
 			data |= BIT(2);
-		fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
 	}
+
+	/* Set enable flag */
+	fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
 
 	/* release lock */
 	spin_unlock(&imgctrl_lock);
