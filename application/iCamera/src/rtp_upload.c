@@ -706,7 +706,7 @@ static Int32 rtp_upload_set_params(void *handle, const void *params)
 		pthread_mutex_lock(&rtpTrans->mutex);
 		
 		if(rtpTrans->cacheBuf) {
-			DBG("rtp upload, free cache buf");
+			//DBG("rtp upload, free cache buf");
 			free(rtpTrans->cacheBuf);
 			rtpTrans->cacheBuf = NULL;
 			rtpTrans->bufSize = 0;
@@ -730,7 +730,7 @@ static Int32 rtp_upload_set_params(void *handle, const void *params)
 
 	rtpTrans->savePath = rtpParams->savePath;
 	rtpTrans->flags = rtpParams->flags;
-	DBG("\nrtp trans flags: 0x%X\n", rtpTrans->flags);
+	//DBG("\nrtp trans flags: 0x%X\n", rtpTrans->flags);
 	
 	return E_NO;
 }

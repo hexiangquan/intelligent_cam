@@ -16,6 +16,7 @@
 #define FTP_USER_NAME	"test"
 #define FTP_PASS_WORD	"123456"
 
+#define DEF_DETECTOR	2
 
 const AppParams c_appParamsDef = {
 	.crc = 0,
@@ -154,15 +155,23 @@ const AppParams c_appParamsDef = {
 		.threshold = 0,
 	},
 	.detectorParams = {
+	#if 0
 		.detecotorId = DETECTOR_TORY_EP,
 		.redLightCapFlag = 
 			DETECTOR_FLAG_LOOP1_POS_CAP | DETECTOR_FLAG_LOOP1_NEG_CAP | DETECTOR_FLAG_LOOP2_NEG_CAP,
 		.greenLightCapFlag = DETECTOR_FLAG_LOOP1_NEG_CAP,
 		.retrogradeCapFlag = 
 			DETECTOR_FLAG_LOOP1_POS_CAP | DETECTOR_FLAG_LOOP2_POS_CAP | DETECTOR_FLAG_LOOP2_NEG_CAP,
+	#else 
+		.detecotorId = DETECTOR_TORY_EP_V2,
+		.redLightCapFlag = 
+			DETECTOR_FLAG_LOOP1_POS_CAP | DETECTOR_FLAG_LOOP1_NEG_CAP | DETECTOR_FLAG_LOOP2_NEG_CAP | DETECTOR_FLAG_LOOP2_POS_CAP,
+		.greenLightCapFlag = DETECTOR_FLAG_LOOP1_NEG_CAP,
+		.retrogradeCapFlag = DETECTOR_FLAG_LOOP1_POS_CAP | DETECTOR_FLAG_LOOP2_POS_CAP | DETECTOR_FLAG_LOOP2_NEG_CAP,
+	#endif
 		.loopDist = { 300, 300, 300, 300, },
 		.limitSpeed = 80,
-		.calcSpeed= 88,
+		.calcSpeed = 88,
 	},
 	.aeParams = {
 		.flags = CAM_AE_FLAG_AE_EN | CAM_AE_FLAG_AG_EN,

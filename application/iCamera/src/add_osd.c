@@ -131,7 +131,7 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 
 	/* Add lum info */
 	if(osdInfo->flags & CAM_OSD_FLAG_LUM_INFO_EN) {
-		sprintf( buf, "Exposure time: %u us, Global Gain: %u, Avg Lum: %u", 
+		sprintf( buf, "曝光时间: %u us, 全局增益: %u, 平均亮度: %u", 
 			 imgMsg->rawInfo.exposure, imgMsg->rawInfo.globalGain,
 			 imgMsg->rawInfo.avgLum);
 		err = osd_process(hOsd, &inBuf, &inArgs, NULL, NULL);
@@ -142,7 +142,7 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 
 	/* Add RGB gains */
 	if(osdInfo->flags & CAM_OSD_FLAG_RGB_GAIN_EN) {
-		sprintf( buf, "RGB Gains: %u, %u, %u", 
+		sprintf( buf, "RGB增益: %u, %u, %u", 
 			 imgMsg->rawInfo.redGain, imgMsg->rawInfo.greenGain, 
 			 imgMsg->rawInfo.blueGain);
 		err = osd_process(hOsd, &inBuf, &inArgs, NULL, NULL);
@@ -164,31 +164,31 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 
 		/* print way num */
 		if(osdInfo->flags & CAM_OSD_FLAG_WAY_NUM_EN)
-			offset += sprintf( buf + offset, "Way Num: %u. ", 
+			offset += sprintf( buf + offset, "车道号: %u; ", 
 						   capInfo->triggerInfo[i].wayNum );
 		/* print group id */
 		if(osdInfo->flags & CAM_OSD_FLAG_GROUP_ID_EN)
-			offset += sprintf( buf + offset, "Group Id: %u. ", 
+			offset += sprintf( buf + offset, "组号: %u; ", 
 							   capInfo->triggerInfo[i].groupId );
 		/* print frame num  */
 		if(osdInfo->flags & CAM_OSD_FLAG_FRAME_NUM_EN)
-			offset += sprintf( buf + offset, "Frame Num: %u. ", 
+			offset += sprintf( buf + offset, "帧号: %u; ", 
 							   capInfo->triggerInfo[i].frameId);
 		/* print retrograde info  */			
 		if( osdInfo->flags & CAM_OSD_FLAG_RETROGRADE_EN &&
 			(capInfo->triggerInfo[i].flags & TRIG_INFO_RETROGRADE) ) {
-			offset += sprintf( buf + offset, "Way %u Retrograde. ", 
+			offset += sprintf( buf + offset, "逆行; ", 
 							   capInfo->triggerInfo[i].wayNum ); 
 		} else if((capInfo->triggerInfo[i].flags & TRIG_INFO_RED_LIGHT) && 
 				  (osdInfo->flags & CAM_OSD_FLAG_RED_LIGHT_TIME_EN)) {
 			/* print red light time */
-			offset += sprintf( buf + offset, "Red light time: %u s. ", 
+			offset += sprintf( buf + offset, "闯红灯, 红灯时间: %us; ", 
 							   capInfo->triggerInfo[i].redlightTime/100);
 		} else if(!(capInfo->triggerInfo[i].flags & TRIG_INFO_RED_LIGHT) && 
 				  !(capInfo->triggerInfo[i].flags & CAM_OSD_FLAG_RETROGRADE_EN)) {
 			/* print speed */
 			if(osdInfo->flags & CAM_OSD_FLAG_SPEED_EN) {
-				offset += sprintf(buf + offset, "Speed: %uKM/H. ", 
+				offset += sprintf(buf + offset, "卡口, 速度: %uKM/H; ", 
 								  capInfo->triggerInfo[i].speed);
 			}
 			if( (capInfo->triggerInfo[i].flags & TRIG_INFO_OVERSPEED) && 
@@ -197,7 +197,7 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 				/* print over speed info */
 				Uint32 overSpeedRatio = capInfo->triggerInfo[i].speed - capInfo->limitSpeed;
 				overSpeedRatio = overSpeedRatio * 100 / capInfo->limitSpeed;
-				offset += sprintf(buf + offset, "Limit speed: %uKM/H Overspeed ratio: %u ", 
+				offset += sprintf(buf + offset, "限速: %uKM/H, 超速比率: %u%%", 
 								  capInfo->limitSpeed, overSpeedRatio);
 			}
 		}

@@ -287,12 +287,15 @@ Int32 detector_run(DetectorHandle hDetector, CaptureInfo *capInfo)
 	if(hDetector->fxns && hDetector->fxns->detect)
 		ret = hDetector->fxns->detect(hDetector, capInfo);
 
-	if(!ret && (capInfo->flags & CAPINFO_FLAG_DELAY_CAP)) {
+	if(!ret) {
 		/* need delay for capture next frame */
-		usleep(hDetector->params.capDelayTime * 1000);
+		if(capInfo->flags & CAPINFO_FLAG_DELAY_CAP)
+			usleep(hDetector->params.capDelayTime * 1000);
+		/* set limit speed */
+		capInfo->limitSpeed = hDetector->params.limitSpeed;
 	}
 
-	return E_UNSUPT;
+	return ret;
 }
 
 /*****************************************************************************

@@ -289,8 +289,8 @@ static Int32 cp_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uin
 	dev->groupId[wayNum - 1]++;
 	info->groupId = dev->groupId[wayNum - 1];
 
-	/* Calc speed */
-	info->speed = detector_calc_speed(params, wayNum, (rxBuf[5]<<8)|(rxBuf[6])*10);
+	/* Calc speed, unit: ms */
+	info->speed = detector_calc_speed(params, wayNum, ((rxBuf[5]<<8) | rxBuf[6]));
 	if(info->speed > params->limitSpeed)
 		info->flags |= TRIG_INFO_OVERSPEED;
 

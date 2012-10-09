@@ -2381,6 +2381,9 @@ static Int32 set_detector_params(ParamsMngHandle hParamsMng, void *data, Int32 s
 		ERR("invalid detector id");
 		return E_INVAL;
 	}
+
+	DBG("set detector cap flags, red: 0x%X, green: 0x%X, reverse: 0x%X", params->redLightCapFlag, 
+		params->greenLightCapFlag, params->redLightCapFlag);
 	
 	/* Copy data */
 	appCfg->detectorParams = *params;
@@ -2414,6 +2417,10 @@ static Int32 get_detector_params(ParamsMngHandle hParamsMng, void *data, Int32 s
 	
 	/* Copy data */
 	*(CamDetectorParam *)data = appCfg->detectorParams;
+
+	CamDetectorParam *params = (CamDetectorParam *)data;
+	DBG("get detector cap flags, red: 0x%X, green: 0x%X, reverse: 0x%X", params->redLightCapFlag, 
+		params->greenLightCapFlag, params->redLightCapFlag);
 
 	return E_NO;
 }

@@ -35,12 +35,11 @@ enum VehicleDetectorId
 
 /* Trigger Position bits define */
 #define DETECTOR_FLAG_LOOP1_POS_CAP		(1 << 0)	//Capture @ positive edge of loop1
-#define DETECTOR_FLAG_LOOP2_POS_CAP		(1 << 1)	//Capture @ positive edge of loop2
-#define DETECTOR_FLAG_LOOP1_NEG_CAP		(1 << 2)	//Capture @ negative edge of loop1
+#define DETECTOR_FLAG_LOOP1_NEG_CAP		(1 << 1)	//Capture @ negative edge of loop1
+#define DETECTOR_FLAG_LOOP2_POS_CAP		(1 << 2)	//Capture @ positive edge of loop2
 #define DETECTOR_FLAG_LOOP2_NEG_CAP		(1 << 3)	//Capture @ negative edge of loop2
-#define DETECTOR_FLAG_OVERSPEED_CAP		(1 << 4)	//capture only when overspeed
-#define DETECTOR_FLAG_DELAY_CAP			(1 << 5)	//delay capture
-
+#define DETECTOR_FLAG_DELAY_CAP			(1 << 4)	//delay capture
+#define DETECTOR_FLAG_OVERSPEED_CAP		(1 << 5)	//capture only when overspeed
 
 
 /* Frame Num */
