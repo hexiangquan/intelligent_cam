@@ -163,7 +163,7 @@ static int ab_cfg_validate(struct img_ctrl_dev *dev, struct hdcam_ab_cfg *cfg)
 
 	/* validate roi */
 	for(i = 0; i < HDCAM_AB_MAX_ROI; i++) {
-		result = 0;//region_validate(dev, &cfg->roi[i]);
+		result = region_validate(dev, &cfg->roi[i]);
 		if(result)
 			break;
 	}
@@ -182,6 +182,8 @@ static int ab_cfg_validate(struct img_ctrl_dev *dev, struct hdcam_ab_cfg *cfg)
 static int ab_hw_setup(struct img_ctrl_dev *dev, struct hdcam_ab_cfg *cfg)
 {	
 	u16 data;
+	u16 exposure[2];
+	u16	gain;
 	
 	/* get lock first */
 	spin_lock(&imgctrl_lock);
@@ -266,10 +268,23 @@ static int ab_hw_setup(struct img_ctrl_dev *dev, struct hdcam_ab_cfg *cfg)
 			data |= BIT(1);
 		if(cfg->flags & HDCAM_AB_FLAG_AA_EN)
 			data |= BIT(3);
-	}
 
-	/* set ctrl flags */
-	fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
+		/* set ctrl flags */
+		fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
+	}else {
+		/* keep the exposure and gain value so we use lastest adjusted value after disable AE */
+		exposure[0] = fpga_read(dev->fpga_base, FPGA_REG_EXPOSURE_TIME0);
+		exposure[1] = fpga_read(dev->fpga_base, FPGA_REG_EXPOSURE_TIME1);
+		gain = fpga_read(dev->fpga_base, FPGA_REG_AFE_GAIN);
+		
+		/* set ctrl flags -- disable AE & AG */
+		fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
+
+		/* set back latest value */
+		fpga_write(dev->fpga_base, FPGA_REG_EXPOSURE_TIME0, exposure[0]);
+		fpga_write(dev->fpga_base, FPGA_REG_EXPOSURE_TIME1, exposure[1]);
+		fpga_write(dev->fpga_base, FPGA_REG_AFE_GAIN, gain);
+	}	
 
 	/* release lock */
 	spin_unlock(&imgctrl_lock);
