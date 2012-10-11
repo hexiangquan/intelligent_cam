@@ -20,7 +20,9 @@ typedef struct {
 	Uint8	limitSpeed;				//nominal limited speed, Uint: km/h
 	Uint8	calcSpeed;				//actual speed limitation that triggers a capture, Uint: km/h
 	Uint8	speedModifyRatio[APP_MAX_CAP_CNT]; //Ratio for speed modification
-	Int8	reserved[8];			//Reserved for future use
+	Uint16	radarId;				//Type of radar for speed detection
+	Uint16	radarTimeout;			//Timeout for radar detection, Uint: ms 
+	Int8	reserved[4];			//Reserved for future use
 } CamDetectorParam;
 
 enum VehicleDetectorId
@@ -31,6 +33,11 @@ enum VehicleDetectorId
 	DETECTOR_TORY_EP_V2,		//Tory new epolice detector
 	DETECTOR_VIDEO_TRIG,		//Video trigger detector
 	DETECTOR_MAX
+};
+
+enum RadarId {
+	RADAR_NONE = 0,				//No radar
+	RADAR_CSR,					//Chuan Su Radar
 };
 
 /* Trigger Position bits define */

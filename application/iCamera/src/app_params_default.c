@@ -172,6 +172,7 @@ const AppParams c_appParamsDef = {
 		.loopDist = { 300, 300, 300, 300, },
 		.limitSpeed = 80,
 		.calcSpeed = 88,
+		.radarId = RADAR_NONE,
 	},
 	.aeParams = {
 		.flags = CAM_AE_FLAG_AE_EN | CAM_AE_FLAG_AG_EN,

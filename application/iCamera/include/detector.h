@@ -20,6 +20,7 @@
 #define __DETECTOR_H__
 
 #include "cam_detector.h"
+#include "radar.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -89,15 +90,6 @@ typedef struct {
 	Int32 (*control)(IN DetectorHandle hDetector, IN DetectorCmd cmd, IN void *arg, IN Int32 len);
 }DetectorFxns;
 
-/* object of this module */
-struct DetectorObj {
-	Int32				fd;			//fd for driver
-	const DetectorFxns	*fxns;
-	CamDetectorParam	params;
-	void				*private;
-	Int32				status;
-};
-
 /* macros for getting data from handle */
 #define DETECTOR_GET_PARAMS(hDetector)	\
 	(const CamDetectorParam *)(&hDetector->params)
@@ -110,6 +102,15 @@ struct DetectorObj {
 #define DETECTOR_SET_FD(hDetector, fd) \
 	((hDetector->fd) = (fd))
 
+/* object of this module */
+struct DetectorObj {
+	Int32				fd;			//fd for driver
+	const DetectorFxns	*fxns;
+	CamDetectorParam	params;
+	void				*private;
+	Int32				status;
+	RadarHandle			hRadar;
+};
 
 #ifdef __cplusplus
 #if __cplusplus

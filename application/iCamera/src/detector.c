@@ -188,6 +188,30 @@ static Int32 detector_set_params(DetectorHandle hDetector, const CamDetectorPara
 			hDetector->params = *params;
 	}
 
+	if(params->radarId != RADAR_NONE) {
+		RadarParams radarCfg;
+
+		radarCfg.timeout = params->radarTimeout;
+		radarCfg.type = params->radarId;
+		if(!hDetector->hRadar) {
+			/* create radar handle */
+			hDetector->hRadar = radar_create(&radarCfg);
+			if(!hDetector->hRadar) {
+				ERR("create radar handle failed!");
+				ret = E_INVAL;
+			}
+		} else {
+			/* already created, set params */
+			ret = radar_set_params(hDetector->hRadar, &radarCfg);
+		}
+	} else {
+		/* don't use radar */
+		if(hDetector->hRadar) {
+			ret = radar_delete(hDetector->hRadar);
+			hDetector->hRadar = NULL;
+		}
+	}
+
 	return ret;
 }
 
@@ -256,8 +280,49 @@ Int32 detector_delete(DetectorHandle hDetector)
 
 	/* try close and ignore error */
 	detector_close(hDetector);
+
+	if(hDetector->hRadar)
+		radar_delete(hDetector->hRadar);
 	
 	free(hDetector);
+	
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : detector_radar_speed_detect
+ Description  : detect speed using radar
+ Input        : DetectorHandle hDetector  
+                CaptureInfo *capInfo      
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/10/11
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 detector_radar_speed_detect(DetectorHandle hDetector, CaptureInfo *capInfo)
+{
+	/* calc index for speed modify ratio */
+	Int32  index = capInfo->triggerInfo[0].wayNum - 1;
+	CamDetectorParam *params = &hDetector->params;
+	
+	Uint32 speed;		
+	Int32  ret = radar_detect_speed(hDetector->hRadar, &speed, params->speedModifyRatio[index]);
+
+	if(!ret) {
+		capInfo->triggerInfo[0].speed = (Uint8)speed;
+		if(speed > params->calcSpeed) {
+			capInfo->triggerInfo[0].flags |= TRIG_INFO_OVERSPEED;
+		} else {
+			if(params->greenLightCapFlag & DETECTOR_FLAG_OVERSPEED_CAP)
+				return E_AGAIN; /* capture only when over speed */
+		}
+	}
 	
 	return E_NO;
 }
@@ -284,6 +349,7 @@ Int32 detector_run(DetectorHandle hDetector, CaptureInfo *capInfo)
 		return E_INVAL;
 
 	Int32 ret = E_UNSUPT;
+	
 	if(hDetector->fxns && hDetector->fxns->detect)
 		ret = hDetector->fxns->detect(hDetector, capInfo);
 
@@ -293,6 +359,8 @@ Int32 detector_run(DetectorHandle hDetector, CaptureInfo *capInfo)
 			usleep(hDetector->params.capDelayTime * 1000);
 		/* set limit speed */
 		capInfo->limitSpeed = hDetector->params.limitSpeed;
+		if(hDetector->hRadar)
+			ret = detector_radar_speed_detect(hDetector, capInfo);
 	}
 
 	return ret;
@@ -388,6 +456,8 @@ Int32 detector_calc_speed(const CamDetectorParam *params, Int32 wayNum, Uint32 t
 extern Int32 tory_cp_test();
 extern Int32 tory_ep_test();
 extern Int32 tory_ep2_test();
+/* test for radar */
+extern Int32 radar_test();
 
 
 /*****************************************************************************
@@ -464,6 +534,9 @@ Int32 detector_test()
 	assert(err == E_NO);
 
 	err = detector_delete(hDetector);
+	assert(err == E_NO);
+
+	err = radar_test();
 	assert(err == E_NO);
 
 	DBG("%s done", __func__);

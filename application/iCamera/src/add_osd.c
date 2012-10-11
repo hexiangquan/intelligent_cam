@@ -133,7 +133,7 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 	if(osdInfo->flags & CAM_OSD_FLAG_LUM_INFO_EN) {
 		sprintf( buf, "曝光时间: %u us, 全局增益: %u, 平均亮度: %u", 
 			 imgMsg->rawInfo.exposure, imgMsg->rawInfo.globalGain,
-			 imgMsg->rawInfo.avgLum);
+			 imgMsg->rawInfo.avgLum >> 4); /* convert 12 bits avg lum to 8 bits */
 		err = osd_process(hOsd, &inBuf, &inArgs, NULL, NULL);
 		if(err)
 			return err;
@@ -177,8 +177,7 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 		/* print retrograde info  */			
 		if( osdInfo->flags & CAM_OSD_FLAG_RETROGRADE_EN &&
 			(capInfo->triggerInfo[i].flags & TRIG_INFO_RETROGRADE) ) {
-			offset += sprintf( buf + offset, "逆行; ", 
-							   capInfo->triggerInfo[i].wayNum ); 
+			offset += sprintf( buf + offset, "逆行; "); 
 		} else if((capInfo->triggerInfo[i].flags & TRIG_INFO_RED_LIGHT) && 
 				  (osdInfo->flags & CAM_OSD_FLAG_RED_LIGHT_TIME_EN)) {
 			/* print red light time */

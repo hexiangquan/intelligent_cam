@@ -2147,7 +2147,7 @@ static Int32 set_light_regions(ParamsMngHandle hParamsMng, void *data, Int32 siz
 	for(i = 0; i < 3; i++) {
 		CamRect *rect = &params->region[i];
 		if(validate_region(hParamsMng, rect))
-			return E_INVAL;
+			break;
 	}
 	
 	/* Copy data */
@@ -2493,6 +2493,51 @@ static Int32 get_upload_cfg(ParamsMngHandle hParamsMng, void *data, Int32 size)
 }
 
 /*****************************************************************************
+ Prototype    : set_ae_hw
+ Description  : set ae cfg to hardware
+ Input        : int fdImgCtrl             
+                const CamAEParam *params  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/10/11
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 set_ae_hw(int fdImgCtrl, const CamAEParam *params)
+{
+	/* sync with hardware */
+	struct hdcam_ab_cfg cfg;
+
+	cfg.flags = params->flags;
+	cfg.targetValue = params->targetValue;
+	cfg.minShutterTime = params->minShutterTime;
+	cfg.maxShutterTime = params->maxShutterTime;
+	cfg.minGainValue = params->minGainValue;
+	cfg.maxGainValue = params->maxGainValue;
+	cfg.minAperture = params->minAperture;
+	cfg.maxAperture = params->maxAperture;
+
+	Int32 i;
+	for(i = 0; i < HDCAM_AB_MAX_ROI; i++) {
+		memcpy(&cfg.roi[i], &params->roi[i], sizeof(cfg.roi[i]));
+	}
+	
+	if(ioctl(fdImgCtrl, IMGCTRL_S_ABCFG, &cfg) < 0) {
+		return E_IO;
+	}
+
+	DBG("set AE params done, flags: 0x%X, target: %d",
+		cfg.flags, cfg.targetValue);
+
+	return E_NO;
+}
+
+/*****************************************************************************
  Prototype    : set_ae_params
  Description  : set auto exposure params
  Input        : ParamsMngHandle hParamsMng  
@@ -2536,29 +2581,9 @@ static Int32 set_ae_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 	/* Copy data */
 	appCfg->aeParams = *params;
 
-	
+	/* Sync with hardware */
 	if(hParamsMng->fdImgCtrl > 0) {
-		/* sync with hardware */
-		struct hdcam_ab_cfg cfg;
-
-		cfg.flags = params->flags;
-		cfg.targetValue = params->targetValue;
-		cfg.minShutterTime = params->minShutterTime;
-		cfg.maxShutterTime = params->maxShutterTime;
-		cfg.minGainValue = params->minGainValue;
-		cfg.maxGainValue = params->maxGainValue;
-		cfg.minAperture = params->minAperture;
-		cfg.maxAperture = params->maxAperture;
-		for(i = 0; i < HDCAM_AB_MAX_ROI; i++) {
-			memcpy(&cfg.roi[i], &params->roi[i], sizeof(cfg.roi[i]));
-		}
-		
-		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_ABCFG, &cfg) < 0) {
-			return E_IO;
-		}
-
-		DBG("set AE params done, flags: 0x%X, target: %d",
-			cfg.flags, cfg.targetValue);
+		set_ae_hw(hParamsMng->fdImgCtrl, params);
 	}
 
 	return E_NO;
@@ -3358,7 +3383,8 @@ static Int32 params_mng_init_sys(ParamsMngHandle hParamsMng)
 	err |= set_img_adj_params(hParamsMng, &appCfg->imgAdjParams, sizeof(appCfg->imgAdjParams));
 	err |= set_io_cfg(hParamsMng, &appCfg->ioCfg, sizeof(appCfg->ioCfg));
 	err |= set_strobe_params(hParamsMng, &appCfg->strobeParams, sizeof(appCfg->strobeParams));
-	err |= set_ae_params(hParamsMng, &appCfg->aeParams, sizeof(appCfg->aeParams));
+	/* Direct set hardware because we don't know input info */
+	err |= set_ae_hw(hParamsMng->fdImgCtrl, &appCfg->aeParams);
 	err |= set_awb_params(hParamsMng, &appCfg->awbParams, sizeof(appCfg->awbParams));
 	err |= set_spec_cap_params(hParamsMng, &appCfg->specCapParams, sizeof(appCfg->specCapParams));
 

@@ -73,7 +73,7 @@ Int32 uart_set_attrs(int fd, UartBaudrate baudrate, UartDataBits dataBits, UartS
 		attrs.c_cflag |= CSTOPB;	// 2 stop bits
 
 	/* set to raw mode, disable echo, signals */
-	attrs.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+	attrs.c_lflag &= ~(ICANON | ECHO | ECHOE | IEXTEN | ISIG);
 
 	/* set no output process, raw mode */
 	attrs.c_oflag &= ~OPOST;

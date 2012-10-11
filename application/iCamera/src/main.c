@@ -294,8 +294,10 @@ static void back_button_detect(int fdExtIo, MsgHandle hMsg)
 		return;
 	}
 
-	if(isPushed)
+	if(isPushed) {
+		INFO("restore button is pushed, restore default cfg params...");
 		app_hdr_msg_send(hMsg, MSG_CTRL, APPCMD_RESTORE_CFG, 0, 0);
+	}
 }
 
 /*****************************************************************************
