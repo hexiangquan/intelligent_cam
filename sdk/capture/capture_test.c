@@ -178,8 +178,8 @@ static Bool main_loop(TestParams *params)
 	cfg.roi[0].endX = 1024;
 	cfg.roi[0].endY = 1000;
 	
-	err = ioctl(fdImg, IMGCTRL_S_ABCFG, &cfg);
-	assert(err == 0);
+	//err = ioctl(fdImg, IMGCTRL_S_ABCFG, &cfg);
+	//assert(err == 0);
 
 	struct hdcam_spec_cap_cfg specTrig;
 	specTrig.exposureTime = 4000;

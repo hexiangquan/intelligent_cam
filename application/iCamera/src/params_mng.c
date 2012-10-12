@@ -35,6 +35,7 @@
 #include "ext_io.h"
 #include "img_ctrl.h"
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include "net_utils.h"
 #include "display.h"
 
@@ -143,34 +144,41 @@ ParamsMngHandle params_mng_create(const char *cfgFile)
 	Bool useDefault = TRUE;
 	
 	hParamsMng->cfgFile = cfgFile;
-	
-	/* read file */
-	FILE *fp = fopen(cfgFile, "rb");
-	if(!fp) {
-		ERRSTR("open %s failed:", cfgFile);
-	} else {		
-		Int32 len = fread(&hParamsMng->appParams, sizeof(AppParams), 1, fp);
-		if(len < 0) {
-			ERR("Read %d, needed: %d", len, sizeof(AppParams));
-		} else {
-			/* validate data */
-			if(hParamsMng->appParams.magicNum != APP_PARAMS_MAGIC) {
-				ERR("invalid magic num");
-			} else {
-				/* do crc */
-				Uint8 *buf = (Uint8 *)(&hParamsMng->appParams) + sizeof(Uint32) * 3;
-				Uint32 checkSum = crc16(buf, hParamsMng->appParams.dataLen);
-				if(checkSum != hParamsMng->appParams.crc) {
-					ERR("do check sum failed...");
-				} else {
-					/* everything is good, use this param */
-					useDefault = FALSE;
-					DBG("\rreading cfg file success...\n");
-				}
-			}	
-		}
 
-		fclose(fp);
+	struct stat fstat;	
+	Int32 ret = stat(cfgFile, &fstat);
+
+	if(ret < 0 || !S_ISREG(fstat.st_mode) || fstat.st_size != sizeof(AppParams)) {
+		INFO("\ninvalid status of cfg file: %s", cfgFile);
+	} else {
+		/* read file */
+		FILE *fp = fopen(cfgFile, "rb");
+		if(!fp) {
+			ERRSTR("open %s failed:", cfgFile);
+		} else {
+			Int32 len = fread(&hParamsMng->appParams, sizeof(AppParams), 1, fp);
+			if(len < 0) {
+				ERR("Read %d, needed: %d", len, sizeof(AppParams));
+			} else {
+				/* validate data */
+				if(hParamsMng->appParams.magicNum != APP_PARAMS_MAGIC) {
+					ERR("invalid magic num");
+				} else {
+					/* do crc */
+					Uint8 *buf = (Uint8 *)(&hParamsMng->appParams) + sizeof(Uint32) * 3;
+					Uint32 checkSum = crc16(buf, hParamsMng->appParams.dataLen);
+					if(checkSum != hParamsMng->appParams.crc) {
+						ERR("do check sum failed...");
+					} else {
+						/* everything is good, use this param */
+						useDefault = FALSE;
+						DBG("\rreading cfg file success...\n");
+					}
+				}	
+			}
+
+			fclose(fp);
+		}
 	}
 
 	if(useDefault) {
@@ -201,9 +209,6 @@ ParamsMngHandle params_mng_create(const char *cfgFile)
 	return hParamsMng;
 
 exit:
-
-	if(fp)
-		fclose(fp);
 
 	if(hParamsMng)
 		free(hParamsMng);
@@ -399,6 +404,8 @@ static Int32 set_osd_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 		ERR("invalid img osd params");
 		return E_INVAL;
 	}
+	
+	DBG("set osd info, position: %d, size: %d", osdInfo->postion, osdInfo->size);
 
 	Int32 offset = sizeof(osdInfo->osdString);
 	osdInfo->osdString[offset - 1] = 0; 

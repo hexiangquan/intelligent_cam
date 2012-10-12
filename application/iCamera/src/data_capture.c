@@ -366,7 +366,7 @@ static Int32 data_cap_ctrl(DataCapHandle hDataCap, CamCapCtrl ctrl)
 			ERRSTR("trig failed");
 			ret = E_IO;
 		} else {
-			//DBG("trig %d success", ctrl);
+			DBG("manual trig %d success", ctrl);
 		}
 	}
 
@@ -434,6 +434,9 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 	DBG("  strobe: 0x%X, exposure: %u, global gain: %u", 
 		imgMsg.rawInfo.strobeStat, imgMsg.rawInfo.exposure, imgMsg.rawInfo.globalGain);
 	*/
+
+	if(imgMsg.rawInfo.capMode != RCI_CAP_TYPE_CONT)
+		DBG("got trig frame: %d...", imgMsg.rawInfo.index);
 
 	/* do day/night check */
 	day_night_check_by_lum(hDataCap->hDayNight, imgMsg.rawInfo.avgLum, hDataCap->hMsg);

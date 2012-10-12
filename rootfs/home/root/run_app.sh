@@ -52,27 +52,34 @@ CheckAppStatus()
 	fi
 }
 
-# CheckUpdate -- Check update file and overwrite current version
-# @ Name -- Process Name
-# @ Update_Dir -- Dir that includes update file
-CheckUpdate()
-{
-	APP=$1
-	DIR=$2
-
-	# Check update dir exist and update app file exist
-	if [ -d "$DIR" ] && [ -f "$DIR/$APP" ]; then
-		mv "$DIR/$APP" .
-		chmod 777 $APP
-		echo "updating $APP done ..."
-	fi
-}
-
 # Application list and install dir define
 INSTALL_DIR="/home/root"
 UPDATE_DIR="update"
 BACKUP_DIR="backup"
 APP_LIST="iCamera camCtrlSrv camBroadcast"
+CFG_FILE="cam.cfg"
+
+# CheckUpdate -- Check update file and overwrite current version
+# @ Name -- Process Name
+# @ Update_Dir -- Dir that includes update file
+# @ Cfg file name -- cfg file that need to be deleted
+CheckUpdate()
+{
+	APP=$1
+	DIR=$2
+	CFG=$3
+
+	# Check update dir exist and update app file exist
+	if [ -d "$DIR" ] && [ -f "$DIR/$APP" ]; then
+		mv "$DIR/$APP" "$INSTALL_DIR"
+		chmod 777 "$INSTALL_DIR/$APP"
+		if [ -e "$INSTALL_DIR/$CFG" ]; then
+			echo -e "remove cfg file $CFG..."
+			rm -f "$INSTALL_DIR/$CFG"
+		fi
+		echo "updating $APP done ..."
+	fi
+}
 
 # StopApp -- Check app process and kill it
 # @ Name -- Process name
@@ -105,7 +112,7 @@ StartApp()
 {
 	for APP in $APP_LIST; do
 		echo -e "\n----- Run app $APP -----"
-		CheckUpdate "$APP" "$UPDATE_DIR";
+		CheckUpdate "$APP" "$UPDATE_DIR" "$CFG_FILE";
 		if [ -e "$APP" ]; then
 			./$APP &
 			sleep 1
