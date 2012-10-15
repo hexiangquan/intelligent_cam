@@ -23,6 +23,7 @@
 #define SWITCH_HEIGH	720
 #define DEF_BRIGHTNESS	0
 #define DEF_CONTRAST	16
+#define DEF_SHARPNESS	128
 #define DEF_IN_WIDTH	2560
 #define DEF_IN_HEIGHT	2048
 #define DEF_GAMMA		220
@@ -61,6 +62,7 @@ typedef struct _TestParams {
 	Uint8	outFmt;
 	Uint16	gamma;
 	Bool	rszBEn;
+	Uint8	sharpness;
 }TestParams;
 
 typedef struct {
@@ -359,8 +361,7 @@ static Bool fake_in_test(TestParams *params)
 	convDynParams.digiGain = params->gain;
 	convDynParams.brigtness = params->brightness;
 	convDynParams.contrast = params->contrast;
-	convDynParams.eeTable = NULL;
-	convDynParams.eeTabSize = 0;
+	convDynParams.sharpness = params->sharpness;
 	
 	
 	convDynParams.outAttrs[0].enbale = TRUE;
@@ -575,8 +576,7 @@ static Bool main_loop(TestParams *params)
 	convDynParams.digiGain = params->gain;
 	convDynParams.brigtness = params->brightness;
 	convDynParams.contrast = params->contrast;
-	convDynParams.eeTable = NULL;
-	convDynParams.eeTabSize = 0;
+	convDynParams.sharpness = params->sharpness;
 	convDynParams.gamma = params->gamma;
 	
 	
@@ -896,7 +896,7 @@ static void usage(void)
 	INFO(" -c contrast for luma adjust, default %d", DEF_CONTRAST);
 	INFO(" -y enable luma adjust");
 	INFO(" -N enable 2D noise filter");
-	INFO(" -e enable edge enhance");
+	INFO(" -e enable edge enhance, defualt: %d", DEF_SHARPNESS);
 	INFO(" -a enable average filter.");
 	INFO(" -m gamma plus 100, e.g for 2.2 gamma, set 220, default: %d", DEF_GAMMA);
 	INFO(" -i using fake input file instead of capture dev");
@@ -915,7 +915,7 @@ static void usage(void)
 int main(int argc, char **argv)
 {
 	int c;
-    char *options = "n:o:w:l:g:b:c:hyNeam:iW:L:F:f:r";
+    char *options = "n:o:w:l:g:b:c:hyNe:am:iW:L:F:f:r";
 	TestParams params;
 
 	bzero(&params, sizeof(params));
@@ -931,6 +931,7 @@ int main(int argc, char **argv)
 	params.inWidth = DEF_IN_WIDTH;
 	params.inHeight = DEF_IN_HEIGHT;
 	params.fakeInput = 0;
+	params.sharpness = DEF_SHARPNESS;
 
 	while ((c = getopt(argc, argv, options)) != -1) {
 		switch (c) {
@@ -980,6 +981,7 @@ int main(int argc, char **argv)
 			break;
 		case 'e':
 			params.flags |= CONV_FLAG_EE_EN;
+			params.sharpness = atoi(optarg);
 			break;
 		case 'a':
 			params.flags |= CONV_FLAG_AVG_EN;

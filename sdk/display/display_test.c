@@ -70,8 +70,6 @@ static AlgHandle img_conv_init(const CapInputInfo *info,  DisplayMode mode, ImgC
 	convDynParams.digiGain = 16;
 	convDynParams.brigtness = 50;
 	convDynParams.contrast = 128;
-	convDynParams.eeTable = NULL;
-	convDynParams.eeTabSize = 0;
 	convDynParams.gamma = 0;
 	
 	/* Chan A, out original size */

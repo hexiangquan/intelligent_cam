@@ -96,12 +96,11 @@ typedef struct _ImgConvDynParams {
 	ConvOutAttrs	outAttrs[CONV_MAX_OUT_CHAN_NUM]; /* out attributes */
 	Uint32			ctrlFlags;		/* ctrl flags, see CONV_FLAG_XXX */
 	Uint16			digiGain;		/* digital gain for format convert */	
+	Uint16			gamma;			/* 100 times of actual gamma value, e.g., set 220 for 2.2 gamma */
 	Uint8			brigtness;		/* luma params, can only be set when init */
 	Uint8			contrast;		/* luma params, can only be set when init */
-	Int16			*eeTable;		/* edge enhance table */
-	Int32			eeTabSize;		/* size of ee table, in bytes */
-	Uint16			gamma;			/* 100 times of actual gamma value, e.g., set 220 for 2.2 gamma */
-	Uint16			reserved;
+	Uint8			sharpness;		/* sharpness gain value */
+	Uint8			reserved[5];
 }ImgConvDynParams;
 
 /* Input args for process, not used */

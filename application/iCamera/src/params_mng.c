@@ -897,6 +897,7 @@ static Int32 get_img_conv_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 	params->brigtness = adjCfg->brightness;
 	params->contrast = adjCfg->contrast;
 	params->gamma = adjCfg->gamma;
+	params->sharpness = (Uint8)adjCfg->sharpness;
 	params->inputFmt = hParamsMng->capInputInfo.colorSpace;
 	params->inputWidth = hParamsMng->capInputInfo.width;
 	params->inputHeight = hParamsMng->capInputInfo.height;

@@ -528,12 +528,13 @@ static Int32 previewer_set_nf(struct prev_module_param *modParam, struct prev_nf
 	
 	if(enable) {
 		*nf = def_nf_params;
+		modParam->param = nf;
+		modParam->len = sizeof (struct prev_nf);
 	} else {
-		memset(nf, 0, sizeof(*nf));
+		modParam->param = NULL;
+		modParam->len = 0;
 	}
-
-	modParam->param = nf;
-	modParam->len = sizeof (struct prev_nf);
+	
 	return E_NO;
 }
 
@@ -628,58 +629,6 @@ static Int32 previewer_set_y_offset(int fd, struct prev_module_param *modParam, 
 	return E_NO;
 }
 
-#define YEE_TAB_MAX		24
-#define YEE_TAB_MIN		(-12)
-/*****************************************************************************
- Prototype    : previewer_init_yee_table
- Description  : init default YEE table 
- Input        : None
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/3/1
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static short *previewer_init_yee_table()
-{
-	short *yeeTab = malloc(YEE_LUT_MAX_SIZE * sizeof(short));
-
-	if(!yeeTab)
-		return NULL;
-
-	Int32 i, j = 0;
-	Int32 offset[] = {
-		21, 28, 39, 49, 60, 70, 81, 92, 102, 113, 124, 140, 384, 400,
-		411, 422, 432, 443, 454, 464, 475, 486, 497, 512, 513, 525,
-		532, 538, 544, 549, 555, 560, 565, 571, 576, 581, 587, 592,
-		597, 603, 608, 613, 619, 624, 630, 636, 643, 655, 891, 910,
-		916, 922, 927, 933, 938, 943, 949, 954, 959, 965, 970, 975, 
-		981, 986, 992, 998, 1005, 1012, 1024};
-	
-	short value = 0, step = -1;
-	
-	/* init default value */
-	for(i = 0; i < ARRAY_SIZE(offset); i++) {
-		for(; j < offset[i]; j++)
-			yeeTab[j] = value;
-
-		if(value <= YEE_TAB_MIN)
-			step = 1;
-		else if(value >= YEE_TAB_MAX)
-			step = -1;
-
-		value += step;
-	}
-
-	return yeeTab;
-	
-}
-
 /*****************************************************************************
  Prototype    : previewer_set_yee
  Description  : Set YEE params
@@ -698,11 +647,61 @@ static short *previewer_init_yee_table()
     Modification : Created function
 
 *****************************************************************************/
-static Int32 previewer_set_yee(struct prev_module_param *modParam, struct prev_yee *yee, short *yeeTab, PreviewAttrs *attrs)
+static Int32 previewer_set_yee(struct prev_module_param *modParam, struct prev_yee *yee, PreviewAttrs *attrs)
 {
-	struct prev_yee yee_params_def = {
+	const short yee_table[] = {
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1, -1, -1, -1, 
+		-2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -3, -3, -3, -3, -3, -3, -3, -3, -3, -3, -4, -4, 
+		-4, -4, -4, -4, -4, -4, -4, -4, -4, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -6, -6, -6, -6, 
+		-6, -6, -6, -6, -6, -6, -6, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -8, -8, -8, -8, -8, 
+		-8, -8, -8, -8, -8, -9, -9, -9, -9, -9, -9, -9, -9, -9, -9, -9, -10, -10, -10, -10, -10, -10,
+		-10, -10, -10, -10, -10, -11, -11, -11, -11, -11, -11, -11, -11, -11, -11, -11, -11, -11, 
+		-11, -11, -11, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, 
+		-12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, 
+		-12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, 
+		-12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, 
+		-12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, 
+		-12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, 
+		-12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, 
+		-12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, 
+		-12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, 
+		-12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, 
+		-12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, 
+		-12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, 
+		-12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, 
+		-12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -12, -11, -11, -11, -11, -11, 
+		-11, -11, -11, -11, -11, -11, -11, -11, -11, -11, -11, -10, -10, -10, -10, -10, -10, -10, 
+		-10, -10, -10, -10, -9, -9, -9, -9, -9, -9, -9, -9, -9, -9, -9, -8, -8, -8, -8, -8, -8, -8,
+		-8, -8, -8, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -7, -6, -6, -6, -6, -6, -6, -6, -6, -6,
+		-6, -6, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4,
+		-3, -3, -3, -3, -3, -3, -3, -3, -3, -3, -3, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -1, 
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
+		1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6,
+		7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 12,
+		12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 16, 16, 
+		16, 16, 16, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 20, 20, 20, 20, 
+		20, 20, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 23, 
+		23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 
+		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 
+		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
+		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 
+		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 
+		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 
+		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 
+		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 
+		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 
+		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 
+		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 22, 
+		22, 22, 22, 22, 22, 22, 21, 21, 21, 21, 21, 21, 20, 20, 20, 20, 20, 20, 19, 19, 19, 19, 19, 
+		18, 18, 18, 18, 18, 18, 17, 17, 17, 17, 17, 16, 16, 16, 16, 16, 15, 15, 15, 15, 15, 15, 14, 
+		14, 14, 14, 14, 13, 13, 13, 13, 13, 12, 12, 12, 12, 12, 12, 11, 11, 11, 11, 11, 10, 10, 10, 
+		10, 10, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 
+		5, 5, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+	};
+
+	const struct prev_yee yee_params_def = {
 		.en = 1,
-		.en_halo_red = 0,
+		.en_halo_red = 1,
 		.merge_meth = IPIPE_YEE_EE_ES,
 		.hpf_shft = 10,
 		.hpf_coef_00 = 84,
@@ -714,17 +713,22 @@ static Int32 previewer_set_yee(struct prev_module_param *modParam, struct prev_y
 		.hpf_coef_20 = (-4 & 0x3FF),
 		.hpf_coef_21 = (-2 & 0x3FF),
 		.hpf_coef_22 = (-1 & 0x3FF),
-		.yee_thr = 20,
+		.yee_thr = 5,
 		.es_gain = 128,
-		.es_thr1 = 768,
-		.es_thr2 = 32,
+		.es_thr1 = 1000,
+		.es_thr2 = 30,
 		.es_gain_grad = 32,
-		.es_ofst_grad = 0, 
+		.es_ofst_grad = 24, 
 	};
 
-	if((attrs->ctrlFlags & CONV_FLAG_EE_EN) && attrs->eeTable) {
+	DBG("set yee params...");
+	assert(ARRAY_SIZE(yee_table) == 1024);
+
+	if(attrs->ctrlFlags & CONV_FLAG_EE_EN) {
 		*yee = yee_params_def;
-		yee->table = yeeTab ? yeeTab : attrs->eeTable;
+		yee->table = (short *)yee_table;
+		yee->es_gain = attrs->sharpness;
+		yee->es_gain_grad = attrs->sharpness >> 2;
 		modParam->param = yee;
 		modParam->len = sizeof (struct prev_yee);
 	} else {
@@ -763,7 +767,6 @@ Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
 	struct prev_yee yee;
 	struct prev_rgb2yuv rgb2yuv;
 	
-	short *yeeTab = NULL;
 	Bool bypass;
 
 	if(fdPrev <= 0) {
@@ -787,7 +790,9 @@ Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
 		switch(cap.module_id) {
 		case PREV_NF1:
 		case PREV_NF2:
-			previewer_set_nf(&modParam, &nf, attrs->ctrlFlags & CONV_FLAG_NF_EN);
+			/* sharpness and noise filter can't be set at same time */
+			if(!(attrs->ctrlFlags & CONV_FLAG_EE_EN))
+				previewer_set_nf(&modParam, &nf, attrs->ctrlFlags & CONV_FLAG_NF_EN);
 			break;
 		case PREV_WB:
 			previewer_set_wb(fdPrev, &modParam, &wb, NULL);
@@ -800,16 +805,7 @@ Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
 			previewer_set_lum(&modParam, &lum, attrs);
 			break;
 		case PREV_YEE:
-			if(attrs->ctrlFlags & CONV_FLAG_EE_EN) {
-				if(!attrs->eeTable || attrs->eeTabSize < YEE_LUT_MAX_SIZE) {
-					/* Use default table */
-					//yeeTab = previewer_init_yee_table();
-					attrs->eeTable = yeeTab;
-				}
-				previewer_set_yee(&modParam, &yee, yeeTab, attrs);
-			} else {
-				modParam.param = NULL;
-			}
+			previewer_set_yee(&modParam, &yee, attrs);
 			break;
 		case PREV_RGB2YUV:
 			previewer_set_y_offset(fdPrev, &modParam, &rgb2yuv, attrs);
@@ -831,9 +827,8 @@ Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
 		cap.index++;
 	}
 
-	if(yeeTab)
-		free(yeeTab);
-
+	
+	DBG("set previwer params done...");
 	return ret;
 }
 
