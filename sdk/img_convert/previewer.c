@@ -721,8 +721,8 @@ static Int32 previewer_set_yee(struct prev_module_param *modParam, struct prev_y
 		.es_ofst_grad = 24, 
 	};
 
-	DBG("set yee params...");
-	assert(ARRAY_SIZE(yee_table) == 1024);
+	//DBG("set yee params...");
+	//assert(ARRAY_SIZE(yee_table) == 1024);
 
 	if(attrs->ctrlFlags & CONV_FLAG_EE_EN) {
 		*yee = yee_params_def;
@@ -828,7 +828,7 @@ Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
 	}
 
 	
-	DBG("set previwer params done...");
+	//DBG("set previwer params done...");
 	return ret;
 }
 

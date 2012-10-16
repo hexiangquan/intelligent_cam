@@ -710,11 +710,13 @@ static void thread_clean_up(ICamCtrlHandle hCamCtrl, Bool reboot, int sock)
 	if(reboot) {
 		sleep(3);
 		Int32 ret = icam_sys_reset(hCamCtrl);
-		if(ret != E_NO) {
-			ERR("call icamera to reset failed, call sys cmd to reset...");
-			sync();
-			system("shutdown -r now\n");
-		}
+		if(ret == E_NO)
+			sleep(5);
+
+		/* we are not reset by system, try reset here */
+		ERR("call icamera to reset failed, call sys cmd to reset...");
+		sync();
+		system("shutdown -r now\n");
 	}
 
 	if(sock > 0)

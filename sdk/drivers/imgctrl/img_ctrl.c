@@ -276,6 +276,7 @@ static int ab_hw_setup(struct img_ctrl_dev *dev, struct hdcam_ab_cfg *cfg)
 		exposure[0] = fpga_read(dev->fpga_base, FPGA_REG_EXPOSURE_TIME0);
 		exposure[1] = fpga_read(dev->fpga_base, FPGA_REG_EXPOSURE_TIME1);
 		gain = fpga_read(dev->fpga_base, FPGA_REG_AFE_GAIN);
+		//_DBG("ae adjusted exposure: %u, gain: %u", (exposure[1] << 16) | exposure[0], gain);
 		
 		/* set ctrl flags -- disable AE & AG */
 		fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);

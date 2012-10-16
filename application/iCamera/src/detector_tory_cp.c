@@ -111,6 +111,9 @@ static Int32 retrograde_cap_parse(DetectorUart *dev, const CamDetectorParam *par
 	/* Group Num */
 	dev->groupId[wayNum - 1]++;
 	info->groupId = dev->groupId[wayNum - 1];
+
+	if(params->retrogradeCapFlag & DETECTOR_FLAG_DELAY_CAP)
+		info->flags |= TRIG_INFO_DELAY_CAP;
 	
 	return E_NO;
 }
@@ -168,6 +171,9 @@ static Int32 cp_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uin
 		info->flags |= TRIG_INFO_OVERSPEED;
 	} else if(params->greenLightCapFlag & DETECTOR_FLAG_OVERSPEED_CAP)
 		return E_NOTEXIST;	//Capture only when overspeed
+
+	if(params->greenLightCapFlag & DETECTOR_FLAG_DELAY_CAP)
+		info->flags |= TRIG_INFO_DELAY_CAP;
 
 	return E_NO;
 }

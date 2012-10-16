@@ -59,7 +59,7 @@ static Int32 upload_update(EncoderHandle hEnc, UploadParams *params);
  *----------------------------------------------*/
 
 #define ENC_POOL_BUF_NUM		3
-#define BUF_ALLOC_TIMEOUT		1000		//ms
+#define BUF_ALLOC_TIMEOUT		50		//ms
 #define UPLOAD_RECON_TIMEOUT	5		//second
 
 /*----------------------------------------------*
@@ -208,11 +208,11 @@ static Int32 encode_frame(EncoderHandle hEnc, ImgMsg *msg)
 	
 	if(hEnc->hPoolEnc) {
 		/* Alloc buffer for encoded data */
-		//hBufOut = buf_pool_alloc_wait(hEnc->hPoolEnc, BUF_ALLOC_TIMEOUT);
-		hBufOut = buf_pool_alloc(hEnc->hPoolEnc);
+		hBufOut = buf_pool_alloc_wait(hEnc->hPoolEnc, BUF_ALLOC_TIMEOUT);
+		//hBufOut = buf_pool_alloc(hEnc->hPoolEnc);
 		if(!hBufOut) {
 			/* alloc buffer failed, use buf for save */
-			DBG("<%s> save file to local file system", hEnc->name);
+			//DBG("<%s> save file to local file system", hEnc->name);
 			hBufOut = hEnc->hBufEnc;
 			saveToLocal = TRUE;
 		}

@@ -1989,6 +1989,7 @@ static Int32 get_exposure_params(ParamsMngHandle hParamsMng, void *data, Int32 s
 		params->shutterTime = info.exposureTime;
 		params->globalGain = info.globalGain;
 		params->reserved = 0;
+		DBG("get exposure params: %u-%u", info.exposureTime, info.globalGain);
 	} else {
 	
 		/* Copy data */

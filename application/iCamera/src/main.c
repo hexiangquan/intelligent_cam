@@ -232,6 +232,7 @@ static Int32 msg_process(CommonMsg *msg, MainEnv *envp)
 		envp->exit = TRUE;
 		break;
 	case APPCMD_REBOOT:
+		INFO("main: recv reboot cmd!");
 		envp->exit = TRUE;
 		envp->reboot = TRUE;
 		break;

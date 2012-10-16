@@ -327,6 +327,7 @@ static Int32 detector_uart_run(DetectorHandle hDetector, CaptureInfo *capInfo)
 
 	/* Clear cap count */
 	capInfo->capCnt = 0;
+	capInfo->flags = 0;
 	
 	/* Recieve and parse trigger data  */
 	for(i = 0; i < APP_MAX_CAP_CNT; i++) {	

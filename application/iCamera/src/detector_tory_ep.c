@@ -324,8 +324,9 @@ static Int32 ep_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uin
 	/* Check if delay cap is set */
 	if(rxBuf[2] == dev->lastFrameCode[TRIG_EP]) {
 		info->flags |= TRIG_INFO_LAST_FRAME;
-		if(params->redLightCapFlag & DETECTOR_FLAG_DELAY_CAP)
+		if(params->redLightCapFlag & DETECTOR_FLAG_DELAY_CAP) {
 			info->flags |= TRIG_INFO_DELAY_CAP;
+		}
 	}
 	
 	return E_NO;
@@ -380,8 +381,12 @@ static Int32 retrograde_cap_parse(DetectorUart *dev, const CamDetectorParam *par
 	info->groupId = dev->groupId[wayNum - 1];
 
 	/* Check if it is last frame of the group */
-	if(rxBuf[2] == dev->lastFrameCode[TRIG_RE])
+	if(rxBuf[2] == dev->lastFrameCode[TRIG_RE]) {
 		info->flags |= TRIG_INFO_LAST_FRAME;
+		if(params->retrogradeCapFlag & DETECTOR_FLAG_DELAY_CAP) {
+			info->flags |= TRIG_INFO_DELAY_CAP;			
+		}
+	}
 	
 	return E_NO;
 }
@@ -434,6 +439,11 @@ static Int32 cp_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uin
 	info->speed = detector_calc_speed(params, wayNum, (rxBuf[3]<<8)|rxBuf[4]);
 	if(info->speed > params->limitSpeed)
 		info->flags |= TRIG_INFO_OVERSPEED;
+	else if(params->greenLightCapFlag & DETECTOR_FLAG_OVERSPEED_CAP)
+		return E_AGAIN; /* need not capture when not over speed */
+
+	if(params->greenLightCapFlag & DETECTOR_FLAG_DELAY_CAP)
+		info->flags |= TRIG_INFO_DELAY_CAP;
 
 	return E_NO;
 }

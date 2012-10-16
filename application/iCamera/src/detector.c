@@ -350,9 +350,11 @@ Int32 detector_run(DetectorHandle hDetector, CaptureInfo *capInfo)
 
 	Int32 ret = E_UNSUPT;
 	
-	if(hDetector->fxns && hDetector->fxns->detect)
+	if(hDetector->fxns && hDetector->fxns->detect) {
+		bzero(capInfo, sizeof(*capInfo));
 		ret = hDetector->fxns->detect(hDetector, capInfo);
-
+	}
+	
 	if(!ret) {
 		/* need delay for capture next frame */
 		if(capInfo->flags & CAPINFO_FLAG_DELAY_CAP)
