@@ -58,7 +58,7 @@ typedef struct {
 	Uint8	enEndHour;		//end hour
 	Uint8	enEndMin;		//end minute, 0~59
 	Uint8	sigVal;			//output signals value, bit[0:2]-stobe[0:2], 
-	Uint8	mode;			//trig or freq output
+	Uint8	mode;			//trig or freq output, bit[0:2]-strobe[0:2]
 	Uint8	acSyncEn;		//sync with AC signals or not
 	Uint8	reserved[5];		
 } CamStrobeCtrlParam;

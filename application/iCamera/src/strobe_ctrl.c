@@ -224,10 +224,15 @@ Int32 strobe_ctrl_set_cfg(StrobeHandle hStrobe, const CamStrobeCtrlParam *params
 
 	hStrobe->params = *params;
 	/* record which strobes need to auto switch */
-	hStrobe->autoSwitchMask = (params->ctrlFlags & 0x0F); 
+	hStrobe->autoSwitchMask = (params->ctrlFlags & 0x0F);
+	if(!hStrobe->autoSwitchMask) {
+		/* all strobe auto switch are disabled, need not switch */
+		hStrobe->params.switchMode = CAM_STROBE_SWITCH_OFF;
+	}
+	
 	/* disable if need auto switch */
 	if(params->switchMode != CAM_STROBE_SWITCH_OFF) {
-		hStrobe->params.status &= ~(hStrobe->autoSwitchMask);		
+		hStrobe->params.status &= ~(hStrobe->autoSwitchMask);	
 		hStrobe->outputEnable = FALSE;
 	} else
 		hStrobe->outputEnable = TRUE;
@@ -241,7 +246,8 @@ Int32 strobe_ctrl_set_cfg(StrobeHandle hStrobe, const CamStrobeCtrlParam *params
 	if(params->ctrlFlags & 0x04)
 		hStrobe->enableCnt++;
 
-	DBG("strobe set switch mode: %d, enable flag: 0x%x", params->switchMode, params->ctrlFlags);
+	DBG("strobe set switch mode: %d, enable flag: 0x%x, cur status: 0x%x",
+		params->switchMode, params->ctrlFlags, params->status);
 
 	return strobe_ctrl_sync_hw(hStrobe);
 }
@@ -346,16 +352,25 @@ static Int32 strobe_switch_by_time(StrobeHandle hStrobe, const DateTime *curTime
 	Uint32 curMin = HOUR_TO_MIN(curTime->hour, curTime->minute);
 	Uint32 enableTime = HOUR_TO_MIN(hStrobe->params.enStartHour, hStrobe->params.enStartMin);
 	Uint32 disableTime = HOUR_TO_MIN(hStrobe->params.enEndHour, hStrobe->params.enEndMin);
-
+	
+	hStrobe->lastCheckTime = time(NULL);
+	
 	/* Check current time */
-	if(curMin >= disableTime && curMin < enableTime)
-		hStrobe->outputEnable = FALSE;
-	else {
-		/* disable output */
-		hStrobe->outputEnable = TRUE;
+	if(curMin >= disableTime && curMin < enableTime) {
+		if(hStrobe->outputEnable) {
+			/* need turn off */
+			hStrobe->outputEnable = FALSE;
+			return E_NO;
+		}
+	} else {
+		/* enable output */
+		if(!hStrobe->outputEnable) {
+			hStrobe->outputEnable = TRUE;
+			return E_NO;
+		}
 	}
 
-	return E_NO;
+	return E_AGAIN;
 }
 
 /*****************************************************************************
@@ -435,7 +450,8 @@ Int32 strobe_ctrl_auto_switch(StrobeHandle hStrobe, const DateTime *curTime, Uin
 	if(hStrobe->outputEnable) {
 		if(!(hStrobe->params.status & hStrobe->autoSwitchMask)) {
 			/* enable output */
-			DBG("enable strobe output.");
+			DBG("enable strobe output, status: 0x%x, mask: 0x%x.", hStrobe->params.status, 
+				hStrobe->autoSwitchMask);
 			hStrobe->params.status |= hStrobe->autoSwitchMask;
 			err = strobe_ctrl_sync_hw(hStrobe);
 		}
