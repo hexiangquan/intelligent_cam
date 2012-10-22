@@ -654,17 +654,17 @@ static void *data_capture_thread(void *arg)
 			usleep(1000);
 			continue;
 		}
+		
+		if(FD_ISSET(hDataCap->fdCap, &rdSet)) {
+			/* read new frame */
+			capture_new_img(hDataCap);
+		}
 
 		/* check which is ready */
 		if( hDataCap->fdDetect > 0 &&
 			FD_ISSET(hDataCap->fdDetect, &rdSet) ){
 			/* trigger capture */
 			detector_trigger(hDataCap);
-		}
-		
-		if(FD_ISSET(hDataCap->fdCap, &rdSet)) {
-			/* read new frame */
-			capture_new_img(hDataCap);
 		}
 
 		if(FD_ISSET(hDataCap->fdMsg, &rdSet)) {

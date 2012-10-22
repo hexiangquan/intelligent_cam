@@ -273,7 +273,7 @@ static Int32 cp_cap_parse(DetectorUart *dev, const CamDetectorParam *params, Uin
 	Int32 wayNum;
 
 	/* Check if capture is needed at this position */
-	if(!params->greenLightCapFlag)
+	if(!(params->greenLightCapFlag & DETECTOR_FLAG_LOOP1_NEG_CAP))
 		return E_NOTEXIST; //Should not capture at this position
 
 	/* Validate data */
