@@ -311,8 +311,8 @@ static Int32 single_file_send(LocalUploadHandle hLocalUpload, const char *fileNa
 	/* send file */
 	ret = upload_run(hLocalUpload->hUpload, hMsg, &img);
 
-	/* delete file if success */
-	if(!ret && (hLocalUpload->flags & LOCAL_FLAG_DEL_AFTER_SND))
+	/* delete file if success or the file contains invalid data */
+	if((!ret || ret == E_CHECKSUM) && (hLocalUpload->flags & LOCAL_FLAG_DEL_AFTER_SND))
 		unlink(fileName);	
 	
 #ifdef PRINT_FILE_INFO

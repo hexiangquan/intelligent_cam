@@ -257,7 +257,7 @@ static Int32 ftp_upload_send(void *handle, const ImgMsg *frame)
 	/* check path name number */
 	if(!nameInfo.fileNum || nameInfo.fileNum > PATHNAME_MAX_CNT_NUM) {
 		ERR("generate pathname num is invalid: num of names is %d.", nameInfo.fileNum);
-		return E_NOMEM;
+		return E_CHECKSUM;
 	}
 
 	/* send files */

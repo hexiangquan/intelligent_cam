@@ -2790,13 +2790,14 @@ static Int32 set_day_night_params(ParamsMngHandle hParamsMng, void *data, Int32 
 *****************************************************************************/
 static Int32 get_day_night_params(ParamsMngHandle hParamsMng, void *data, Int32 size)
 {
-	if(!data || size < sizeof(CamAWBParam)) 
+	if(!data || size < sizeof(CamDayNightModeCfg)) 
 		return E_INVAL;
 
 	AppParams *appCfg = &hParamsMng->appParams;
 	
 	/* Copy data */
-	*(CamDayNightModeCfg *)data = appCfg->dayNightCfg;
+	CamDayNightModeCfg *dayNightCfg = (CamDayNightModeCfg *)data;
+	*dayNightCfg = appCfg->dayNightCfg;
 
 	return E_NO;
 }
@@ -3299,7 +3300,7 @@ static const PmCtrlInfo g_paramsConvert[] = {
 	{.cmd = PMCMD_G_CONVTERPARAMS, .fxn = get_converter_params, .flags = 0,},
 	{.cmd = PMCMD_G_IMGENCODERPARAMS, .fxn = get_img_encoder_params, .flags = 0,},
 	{.cmd = PMCMD_G_VIDENCODERPARAMS, .fxn = get_vid_encoder_params, .flags = 0,},
-	{.cmd = PMCMD_S_SWITCHDAYNIGHT, .fxn = day_night_switch, .flags = 0,},
+	{.cmd = PMCMD_S_SWITCHDAYNIGHT, .fxn = day_night_switch, .flags = PM_CTRL_INFO_SAVE,},
 	{.cmd = PMCMD_MAX1, .fxn = NULL, .flags = 0,},
 };
 

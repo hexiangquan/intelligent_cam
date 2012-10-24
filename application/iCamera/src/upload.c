@@ -434,7 +434,7 @@ Bool upload_get_connect_status(UploadHandle hUpload)
     Modification : Created function
 
 *****************************************************************************/
-static Int32 upload_save_frame(UploadHandle hUpload, const ImgMsg *data)
+static Int32 upload_save_frame(UploadHandle hUpload, const ImgMsg *data, Int32 prevErr)
 {
 	Int32 err = E_NO;
 
@@ -447,7 +447,7 @@ static Int32 upload_save_frame(UploadHandle hUpload, const ImgMsg *data)
 			err = jpg_encoder_save_frame(data, hUpload->savePath);
 		}
 	} else 
-		err = E_TRANS;
+		err = prevErr;
 	
 	/* free buf */
 	if(hUpload->flags & UPLOAD_FLAG_FREE_BUF)
@@ -533,7 +533,7 @@ static Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data)
 	
 save_frame:
 	/* send err, save to local */
-	err = upload_save_frame(hUpload, data);
+	err = upload_save_frame(hUpload, data, err);
 
 	return err;
 }
@@ -684,7 +684,7 @@ Int32 upload_run(UploadHandle hUpload, MsgHandle hCurMsg, const ImgMsg *data)
 			err = msg_send(hCurMsg, hUpload->msgName, (MsgHeader *)data, 0);
 		if(err) {
 			/* save if server is not connected or send msg err */
-			err = upload_save_frame(hUpload, data);
+			err = upload_save_frame(hUpload, data, err);
 		}
 		return err;
 	} else {

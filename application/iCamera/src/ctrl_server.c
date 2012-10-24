@@ -766,7 +766,7 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	hCtrlSrv->hStrobe = strobe_ctrl_create(&strobeAttrs);
 	if(!hCtrlSrv->hStrobe) {
 		ERR("create strobe module failed!");
-		goto exit;
+		//goto exit;
 	}
 
 	/* create data capture module */

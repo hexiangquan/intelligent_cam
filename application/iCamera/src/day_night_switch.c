@@ -54,7 +54,7 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
-#define DAY_NIGHT_MIN_SWITCH 	100
+#define DAY_NIGHT_MIN_SWITCH 	1000
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -92,8 +92,15 @@ Int32 day_night_cfg_params(DayNightHandle hDayNight, const CamDayNightModeCfg *c
 	hDayNight->cfg = *cfg;
 	pthread_mutex_unlock(&hDayNight->mutex);
 
-	DBG("day night cfg params, day start %u:%u, night start %u:%u", cfg->dayModeStartHour, cfg->dayModeStartMin,
-		cfg->nightModeStartHour, cfg->nightModeStartMin);
+	if(cfg->switchMethod == CAM_DN_SWT_TIME)
+		DBG("day night cfg params, day start %u:%u, night start %u:%u", cfg->dayModeStartHour, cfg->dayModeStartMin,
+			cfg->nightModeStartHour, cfg->nightModeStartMin);
+	else if(cfg->switchMethod == CAM_DN_SWT_AUTO)
+		DBG("day night cfg params, threshold: %u, switch cnt: %u", 
+			cfg->threshold, hDayNight->minSwitchCnt);
+	else
+		DBG("day night cfg params, none-switch.");
+	
 	return E_NO;
 }
 
@@ -245,7 +252,7 @@ Int32 day_night_delete(DayNightHandle hDayNight)
 static Int32 day_night_notify_switch(DayNightHandle hDayNight, MsgHandle hCurMsg)
 {
 	if(!hCurMsg || !hDayNight->dstMsg)
-		return E_NO;
+		return E_MODE;
 
 	MsgHeader msg;
 
@@ -347,14 +354,20 @@ Int32 day_night_check_by_lum(DayNightHandle hDayNight, Uint16 lumVal, MsgHandle 
 			hDayNight->lumKeepCnt++;
 	}
 
+	//DBG("day night switch by lum, lum: %u, cnt: %u, threshold: %u", 
+		//lumVal, hDayNight->lumKeepCnt, hDayNight->cfg.threshold);
+
 	if(hDayNight->lumKeepCnt > hDayNight->minSwitchCnt) {
 		DBG("switch day/night mode by lum val...");
-		if(cfg->mode == CAM_DAY_MODE)
+		Uint8 oldMode = cfg->mode;
+		if(oldMode == CAM_DAY_MODE)
 			cfg->mode = CAM_NIGHT_MODE;
 		else
 			cfg->mode = CAM_DAY_MODE;
 
-		return day_night_notify_switch(hDayNight, hCurMsg);
+		/* If switch mode failed, we need to keep previous mode */
+		if(day_night_notify_switch(hDayNight, hCurMsg) != E_NO)
+			cfg->mode = oldMode;
 	}
 
 	return E_AGAIN;	

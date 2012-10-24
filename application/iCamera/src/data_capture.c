@@ -749,7 +749,7 @@ DataCapHandle data_capture_create(const DataCapAttrs *attrs)
 	hDataCap->detectorParams = attrs->detectorParams;
 	hDataCap->hDayNight = attrs->hDayNight;
 	hDataCap->hStrobe = attrs->hStrobe;
-	assert(hDataCap->hDayNight && hDataCap->hStrobe);
+	assert(hDataCap->hDayNight);
 
 	/* init our running evironment */
 	ret = data_capture_config(hDataCap);
