@@ -59,7 +59,7 @@ CPP_FLAGS ?=
 
 # Link libs and options
 LD_FLAGS += -L$(SDK_LIB_DIR) -L$(APP_LIB_DIR)
-LD_LIBS := -lpthread -lm -lcamctrl -llog -lnetproto -lnetutils -lcrc -lmsg
+LD_LIBS := -lpthread -lm -lcamctrl -llog -lnetproto -lnetutils -lcrc -lmsg -lsyscommu
 
 # Comment this out if you want to see full compiler and linker output.
 #override VERBOSE = @

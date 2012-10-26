@@ -1,3 +1,6 @@
+#ifndef __LOG_H__
+#define __LOG_H__
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -9,9 +12,6 @@
 #include <pthread.h>
 #include <sys/types.h>
 #include "common.h"
-
-#ifndef __LOG_H__
-#define __LOG_H__
 
 typedef enum {
 	LOG_LEVEL_DBG	= 0,
