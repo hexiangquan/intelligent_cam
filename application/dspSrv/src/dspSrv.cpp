@@ -140,17 +140,20 @@ int DspSrv::ReadDspImg(int& fd)
 	}
 
 	// read from device
-	SysMsg *msgBuf = static_cast<SysMsg *>(buf);
+	SysMsg *msgBuf = (SysMsg *)buf;//static_cast<SysMsg *>(buf);
 	err = sys_commu_read(fd, msgBuf, bufSize);
 	if(err < 0) {
-		ERR("read msg from dsp failed!");
+		ERR("read msg from dsp failed: %d, size: %u!", err, bufSize);
 		return err;
 	}
 
 	// check if this msg is new image 
 	if(msgBuf->cmd != SYS_CMD_NEW_JPG) {
+		ERR("read msg not new jpeg, magic: 0x%X, cmd 0x%X.", msgBuf->magic, msgBuf->cmd);
 		return E_AGAIN;	
 	}
+
+	DBG("read img from dsp, len: %u ...", msgBuf->dataLen);
 
 	return E_NO;
 }
