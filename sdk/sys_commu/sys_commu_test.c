@@ -92,10 +92,17 @@ static Bool main_loop(TestParams *params)
 	#endif
 		
 		//usleep(500000);
+		bzero(data_in, len);
 		gettimeofday(&tmStart,NULL);
 		err = sys_commu_read(fd, msg_in, len + sizeof(SysMsg));
 		gettimeofday(&tmEnd,NULL);
 		timeRd = 1000000*(tmEnd.tv_sec-tmStart.tv_sec)+tmEnd.tv_usec-tmStart.tv_usec;
+
+		if(err) {
+			ERR("<%d> read from dsp err: %d", i, err);
+			if(err != E_CHECKSUM)
+				continue;
+		}
 		
 		if( msg_in->dataLen != msg_out->dataLen || 
 			memcmp(data_in, data_out, msg_in->dataLen) ) {
@@ -108,7 +115,7 @@ static Bool main_loop(TestParams *params)
 		msg_out->cmd = i;
 		//msg_out->dataLen = RAND(0, len);
 
-		usleep(20000);
+		usleep(5000);
 	}
 
 	ret = TRUE;

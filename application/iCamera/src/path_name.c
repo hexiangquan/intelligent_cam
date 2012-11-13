@@ -330,7 +330,7 @@ Int32 path_name_generate(PathNameHandle hPathName, const ImgMsg *imgBuf, PathNam
 				strcpy(strBuf, STR_CHECK_POST);
 		}
 		
-		if(capInfo->triggerInfo[i].flags & TRIG_INFO_RETROGRADE)
+		if(capInfo->triggerInfo[i].flags & TRIG_INFO_REVERSE)
 			strcpy(strBuf, STR_RETROGRADE);
 
 		/* type of capture */
@@ -352,7 +352,7 @@ Int32 path_name_generate(PathNameHandle hPathName, const ImgMsg *imgBuf, PathNam
 		/* frame number
 		  * need change case number to enumeration string, to be modified!
 		  */
-		if(capInfo->triggerInfo[i].flags & TRIG_INFO_RETROGRADE) {
+		if(capInfo->triggerInfo[i].flags & TRIG_INFO_REVERSE) {
 			strBuf[0] = 'R';
 			strBuf[1] = 'A' + capInfo->triggerInfo[i].frameId - FRAME_TRIG_BASE;
 			strBuf[2] = '\0';
@@ -637,7 +637,7 @@ Int32 path_name_test()
 	trigInfo = &capInfo->triggerInfo[2];
 	capInfo->capCnt = 3;
 	
-	trigInfo->flags = TRIG_INFO_RETROGRADE;
+	trigInfo->flags = TRIG_INFO_REVERSE;
 	trigInfo->frameId = FRAME_TRIG_BASE + 1;
 	trigInfo->groupId = 99;
 	

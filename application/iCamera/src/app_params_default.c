@@ -205,5 +205,14 @@ const AppParams c_appParamsDef = {
 		.aeTargetVal = 75,
 		.flags = CAM_SPEC_CAP_FLAG_AE_EN,
 	},
+	.plateRecogCfg = {
+		.flags = PR_FLAG_MOD_EN | PR_FLAG_INDIVIDUAL_EN,
+		.minPlateWidth = 80,
+		.maxPlateWidth = 200,
+		.recogRegion = {0,0,0,0}, // all the frame
+		.defaultProvinces = "’„À’ª¶",
+		.locateThreshold = 5,
+		.recogThreshold = 1,
+	},
 };
 

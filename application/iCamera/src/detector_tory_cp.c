@@ -106,7 +106,7 @@ static Int32 retrograde_cap_parse(DetectorUart *dev, const CamDetectorParam *par
 	info->wayNum = wayNum;
 
 	/* Set retrograde flag */
-	info->flags |= TRIG_INFO_RETROGRADE | TRIG_INFO_LAST_FRAME;
+	info->flags |= TRIG_INFO_REVERSE | TRIG_INFO_LAST_FRAME;
 	
 	/* Group Num */
 	dev->groupId[wayNum - 1]++;
@@ -335,7 +335,7 @@ Int32 tory_cp_test()
 	assert(err == E_NO);
 
 	//assert(trigInfo.frameId == FRAME_TRIG_BASE + i);
-	assert(trigInfo.flags & TRIG_INFO_RETROGRADE);
+	assert(trigInfo.flags & TRIG_INFO_REVERSE);
 
 	DBG("%s parse trig info:", __func__);
 	DBG("  way num: %d, group id: %d, frame id: %d", 

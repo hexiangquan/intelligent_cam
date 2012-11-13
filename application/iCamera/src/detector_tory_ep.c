@@ -373,7 +373,7 @@ static Int32 retrograde_cap_parse(DetectorUart *dev, const CamDetectorParam *par
 	info->wayNum = wayNum;
 
 	/* Set retrograde flag */
-	info->flags |= TRIG_INFO_RETROGRADE;
+	info->flags |= TRIG_INFO_REVERSE;
 	
 	/* Group Num */
 	if(info->frameId == FRAME_TRIG_BASE)
@@ -659,7 +659,7 @@ Int32 tory_ep_test()
 		assert(err == E_NO);
 
 		//assert(trigInfo.frameId == FRAME_TRIG_BASE + i);
-		assert(trigInfo.flags & TRIG_INFO_RETROGRADE);
+		assert(trigInfo.flags & TRIG_INFO_REVERSE);
 
 		DBG("parse trig info:");
 		DBG("  way num: %d, group id: %d, frame id: %d", 

@@ -39,7 +39,7 @@ endif
 
 CFLAGS += -Wall -I. -g
 LDFLAGS := -L$(LIB_PATH) -L$(LIB_INSTALL_DIR) -L$(SDK_LIB_DIR)
-LDFLAGS += -lpthread -l$(LIB_NAME) -lnetutils
+LDFLAGS += -lpthread -l$(LIB_NAME) -lnetutils -lcrc
 
 CFLAGS += -I$(INC_DIR)
 

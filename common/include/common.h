@@ -138,8 +138,8 @@ typedef enum _ChromaFormat {
 typedef struct _Rectanagle {
 	Uint16	left;
 	Uint16	top;
-	Uint16	width;
-	Uint16	height;
+	Uint16	right;
+	Uint16	bottom;
 }Rectanagle;
 
 /* Image dimention */
@@ -168,6 +168,27 @@ typedef struct _DateTime {
 /* Macro for convert hour to mintues */
 #define HOUR_TO_MIN(h, m) 		((h)*(60) + (m))
 #define HOUR_TO_SEC(h, m, s)	((h)*60*60 + (m)*60 + (s))
+
+/* Color value define */
+typedef enum {
+	COLOR_INV = 0,
+	COLOR_BLUE,
+	COLOR_YELLOW,
+	COLOR_WHITE,
+	COLOR_BLACK,
+	COLOR_GREEN,
+	COLOR_GRAY,
+	COLOR_RED,
+	COLOR_MAX
+}Color;
+
+/* Move direction */
+typedef enum {
+	DIRECTION_LEFT = 1,
+	DIRECTION_RIGHT,   
+	DIRECTION_UP, 
+	DIRECTION_DOWN,
+}Direction;
 
 
 /* Common APIs */

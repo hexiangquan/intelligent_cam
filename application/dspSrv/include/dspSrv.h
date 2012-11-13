@@ -11,8 +11,9 @@
 
 class DspSrv {
 public:
-	DspSrv(): srvPort(0), srvIp(""), hCamCtrl(NULL), bufSize(DSP_SRV_BUF_SIZE), buf(NULL) {}
-	DspSrv(const std::string &ip, uint16_t port): srvPort(port), srvIp(ip), hCamCtrl(NULL), bufSize(DSP_SRV_BUF_SIZE), buf(NULL) {}
+	DspSrv(): srvPort(0), srvIp(""), hCamCtrl(NULL), bufSize(DSP_SRV_BUF_SIZE), buf(NULL), bytesRecv(0), lastShowTime(0), frameCnt(0) {}
+	DspSrv(const std::string &ip, uint16_t port): srvPort(port), srvIp(ip), hCamCtrl(NULL), bufSize(DSP_SRV_BUF_SIZE), buf(NULL), 
+		bytesRecv(0), lastShowTime(0), frameCnt(0) {}
 	~DspSrv() 
 		{ if(hCamCtrl) icam_ctrl_delete(hCamCtrl); }
 	int Run();
@@ -28,6 +29,9 @@ private:
 	size_t bufSize;
 	void *buf;
 	static bool exit;
+	size_t bytesRecv;
+	time_t lastShowTime;
+	uint32_t frameCnt;
 
 private:
 	int GetSrvInfo();

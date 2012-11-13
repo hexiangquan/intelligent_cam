@@ -6,6 +6,7 @@
 #include "cam_detector.h"
 #include "cam_info.h"
 #include "cap_info_parse.h"
+#include "cam_plate_recog.h"
 
 #define MSG_MAX_LEN		1024
 
@@ -82,6 +83,7 @@ typedef struct _ImgMsg {
 	CamRoadInfo		roadInfo;			/* Road info */
 	RawCapInfo		rawInfo;			/* raw capture info from hardware */
 	CaptureInfo		capInfo;			/* capture info of this frame */
+	LicensePlateInfo plateInfo;			/* vehicle plate info */
 }ImgMsg;
 
 #ifdef __cplusplus

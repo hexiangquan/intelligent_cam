@@ -31,6 +31,7 @@
 #include "cam_detector.h"
 #include "cam_status.h"
 #include "cam_file.h"
+#include "cam_plate_recog.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -173,6 +174,13 @@ typedef enum {
 	ICAMCMD_S_UPDATE_FPGA,
 	/* reset icam process and system */
 	ICAMCMD_S_RESET,
+	/* using CamPlateRecogCfg for params */
+	ICAMCMD_S_PLATERECOGCFG,
+	ICAMCMD_G_PLATERECOGCFG,
+	/* using CamVidDetectCfg for params */
+	ICAMCMD_S_VIDDETECTCFG,
+	ICAMCMD_G_VIDDETECTCFG,
+	
 }ICamCtrlCmd;
 
 typedef struct {
@@ -371,6 +379,18 @@ extern Int32 icam_set_upload_cfg(IN ICamCtrlHandle hCtrl, IN CamImgUploadCfg *cf
 
 /* set work mode */
 extern Int32 icam_set_work_mode(IN ICamCtrlHandle hCtrl, IN const CamWorkMode *params);
+
+/* set plate recognize cfg */
+extern Int32 icam_set_plate_recog_cfg(IN ICamCtrlHandle hCtrl, IN const CamPlateRecogCfg * cfg);
+
+/* get plate recognize cfg */
+extern Int32 icam_get_plate_recog_cfg(IN ICamCtrlHandle hCtrl, OUT CamPlateRecogCfg * cfg);
+
+/* set video recognize cfg */
+extern Int32 icam_set_vid_detect_cfg(IN ICamCtrlHandle hCtrl, IN const CamVidDetectCfg * cfg);
+
+/* get video recognize cfg */
+extern Int32 icam_get_vid_detect_cfg(IN ICamCtrlHandle hCtrl, OUT CamVidDetectCfg *cfg);
 
 /* ask cam to send all files in a dir */
 extern Int32 icam_snd_dir(IN ICamCtrlHandle hCtrl, IN const char *dirPath);

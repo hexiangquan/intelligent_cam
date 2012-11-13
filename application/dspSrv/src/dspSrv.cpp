@@ -142,6 +142,7 @@ int DspSrv::ReadDspImg(int& fd)
 	// read from device
 	SysMsg *msgBuf = (SysMsg *)buf;//static_cast<SysMsg *>(buf);
 	err = sys_commu_read(fd, msgBuf, bufSize);
+	usleep(1000);
 	if(err < 0) {
 		ERR("read msg from dsp failed: %d, size: %u!", err, bufSize);
 		return err;
@@ -153,7 +154,25 @@ int DspSrv::ReadDspImg(int& fd)
 		return E_AGAIN;	
 	}
 
-	DBG("read img from dsp, len: %u ...", msgBuf->dataLen);
+	// do statistic 
+	bytesRecv += msgBuf->transLen;
+	++frameCnt;
+	// first time, just record current time
+	if(!lastShowTime) {
+		lastShowTime = time(NULL);
+		return E_NO;
+	}
+
+	// show recv speed and frame rate
+	time_t timeLapsed = time(NULL) - lastShowTime;
+	if(timeLapsed >= 10) {	
+		size_t speed = bytesRecv / 1024 / timeLapsed;
+		double frameRate = (double)frameCnt/((double)timeLapsed);
+		DBG("read img from dsp, speed: %u KB/s, frame rate: %.1f fps ", speed, frameRate);
+		frameCnt = 0;
+		lastShowTime = time(NULL);
+		bytesRecv = 0;
+	}
 
 	return E_NO;
 }

@@ -48,7 +48,6 @@ enum RadarId {
 #define DETECTOR_FLAG_DELAY_CAP			(1 << 4)	//delay capture
 #define DETECTOR_FLAG_OVERSPEED_CAP		(1 << 5)	//capture only when overspeed
 
-
 /* Frame Num */
 enum FrameID
 {
@@ -64,10 +63,14 @@ enum FrameID
 
 /* captrue and trigger info generated at run time */
 #define TRIG_INFO_RED_LIGHT		            (1 << 0)
-#define TRIG_INFO_RETROGRADE				(1 << 1)
+#define TRIG_INFO_REVERSE					(1 << 1)
 #define TRIG_INFO_OVERSPEED					(1 << 2)
 #define TRIG_INFO_LAST_FRAME				(1 << 3)
 #define TRIG_INFO_DELAY_CAP					(1 << 4)
+#define TRIG_INFO_STOP						(1 << 5)	// stop at wrong place
+#define TRIG_INFO_TRUN_LEFT					(1 << 6)	//turn left when not allowed
+#define TRIG_INFO_TURN_RIGHT				(1 << 7)	//turn right illegally
+#define TRIG_INFO_CHANGE_WAY				(1 << 8)	//driving at illegal way
 
 /* single way trigger info */
 typedef struct {
@@ -95,6 +98,19 @@ typedef struct {
 	Uint8			limitSpeed;						//Limit speed
 	Uint8			reserved[5];					//Reserved
 }CaptureInfo;
+
+/* Config for video detect */
+typedef struct {
+	Uint32 		flags;
+	Rectanagle 	region[APP_MAX_CAP_CNT];
+}CamVidDetectCfg;
+
+/* Video detect result */
+typedef struct {
+	Uint32 		frameIndex;
+	CaptureInfo	capInfo;
+}VideoDetectResult;
+
 
 #endif
 

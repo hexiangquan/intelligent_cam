@@ -567,7 +567,7 @@ Int32 ftp_upload_test(const char *username, const char *passwd, const char *srvi
 		trigInfo->groupId = 77 + i;
 		trigInfo->redlightTime = 0;
 		trigInfo->wayNum = (i + 1) % 3 + 1;
-		trigInfo->flags = TRIG_INFO_RETROGRADE | TRIG_INFO_LAST_FRAME;
+		trigInfo->flags = TRIG_INFO_REVERSE | TRIG_INFO_LAST_FRAME;
 		trigInfo->speed = 102;
 
 		/* get current time */	

@@ -616,6 +616,24 @@ static void *ctrl_server_thread(void *arg)
 			ret = params_mng_control(hParamsMng, PMCMD_G_DAYNIGHTCFG, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamDayNightModeCfg);
 			break;
+		case ICAMCMD_S_PLATERECOGCFG:
+			ret = params_mng_control(hParamsMng, PMCMD_S_PLATERECOGCFG, data, msgHdr->dataLen);
+			if(!ret)
+				ret = data_capture_cfg_plate_recog(hCtrlSrv->hDataCap, hCtrlSrv->hMsg, (CamPlateRecogCfg *)data);
+			break;
+		case ICAMCMD_G_PLATERECOGCFG:
+			ret = params_mng_control(hParamsMng, PMCMD_G_PLATERECOGCFG, data, CTRL_MSG_BUF_LEN);
+			respLen = sizeof(CamPlateRecogCfg);
+			break;
+		case ICAMCMD_S_VIDDETECTCFG:
+			ret = params_mng_control(hParamsMng, PMCMD_S_VIDDETECTCFG, data, msgHdr->dataLen);
+			if(!ret)
+				ret = data_capture_cfg_vid_detect(hCtrlSrv->hDataCap, hCtrlSrv->hMsg, (CamVidDetectCfg *)data);
+			break;
+		case ICAMCMD_G_VIDDETECTCFG:
+			ret = params_mng_control(hParamsMng, PMCMD_G_VIDDETECTCFG, data, CTRL_MSG_BUF_LEN);
+			respLen = sizeof(CamVidDetectCfg);
+			break;
 		case ICAMCMD_S_CAPCTRL:
 			/* tell other tasks to update params */
 			ret = data_capture_ctrl(hCtrlSrv->hDataCap, hCtrlSrv->hMsg, *(Int32 *)data);
@@ -777,6 +795,10 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 			&dataCapAttrs.detectorParams, sizeof(dataCapAttrs.detectorParams));
 	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_CONVTERPARAMS, 
 			&dataCapAttrs.convParams, sizeof(dataCapAttrs.convParams));
+	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_VIDDETECTCFG, 
+			&dataCapAttrs.vidDetectCfg, sizeof(dataCapAttrs.vidDetectCfg));
+	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_PLATERECOGCFG, 
+			&dataCapAttrs.plateRecogCfg, sizeof(dataCapAttrs.plateRecogCfg));
 	assert(ret == E_NO);
 
 	DBG("creating data capture...");
@@ -791,7 +813,6 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	
 	EncoderParams 	encParams;
 	UploadParams	uploadParams;
-
 	
 	/* get img enc & upload params */
 	ret = params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_IMGENCODERPARAMS, 

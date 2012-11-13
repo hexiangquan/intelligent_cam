@@ -30,6 +30,8 @@
 #include "img_ctrl.h"
 #include <sys/ioctl.h>
 #include "rtp_upload.h"
+#include "target_ctrl.h"
+#include "syslink.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -61,6 +63,7 @@
 #define CAPTHR_STAT_CONV_EN			(1 << 0)	//enable convert
 #define CAPTHR_STAT_CAP_STARTED		(1 << 1)	//capture started
 #define CAPTHR_STAT_TRIG			(1 << 2)	//tirgger mode
+#define CAPTHR_STAT_PR_EN			(1 << 3)	//plate recog enable
 
 #define CONV_BUF_NUM				2
 
@@ -95,7 +98,7 @@ struct DataCapObj{
 	Bool				encImg;
 	Bool				exit;
 	Int32				status;
-	Int32				fdMsg, fdCap, fdDetect, fdMax;
+	Int32				fdMsg, fdCap, fdDetect, fdSyslink, fdMax;
 	Int32				fdImgCtrl;
 	MsgHandle			hMsg;
 	ImgDimension		capDim;
@@ -104,6 +107,7 @@ struct DataCapObj{
 	const char 			*dstName[2];
 	DayNightHandle		hDayNight;
 	StrobeHandle		hStrobe;
+	TargetInfo			targetInfo;
 };
 
 
@@ -134,6 +138,16 @@ static Int32 data_capture_get_fds(DataCapHandle hDataCap)
 	ret = detector_control(hDataCap->hDetector, DETECTOR_CMD_GET_FD, &hDataCap->fdDetect, sizeof(Int32));
 	if(ret == E_NO && hDataCap->fdDetect > 0)
 		hDataCap->fdMax = MAX(hDataCap->fdMax, hDataCap->fdDetect);
+
+	/* get syslink fd */
+	if(hDataCap->fdSyslink < 0)
+		hDataCap->fdSyslink = open(SYSLINK_DEV_NAME, O_RDWR);
+	if(hDataCap->fdSyslink > 0) {
+		/* set timeout for read frome target */
+		Uint32 timeout = 500; //ms
+		ioctl(hDataCap->fdSyslink, SYSLINK_S_TIMEOUT, &timeout);
+		hDataCap->fdMax = MAX(hDataCap->fdMax, hDataCap->fdSyslink);
+	}
 
 	hDataCap->fdMax += 1;
 	return ret;
@@ -223,7 +237,6 @@ static Int32 data_capture_config(DataCapHandle hDataCap)
 	}
 	
 	/* Init msg for new image */
-
 	ret = capture_get_input_info(hDataCap->hCap, &hDataCap->inputInfo);
 	assert(ret == E_NO);
 
@@ -422,9 +435,11 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 		return err;
 	}
 
-	/* choose strem channel Id */
+	/* choose stream channel Id */
 	Int32 		streamId = 0;
 	CaptureInfo	*capInfo = &hDataCap->defCapInfo;
+	
+	bzero(&imgMsg, sizeof(imgMsg));
 
 	/* parse raw capture info */
 	cap_info_parse((Uint8 *)capFrame.dataBuf, &hDataCap->capDim, &imgMsg.rawInfo);
@@ -433,13 +448,16 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 		imgMsg.rawInfo.index, imgMsg.rawInfo.capMode, imgMsg.rawInfo.avgLum);
 	DBG("  strobe: 0x%X, exposure: %u, global gain: %u", 
 		imgMsg.rawInfo.strobeStat, imgMsg.rawInfo.exposure, imgMsg.rawInfo.globalGain);
-	*/
 
 	if(imgMsg.rawInfo.capMode != RCI_CAP_TYPE_CONT)
 		DBG("got trig frame: %d...", imgMsg.rawInfo.index);
+	*/
 
 	/* do day/night check */
 	day_night_check_by_lum(hDataCap->hDayNight, imgMsg.rawInfo.avgLum, hDataCap->hMsg);
+
+	/* whether we got a triggered image or normal frame */
+	Bool isTrigImg = FALSE;
 	
 	if(hDataCap->encImg) {
 		/* check frame index from img data */
@@ -451,14 +469,14 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 			dstName = hDataCap->dstName[1];
 			hDataCap->encImg = FALSE;
 			capInfo = &hDataCap->capInfo;
-
+			hDataCap->targetInfo.vidDetectFlag = FALSE;
+			isTrigImg = TRUE;
 			/* enable video send */
 			send_video_clip(hDataCap);
 		}
 	}
 
-	/* do convert */
-	//DBG("<%d> conv one frame", capFrame->index);
+	/* get capture time */
 	imgMsg.dimension = hDataCap->capDim;
 	imgMsg.timeCode = capFrame.timeStamp;
 	imgMsg.roadInfo = hDataCap->roadInfo;
@@ -477,9 +495,26 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 		/* convert failed, just return */
 		return err;
 	}
+
+	/* fill capture info */
+	imgMsg.capInfo = *capInfo;
+
+	if(isTrigImg && (hDataCap->status & CAPTHR_STAT_PR_EN)) {
+		/* Wait license plate info */
+		TargetInfo *targetInfo = &hDataCap->targetInfo;
+		targetInfo->plateInfoFlag = FALSE;
+		err = target_ctrl_process(hDataCap->fdSyslink, targetInfo);
+		if( targetInfo->plateInfoFlag && 
+			imgMsg.rawInfo.index >= targetInfo->plateInfo.frameIndex ) {
+			targetInfo->plateInfoFlag = FALSE;
+			imgMsg.plateInfo = targetInfo->plateInfo;
+		} else {
+			DBG("cap new img, wait plat info failed, flag: %u, index: %u, cur-index: %u",
+				targetInfo->plateInfoFlag, targetInfo->plateInfo.frameIndex, imgMsg.rawInfo.index);
+		}
+	}
 	
 	/* send msg */
-	imgMsg.capInfo = *capInfo;
 	err = msg_send(hDataCap->hMsg, dstName, (MsgHeader *)&imgMsg, 0);
 	//err = 1;
 	if(err) {
@@ -602,6 +637,46 @@ static Int32 detector_trigger(DataCapHandle hDataCap)
 	return ret;
 }
 
+/*****************************************************************************
+ Prototype    : target_trigger
+ Description  : handle trigger by target processor
+ Input        : DataCapHandle hDataCap  
+ Output       : None
+ Return Value : static
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/11/13
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+static Int32 target_trigger(DataCapHandle hDataCap)
+{
+	Int32 ret;
+	ret = target_ctrl_process(hDataCap->fdSyslink, &hDataCap->targetInfo);
+	if(ret < 0)
+		return ret;
+
+	CaptureInfo	*capInfo = &hDataCap->capInfo;
+	if(hDataCap->targetInfo.vidDetectFlag && (hDataCap->status & CAPTHR_STAT_CAP_STARTED)) {
+		hDataCap->encImg = TRUE;
+		hDataCap->capIndex = hDataCap->targetInfo.vidDetectInfo.frameIndex;
+		*capInfo = hDataCap->targetInfo.vidDetectInfo.capInfo;
+		/* enable strobe output */
+		strobe_ctrl_output_enable(hDataCap->hStrobe, capInfo);
+
+		/* send trig cmd */
+		ret = ioctl(hDataCap->fdImgCtrl, IMGCTRL_SPECTRIG, NULL);
+		if(ret < 0) {
+			ERRSTR("trig capture failed");
+			ret = E_IO;
+		}
+	}
+
+	return ret;
+}
 
 /*****************************************************************************
  Prototype    : data_capture_thread
@@ -647,6 +722,8 @@ static void *data_capture_thread(void *arg)
 		FD_SET(hDataCap->fdMsg, &rdSet);
 		if(hDataCap->fdDetect > 0)
 			FD_SET(hDataCap->fdDetect, &rdSet);
+		if(hDataCap->fdSyslink)
+			FD_SET(hDataCap->fdSyslink, &rdSet);
 		
 		ret = select(hDataCap->fdMax, &rdSet, NULL, NULL, NULL);
 		if(ret < 0 && errno != EINTR) {
@@ -665,6 +742,12 @@ static void *data_capture_thread(void *arg)
 			FD_ISSET(hDataCap->fdDetect, &rdSet) ){
 			/* trigger capture */
 			detector_trigger(hDataCap);
+		}
+
+		if( hDataCap->fdSyslink > 0 &&
+			FD_ISSET(hDataCap->fdSyslink, &rdSet) ){
+			/* process target msg */
+			target_trigger(hDataCap);
 		}
 
 		if(FD_ISSET(hDataCap->fdMsg, &rdSet)) {
@@ -1065,6 +1148,65 @@ Int32 data_capture_set_road_info(DataCapHandle hDataCap, MsgHandle hCurMsg, cons
 	/* send msg */
 	Int32 err = msg_send(hCurMsg, msg_get_name(hDataCap->hMsg), (MsgHeader *)&msg, 0);
 	
+	return err;
+}
+
+/*****************************************************************************
+ Prototype    : data_capture_cfg_plate_recog
+ Description  : cfg plate recog modlue
+ Input        : DataCapHandle hDataCap       
+                MsgHandle hCurMsg            
+                const CamPlateRecogCfg *cfg  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/11/13
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 data_capture_cfg_plate_recog(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamPlateRecogCfg *cfg)
+{
+	Int32 err;
+
+	err = target_plate_recog_cfg(hDataCap->fdSyslink, cfg);
+	if(err)
+		return err;
+	
+	if(cfg->flags & PR_FLAG_MOD_EN)
+		hDataCap->status |= CAPTHR_STAT_PR_EN;
+	else
+		hDataCap->status &= ~CAPTHR_STAT_PR_EN;
+
+	return E_NO;
+}
+
+/*****************************************************************************
+ Prototype    : data_capture_cfg_vid_detect
+ Description  : cfg video detect params
+ Input        : DataCapHandle hDataCap      
+                MsgHandle hCurMsg           
+                const CamVidDetectCfg *cfg  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/11/13
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 data_capture_cfg_vid_detect(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamVidDetectCfg *cfg)
+{
+	Int32 err;
+
+	err = target_vid_detect_cfg(hDataCap->fdSyslink, cfg);
+
 	return err;
 }
 

@@ -176,7 +176,7 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 							   capInfo->triggerInfo[i].frameId);
 		/* print retrograde info  */			
 		if( osdInfo->flags & CAM_OSD_FLAG_RETROGRADE_EN &&
-			(capInfo->triggerInfo[i].flags & TRIG_INFO_RETROGRADE) ) {
+			(capInfo->triggerInfo[i].flags & TRIG_INFO_REVERSE) ) {
 			offset += sprintf( buf + offset, "ÄæÐÐ; "); 
 		} else if((capInfo->triggerInfo[i].flags & TRIG_INFO_RED_LIGHT) && 
 				  (osdInfo->flags & CAM_OSD_FLAG_RED_LIGHT_TIME_EN)) {

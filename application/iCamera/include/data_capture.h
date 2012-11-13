@@ -27,6 +27,7 @@
 #include "cam_info.h"
 #include "day_night_switch.h"
 #include "strobe_ctrl.h"
+#include "cam_plate_recog.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -71,6 +72,8 @@ typedef struct {
 	CamRoadInfo			roadInfo;
 	DayNightHandle		hDayNight;
 	StrobeHandle		hStrobe;
+	CamPlateRecogCfg	plateRecogCfg;
+	CamVidDetectCfg		vidDetectCfg;
 }DataCapAttrs;
 
 typedef struct DataCapObj *DataCapHandle;
@@ -242,6 +245,44 @@ extern Int32 data_capture_ctrl(DataCapHandle hDataCap, MsgHandle hCurMsg, Int32 
 
 *****************************************************************************/
 extern Int32 data_capture_set_road_info(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamRoadInfo *info);
+
+/*****************************************************************************
+ Prototype    : data_capture_cfg_plate_recog
+ Description  : cfg plate recog modlue
+ Input        : DataCapHandle hDataCap       
+                MsgHandle hCurMsg            
+                const CamPlateRecogCfg *cfg  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/11/13
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 data_capture_cfg_plate_recog(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamPlateRecogCfg *cfg);
+
+/*****************************************************************************
+ Prototype    : data_capture_cfg_vid_detect
+ Description  : cfg video detect params
+ Input        : DataCapHandle hDataCap      
+                MsgHandle hCurMsg           
+                const CamVidDetectCfg *cfg  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2012/11/13
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+extern Int32 data_capture_cfg_vid_detect(DataCapHandle hDataCap, MsgHandle hCurMsg, const CamVidDetectCfg *cfg);
 
 #ifdef __cplusplus
 #if __cplusplus
