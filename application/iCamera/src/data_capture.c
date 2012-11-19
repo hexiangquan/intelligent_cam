@@ -505,12 +505,12 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 		targetInfo->plateInfoFlag = FALSE;
 		err = target_ctrl_process(hDataCap->fdSyslink, targetInfo);
 		if( targetInfo->plateInfoFlag && 
-			imgMsg.rawInfo.index >= targetInfo->plateInfo.frameIndex ) {
+			imgMsg.rawInfo.index >= targetInfo->plateFrameId) {
 			targetInfo->plateInfoFlag = FALSE;
 			imgMsg.plateInfo = targetInfo->plateInfo;
 		} else {
 			DBG("cap new img, wait plat info failed, flag: %u, index: %u, cur-index: %u",
-				targetInfo->plateInfoFlag, targetInfo->plateInfo.frameIndex, imgMsg.rawInfo.index);
+				targetInfo->plateInfoFlag, targetInfo->plateFrameId, imgMsg.rawInfo.index);
 		}
 	}
 	
@@ -662,7 +662,7 @@ static Int32 target_trigger(DataCapHandle hDataCap)
 	CaptureInfo	*capInfo = &hDataCap->capInfo;
 	if(hDataCap->targetInfo.vidDetectFlag && (hDataCap->status & CAPTHR_STAT_CAP_STARTED)) {
 		hDataCap->encImg = TRUE;
-		hDataCap->capIndex = hDataCap->targetInfo.vidDetectInfo.frameIndex;
+		hDataCap->capIndex = hDataCap->targetInfo.trigFrameId;
 		*capInfo = hDataCap->targetInfo.vidDetectInfo.capInfo;
 		/* enable strobe output */
 		strobe_ctrl_output_enable(hDataCap->hStrobe, capInfo);

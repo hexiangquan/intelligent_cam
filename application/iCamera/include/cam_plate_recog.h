@@ -21,7 +21,7 @@ typedef struct _CamPlateRecogCfg {
 	Uint32 		flags;					//flags for enable special functions
 	Uint16 		minPlateWidth;			//min license plate width, in pixels
 	Uint16 		maxPlateWidth;			//max license plate width, in pixels
-	Rectanagle 	recogRegion;			//region for recognize plate
+	Rectangle 	recogRegion;			//region for recognize plate
 	Int8 		defaultProvinces[24];	//default provinces in Chinese characters
 	Uint16 		locateThreshold;		//threshold for locate plate, 0~9	
 	Uint16 		recogThreshold;			//threshold for recognize plate, 0~9
@@ -49,9 +49,10 @@ typedef enum {
 /* Plate recognization result define */
 typedef struct _SinglePlateInfo {
 	Int8 		license[16];		//licence info
-	Rectanagle  location;    		//location of the plate
-	Uint16 		color; 				//color of the plate, see enum Color in common.h
+	Rectangle   location;    		//location of the plate
+	Uint8 		color; 				//color of the plate, see enum Color in common.h
 	Uint8 		type;				//type of plate
+	Uint8		laneId;				//way number, start from 0
 	Uint8 		confidence;			//confidence of the result, 0~100
 	Uint8 		brightness;			//brightness of the plate, unused
 	Uint8  		direction;			//direction of the plate, unused
@@ -62,7 +63,6 @@ typedef struct _SinglePlateInfo {
 
 /* Whole image info */
 typedef struct {
-	Uint32			frameIndex; //frame index from hardware
 	Uint32			totalNum;	//total num of plate recognized
 	SinglePlateInfo info[CAM_MAX_PLATE_RECOG_NUM];
 }LicensePlateInfo;

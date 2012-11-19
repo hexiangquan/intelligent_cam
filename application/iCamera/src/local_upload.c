@@ -577,8 +577,10 @@ Int32 local_upload_cfg(LocalUploadHandle hLocalUpload, UploadParams *params, Int
 *****************************************************************************/
 Int32 local_upload_send(LocalUploadHandle hLocalUpload, Bool isDir, const char *pathName, MsgHandle hCurMsg)
 {
-	if(!hLocalUpload || !pathName || !hCurMsg)
+	if(!hLocalUpload || !pathName || !hCurMsg) {
+		//ERR("local upload send, inv val: %d-%d-%d", (int)hLocalUpload, (int)pathName, (int)hCurMsg);
 		return E_INVAL;
+	}
 
 	if(hLocalUpload->pid == 0) {
 		ERR("local upload has not start running.");
@@ -591,6 +593,7 @@ Int32 local_upload_send(LocalUploadHandle hLocalUpload, Bool isDir, const char *
 	memset(&msg, 0, sizeof(msg));
 	msg.header.cmd = isDir ? APPCMD_SEND_DIR : APPCMD_SEND_FILE;
 	msg.header.dataLen = strlen(pathName) + 1;
+	msg.header.type = MSG_TYPE_REQU;
 	if(msg.header.dataLen > sizeof(msg.buf)) {
 		ERR("path name too long.");
 		return E_NOMEM;

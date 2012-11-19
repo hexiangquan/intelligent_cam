@@ -100,14 +100,22 @@ typedef struct {
 }CaptureInfo;
 
 /* Config for video detect */
+#define VDR_FLAG_IN_EN	(1 << 0)
+#define VDR_FLAG_OUT_EN	(1 << 1)
+
+typedef struct _VideoDetectRoi
+{	
+	Uint32		flags;			//Flags for detect enable
+	Rectangle 	range;
+}VidDetectRoi;
+
 typedef struct {
-	Uint32 		flags;
-	Rectanagle 	region[APP_MAX_CAP_CNT];
+	Uint32 			flags;
+	VidDetectRoi 	region[APP_MAX_CAP_CNT];
 }CamVidDetectCfg;
 
 /* Video detect result */
 typedef struct {
-	Uint32 		frameIndex;
 	CaptureInfo	capInfo;
 }VideoDetectResult;
 

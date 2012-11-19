@@ -474,6 +474,7 @@ static Int32 cam_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Int8
 	msgHdr->cmd = cmdInfo->camCmd;
 	msgHdr->index = cmdHdr->serial;
 	msgHdr->dataLen = cmdHdr->dataLen;
+	msgHdr->param[0] = msgHdr->param[1] = 0;
 
 	if(cmdInfo->flags & CMD_FLAG_CHECKSUM) {
 		/* do checksum */

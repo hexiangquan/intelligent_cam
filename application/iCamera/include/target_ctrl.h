@@ -28,7 +28,9 @@
 typedef struct {
 	Bool				vidDetectFlag;
 	Bool				plateInfoFlag;
-	VideoDetectResult 	vidDetectInfo;	
+	Uint32				trigFrameId;
+	VideoDetectResult 	vidDetectInfo;
+	Uint32				plateFrameId;		// frame id of this plate info
 	LicensePlateInfo 	plateInfo;
 }TargetInfo;
 

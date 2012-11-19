@@ -297,7 +297,8 @@ static void back_button_detect(int fdExtIo, MsgHandle hMsg)
 
 	if(isPushed) {
 		INFO("restore button is pushed, restore default cfg params...");
-		app_hdr_msg_send(hMsg, MSG_CTRL, APPCMD_RESTORE_CFG, 0, 0);
+		/* reboot after restore to default */
+		app_hdr_msg_send(hMsg, MSG_CTRL, APPCMD_RESTORE_CFG, TRUE, 0);
 	}
 }
 

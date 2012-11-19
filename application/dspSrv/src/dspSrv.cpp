@@ -168,7 +168,12 @@ int DspSrv::ReadDspImg(int& fd)
 	if(timeLapsed >= 10) {	
 		size_t speed = bytesRecv / 1024 / timeLapsed;
 		double frameRate = (double)frameCnt/((double)timeLapsed);
-		DBG("read img from dsp, speed: %u KB/s, frame rate: %.1f fps ", speed, frameRate);
+		struct timeval tv;
+		struct tm tm;
+		gettimeofday(&tv, NULL);
+		localtime_r(&tv.tv_sec, &tm);
+		DBG("<%u/%u %u:%u> read img from dsp, speed: %u KB/s, frame rate: %.1f fps ", 
+			tm.tm_mon+1, tm.tm_mday, tm.tm_hour, tm.tm_min,	speed, frameRate);
 		frameCnt = 0;
 		lastShowTime = time(NULL);
 		bytesRecv = 0;

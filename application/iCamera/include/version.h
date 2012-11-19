@@ -47,7 +47,7 @@
  * macros                                       *
  *----------------------------------------------*/
 
-#define ICAM_VERSION		(0x20121011)
+#define ICAM_VERSION		(0x20121119)
 
 /*----------------------------------------------*
  * routines' implementations                    *

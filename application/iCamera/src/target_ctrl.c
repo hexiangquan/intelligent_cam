@@ -29,6 +29,7 @@ Int32 target_ctrl_process(Int32 fd, TargetInfo *info)
 			memcpy(&info->vidDetectInfo, buf + sizeof(*msg), msg->dataLen);
 			if(info->vidDetectInfo.capInfo.capCnt)
 				info->vidDetectFlag = TRUE;
+			info->trigFrameId = msg->params[0];
 		} else {
 			ERR("invalid len of video detect result!");
 			ret = E_CHECKSUM;
@@ -39,6 +40,7 @@ Int32 target_ctrl_process(Int32 fd, TargetInfo *info)
 		if(msg->dataLen == sizeof(LicensePlateInfo)) {
 			memcpy(&info->plateInfo, buf + sizeof(*msg), msg->dataLen);
 			info->vidDetectFlag = TRUE;
+			info->plateFrameId = msg->params[0];
 		} else {
 			ERR("invalid len of plate info!");
 			ret = E_CHECKSUM;

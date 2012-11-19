@@ -135,12 +135,12 @@ typedef enum _ChromaFormat {
 }ChromaFormat;
 
 /* rectangle position */
-typedef struct _Rectanagle {
+typedef struct _Rectangle {
 	Uint16	left;
 	Uint16	top;
 	Uint16	right;
 	Uint16	bottom;
-}Rectanagle;
+}Rectangle;
 
 /* Image dimention */
 typedef struct _ImgDimension {

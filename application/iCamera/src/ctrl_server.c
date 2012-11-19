@@ -344,7 +344,7 @@ static void *ctrl_server_thread(void *arg)
 		case APPCMD_RESTORE_CFG:
 			ret = params_mng_control(hParamsMng, PMCMD_S_RESTOREDEFAULT, data, msgHdr->dataLen);
 			/* we should reboot after restore params */
-			if(!ret)
+			if(!ret && msgHdr->param[0])
 				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_MAIN, APPCMD_REBOOT, 0, 0);
 			needResp = FALSE;
 			break;
@@ -653,13 +653,11 @@ static void *ctrl_server_thread(void *arg)
 			break;
 		case ICAMCMD_S_SNDFILE:
 			/* send single file */
+			DBG("send single file cmd: %s", data);
 			ret = local_upload_send(hCtrlSrv->hLocalUpload, FALSE, data, hCtrlSrv->hMsg);
 			break;
 		case ICAMCMD_S_RESTORECFG:
 			ret = params_mng_control(hParamsMng, PMCMD_S_RESTOREDEFAULT, data, msgHdr->dataLen);
-			/* we should reboot after restore params */
-			if(!ret)
-				ret = app_hdr_msg_send(hCtrlSrv->hMsg, MSG_MAIN, APPCMD_REBOOT, 0, 0);	
 			break;
 		default:
 			ERR("unkown cmd: 0x%X", (unsigned int)msgHdr->cmd);
