@@ -105,6 +105,8 @@ typedef unsigned char	Uint8;
 /* Get randrom data */
 #define RAND(min, max)			((min)+(rand()%((max)-(min))))
 
+#define BIT(x)					(1 << (x))
+
 /* Chroma Format define */
 typedef enum _ChromaFormat {
 	FMT_NA = -1,			/* Chroma format not applicable. */
@@ -141,6 +143,18 @@ typedef struct _Rectangle {
 	Uint16	right;
 	Uint16	bottom;
 }Rectangle;
+
+/* point position */
+typedef struct _Point {
+	Uint16	x;		// horizonntal position 
+	Uint16	y;		// vertical position
+}Point;
+
+/* line */
+typedef struct _Line {
+	Point	start;
+	Point	end;
+}Line;
 
 /* Image dimention */
 typedef struct _ImgDimension {

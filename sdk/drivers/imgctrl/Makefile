@@ -57,7 +57,7 @@ debug: EXTRA_CFLAGS += -D_DEBUG
 
 .PHONY: clean debug release install default test
 	
-default: debug test
+default: debug test install
 
 docs:
 
@@ -82,6 +82,9 @@ install:
 
 clean:
 	-rm -rf *.o *mod* *.ko .cmem* .tmp*
+
+rebuild: clean default
+
 #
 #  @(#) ti.sdo.linuxutils.cmem; 2, 2, 0,142; 11-30-2010 18:31:30; /db/atree/library/trees/linuxutils/linuxutils-j02x/src/ xlibrary
 

@@ -57,6 +57,7 @@ typedef struct {
 	Uint32		magicNum;
 	Uint32		devSN;				// device serical number
 	Int8		description[32];	// device description
+	Int8		location[32];		// location of device
 	Uint32		version;			// version of main program
 	Uint32		bootTime;			// sytem boot time, in seconds since 1970.1.1 00:00
 	Uint32		runTime;			// run time, in seconds

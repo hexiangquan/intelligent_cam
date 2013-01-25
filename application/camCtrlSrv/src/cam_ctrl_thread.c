@@ -256,18 +256,13 @@ const static CmdInfo s_cmdInfo[] = {
 	/* send sd file */
 	{.tcpCmd = TC_SET_RD_SD_FILE, .camCmd = ICAMCMD_S_SNDFILE, 
 	 .flags = 0, .requLen = -1, .respLen = 0,},
-	/* set Plate recog params */
-	{.tcpCmd = TC_SET_PLATERECOGCFG, .camCmd = ICAMCMD_S_PLATERECOGCFG, 
-	 .flags = 0, .requLen = sizeof(CamPlateRecogCfg), .respLen = 0,},
-	/* get Plate recog params */
-	{.tcpCmd = TC_GET_PLATERECOGCFG, .camCmd = ICAMCMD_G_PLATERECOGCFG, 
-	 .flags = 0, .requLen = 0, .respLen = sizeof(CamPlateRecogCfg),},
-	/* set video detect params */
-	{.tcpCmd = TC_SET_VIDDETECTPARAM, .camCmd = ICAMCMD_S_VIDDETECTCFG, 
-	 .flags = 0, .requLen = sizeof(CamVidDetectCfg), .respLen = 0,},
-	/* get video detect params */
-	{.tcpCmd = TC_GET_VIDDETECTPARAM, .camCmd = ICAMCMD_G_VIDDETECTCFG, 
-	 .flags = 0, .requLen = 0, .respLen = sizeof(CamVidDetectCfg),},
+	/* set dsp */
+	{.tcpCmd = TC_SET_DSP_PARAMS, .camCmd = ICAMCMD_S_DSP, 
+	 .flags = 0, .requLen = -1, .respLen = 0,},
+	/* get dsp */
+	{.tcpCmd = TC_GET_DSP_PARAMS, .camCmd = ICAMCMD_G_DSP, 
+	 .flags = 0, .requLen = 32, .respLen = -1,}, 
+	
 };
 
 /*****************************************************************************
@@ -630,7 +625,6 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 
 	switch(cmdHdr->cmd) {
 	case TC_FUN_CAMERARESET:
-		ret = E_NO;
 		params->reboot = TRUE;
 		cmdHdr->dataLen = 0;
 		break;

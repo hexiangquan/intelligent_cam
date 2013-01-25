@@ -81,6 +81,12 @@ typedef struct {
 typedef struct {
 	Uint8	macAddr[8];		//Mac Addr
 	Uint32	deviceSN;		//Device Serial Number
+	Int8	name[32];		//Name of this device
+	Int8	location[32];	//Location of this device
+	Int8	manufacture[32];//Name of manufacture
+	Int8	model[32];		//Device Model 
+	Int8	hardware[16];	//Hardware Version
+	Int8	firmware[16];	//Firmware Version
 } CamDeviceInfo;
 
 /* 

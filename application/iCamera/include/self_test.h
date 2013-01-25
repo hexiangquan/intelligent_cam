@@ -56,6 +56,7 @@
 #define SELF_TEST_SYSCOMMU		(1 << 5)
 #define SELF_TEST_DAYNIGHT		(1 << 6)
 #define SELF_TEST_STROBE		(1 << 7)
+#define SELF_TEST_TARGETCTRL	(1 << 8)
 
 /*----------------------------------------------*
  * routines' implementations                    *

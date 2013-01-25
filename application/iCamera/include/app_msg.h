@@ -3,10 +3,8 @@
 
 #include "msg.h"
 #include "buffer.h"
-#include "cam_detector.h"
 #include "cam_info.h"
 #include "cap_info_parse.h"
-#include "cam_plate_recog.h"
 
 #define MSG_MAX_LEN		1024
 
@@ -71,6 +69,8 @@ typedef struct _CommonMsg {
 	Int8		buf[MSG_MAX_LEN];	/* Buffer for append data */
 }CommonMsg;
 
+#define CAP_INFO_SIZE	(512)
+
 /* Msg structure for new frame */
 typedef struct _ImgMsg {
 	MsgHeader		header;				/* Msg header, must be the first field */
@@ -82,8 +82,7 @@ typedef struct _ImgMsg {
 	Int32			frameType;			/* Frame type for video */
 	CamRoadInfo		roadInfo;			/* Road info */
 	RawCapInfo		rawInfo;			/* raw capture info from hardware */
-	CaptureInfo		capInfo;			/* capture info of this frame */
-	LicensePlateInfo plateInfo;			/* vehicle plate info */
+	Int8			capInfo[CAP_INFO_SIZE];	/* capture info of this frame */
 }ImgMsg;
 
 #ifdef __cplusplus

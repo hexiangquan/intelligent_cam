@@ -1,5 +1,6 @@
 #include "log.h"
 #include "sys_commu.h"
+#include <sys/ioctl.h>
 
 #define DEF_BUF_SIZE	(2 * 1024 * 1024)
 #define DEF_LOOP_CNT	1000
@@ -9,7 +10,6 @@ typedef struct _TestParams {
 	int loopCnt;
 	int bufSize;
 }TestParams;
-
 
 /* test between process */
 static Bool main_loop(TestParams *params)
@@ -22,6 +22,12 @@ static Bool main_loop(TestParams *params)
 	assert(fd > 0);
 	if(fd < 0)
 		goto exit;
+
+	struct syslink_attrs attrs;
+	attrs.info_base = 0xE0000000;
+	DBG("set syslink attrs!");
+	err = ioctl(fd, SYSLINK_S_ATTRS, &attrs);
+	assert(err == 0);
 
 	int i = 0;
 	int len = params->bufSize;
@@ -47,6 +53,8 @@ static Bool main_loop(TestParams *params)
 	fd_set	rdSet, wrSet;
 	int fdMax;
 	int errCnt = 0;
+
+	DBG("start read write loop!");
 	
 	while(++i < params->loopCnt) {
 
@@ -106,7 +114,7 @@ static Bool main_loop(TestParams *params)
 		
 		if( msg_in->dataLen != msg_out->dataLen || 
 			memcmp(data_in, data_out, msg_in->dataLen) ) {
-			ERR("\n<%d> **len diff: %d-%d, or mem cmp diff!**\n", 
+			ERR("\n<%d> len diff: %d-%d, or mem cmp diff!\n", 
 				i, msg_out->dataLen, msg_in->dataLen);
 			errCnt++;
 		} else

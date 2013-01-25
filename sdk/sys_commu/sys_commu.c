@@ -3,8 +3,69 @@
 #include "sys_commu.h"
 #include "crc16.h"
 #include "syslink.h"
+#include <sys/ioctl.h>
 
 #define SYS_COMMU_CRC_EN	1
+
+
+/*****************************************************************************
+ Prototype    : sys_commu_init
+ Description  : init sys commu chan
+ Input        : struct syslink_attrs *attrs  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2013/1/18
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+int sys_commu_open(struct syslink_attrs *attrs)
+{
+	int fd;
+
+	fd = open(SYSLINK_DEV_NAME, O_RDWR);
+	if(fd < 0) {
+		ERRSTR("open %s failed!", SYSLINK_DEV_NAME);
+		return E_IO;
+	}
+
+	int err = ioctl(fd, SYSLINK_S_ATTRS, attrs);
+	if(err < 0) {
+		ERR("set attrs failed!");
+		close(fd);
+		return E_INVAL;
+	}
+
+	return fd;
+}
+
+/*****************************************************************************
+ Prototype    : sys_commu_close
+ Description  : close sys commu chan
+ Input        : int fd  
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2013/1/18
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+int sys_commu_close(int fd)
+{
+	if(fd < 0)
+		return E_IO;
+	
+	close(fd);
+	return E_NO;
+}
 
 /*****************************************************************************
  Prototype    : sys_commu_read
@@ -31,39 +92,25 @@ int sys_commu_read(int fd, SysMsg *msg, int len)
 
 	int ret;
 
+	//DBG("read len: %d", len);
+
 	/* read msg header */
-	do {
-		ret = read(fd, msg, sizeof(SysMsg));
-		//DBG("read len: %d", ret);
-		
-		if(ret != sizeof(SysMsg))
-			return E_IO;
-	} while(msg->magic != SYS_MSG_MAGIC);
+	ret = read(fd, msg, len);
 
-	if(msg->dataLen) {
-		/* Read additional data */
-		if(len - sizeof(SysMsg) < msg->transLen) {
-			ERR("no enough space for recieve append data, translen: %u, buf available: %u",
-				msg->transLen, len - sizeof(SysMsg));
-			/* clear such length */
-			ioctl(fd, SYSLINK_FLUSH_RD, &msg->transLen);
-			return E_NOSPC;
-		}
-
-		Uint8 *data = (Uint8 *)msg + sizeof(SysMsg);
-		ret = read(fd, data, msg->transLen);
-		if(ret < 0)
-			return E_IO;
+	if(ret < 0)
+		return ret;
 		
 	#ifdef SYS_COMMU_CRC_EN
+	if(msg->dataLen) {
+		Uint8 *data = (Uint8 *)msg + sizeof(SysMsg);
 		Uint32 crc = crc16(data, msg->dataLen);
 		if(crc != msg->checksum) {
 			ERR("crc check failed(%x-%x), cmd: %x, data len: %u!",
 				msg->checksum, crc, msg->cmd, msg->dataLen);
 			return E_CHECKSUM;
 		}
-	#endif
 	}
+	#endif
 
 	//DBG("recv len: %u, data len: %u", ret, msg->transLen + sizeof(SysMsg));
 	return E_NO;

@@ -2,7 +2,7 @@
 #include "crc16.h"
 #include "log.h"
 #include "syslink.h"
-#include "sys_commu.h"
+#include "syslink_proto.h"
 
 /*****************************************************************************
  Prototype    : dsp_update
@@ -32,15 +32,15 @@ Int32 dsp_update(const void *data, size_t len, Uint32 checksum)
 		return E_CHECKSUM;
 	}
 
-	int fd = open(SYSLINK_DEV, O_RDWR);
+	int fd = open(SYSLINK_DEV_NAME, O_RDWR);
 	if(fd < 0) {
-		ERRSTR("open %s failed", SYSLINK_DEV);
+		ERRSTR("open %s failed", SYSLINK_DEV_NAME);
 		return E_IO;
 	}
 
 	
-	size_t bufLen = sizeof(SysMsg) + ROUND_UP(len, SYS_MSG_ALIGN);
-	SysMsg *msgBuf = calloc(1, bufLen);
+	size_t bufLen = sizeof(struct syslink_msg) + ROUND_UP(len, SYS_MSG_ALIGN);
+	struct syslink_msg *msgBuf = calloc(1, bufLen);
 	Int32 ret;
 	if(!msgBuf) {
 		ret = E_NOMEM;

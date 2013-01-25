@@ -1,13 +1,15 @@
 #include "params_mng.h"
+#include "version.h"
 
-#define LOCAL_IP		"192.168.0.218"
+#define NET_SEG			"192.168.10."
+#define LOCAL_IP		NET_SEG"245"
 #define IP_MASK			"255.255.255.0"
-#define GATE_WAY		"192.168.0.1"
+#define GATE_WAY		NET_SEG"1"
 #define DOMAIN_NAME		"WORKGROUP"
 #define HOST_NAME		"dm36x-ipnc"
-#define DNS_SERVER		"192.168.0.1"
-#define SERVER_IP		"192.168.0.25"
-#define NTP_SRV_IP		"192.168.0.11"
+#define DNS_SERVER		NET_SEG"1"
+#define SERVER_IP		NET_SEG"10"
+#define NTP_SRV_IP		NET_SEG"10"
 #define TCP_SRV_PORT	9300
 #define OSD_STRING		"HDCAM"
 #define ROAD_NAME		OSD_STRING
@@ -15,6 +17,8 @@
 #define RTP_PAYLOAD		21
 #define FTP_USER_NAME	"test"
 #define FTP_PASS_WORD	"123456"
+#define MANUFACTURE		"iCare Vision"
+#define MODEL			"ITC-200"
 
 #define DEF_DETECTOR	2
 
@@ -31,8 +35,14 @@ const AppParams c_appParamsDef = {
 		.dnsServer = {DNS_SERVER},
 	},
 	.devInfo = {
-		.macAddr = {0x0C, 0x00, 0x20, 0x12, 0x03, 0x06},
-		.deviceSN = 20120306,
+		.macAddr = {0x0C, 0x00, 0x20, 0x12, 0x03, 0x04},
+		.deviceSN = 20130104,
+		.name = {OSD_STRING},
+		.location = {ROAD_NAME},
+		.manufacture = {MANUFACTURE},
+		.model = {MODEL},
+		.firmware = {FIRMWARE_VER},
+		.hardware = {HARDWARE_VER},
 	},
 	.osdParams = {
 		.imgOsd = {
@@ -151,8 +161,11 @@ const AppParams c_appParamsDef = {
 	.strobeParams = {
 		.status = 0,
 		.switchMode = CAM_STROBE_SWITCH_AUTO,
-		.ctrlFlags = 0,
-		.threshold = 0,
+		.ctrlFlags = 
+			CAM_STROBE_FLAG_AUTO0 | CAM_STROBE_FLAG_AUTO1 | CAM_STROBE_FLAG_AUTO2 | CAM_STROBE_FLAG_EN_BY_WAY,
+		.thresholdOn = 10,
+		.thresholdOff = 25,
+		.offset = 100,
 	},
 	.detectorParams = {
 	#if 0
@@ -204,15 +217,6 @@ const AppParams c_appParamsDef = {
 		.aeMaxGain = 300,
 		.aeTargetVal = 75,
 		.flags = CAM_SPEC_CAP_FLAG_AE_EN,
-	},
-	.plateRecogCfg = {
-		.flags = PR_FLAG_MOD_EN | PR_FLAG_INDIVIDUAL_EN,
-		.minPlateWidth = 80,
-		.maxPlateWidth = 200,
-		.recogRegion = {0,0,0,0}, // all the frame
-		.defaultProvinces = "’„À’ª¶",
-		.locateThreshold = 5,
-		.recogThreshold = 1,
 	},
 };
 

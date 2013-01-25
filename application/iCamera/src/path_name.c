@@ -272,8 +272,8 @@ Int32 path_name_generate(PathNameHandle hPathName, const ImgMsg *imgBuf, PathNam
 	Int8 				prePattern[PATHNAME_MAX_LINE_SIZE];
 	Int8 				fullName[PATHNAME_MAX_LINE_SIZE];
 	Uint32 				i, patternLen, index;
-	Int32 				capCnt = imgBuf->capInfo.capCnt;
-	const CaptureInfo	*capInfo = &imgBuf->capInfo;
+	const CaptureInfo	*capInfo = (CaptureInfo *)imgBuf->capInfo;
+	Int32 				capCnt = capInfo->capCnt;
 	Uint16 				redLightTime;
 	const DateTime 		*capTime = &imgBuf->timeStamp;
 
@@ -537,7 +537,7 @@ Int32 path_name_test()
 
 	/* generate file name */
 	ImgMsg img;
-	CaptureInfo *capInfo = &img.capInfo;
+	CaptureInfo *capInfo = (CaptureInfo *)img.capInfo;
 
 	bzero(&img, sizeof(img));
 

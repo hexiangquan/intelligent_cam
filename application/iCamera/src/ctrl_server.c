@@ -35,6 +35,7 @@
 #include <sys/ioctl.h>
 #include "strobe_ctrl.h"
 #include "ntp_sync.h"
+#include "target_ctrl.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -65,6 +66,7 @@
  *----------------------------------------------*/
 #define CTRL_MSG_BUF_LEN		(2 * 1024 * 1024)
 #define EXTIO_DEV				"/dev/extio"
+#define HOME_PATH				"/home/root"
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -90,6 +92,7 @@ struct CtrlSrvObj{
 	pthread_mutex_t 	encMutex;		//mutex for encoders
 	Bool				exit;			//flag for exit
 	const char			*msgName;		//our msg name for IPC
+	const char			*cfgFileName;	//name of cfg file
 	DayNightHandle		hDayNight;		//day night  switch obj
 	StrobeHandle		hStrobe;		//strobe ctrl obj
 	NtpSyncHandle		hNtpSync;		//Ntp time sync obj
@@ -334,12 +337,15 @@ static void *ctrl_server_thread(void *arg)
 		case APPCMD_SET_CAP_INPUT:
 			ret = cap_info_update(hCtrlSrv);
 			needResp = FALSE;
+			target_reset();
 			break;
 		case APPCMD_DAY_NIGHT_SWITCH:
 			ret = params_mng_control(hCtrlSrv->hParamsMng, 
 					PMCMD_S_SWITCHDAYNIGHT, &msgHdr->param[0], sizeof(msgHdr->param[0]));
 			if(!ret)
 				ret = conv_params_update(hCtrlSrv);
+			target_day_night_switch(msgHdr->param[0]);
+			needResp = FALSE;
 			break;
 		case APPCMD_RESTORE_CFG:
 			ret = params_mng_control(hParamsMng, PMCMD_S_RESTOREDEFAULT, data, msgHdr->dataLen);
@@ -616,24 +622,6 @@ static void *ctrl_server_thread(void *arg)
 			ret = params_mng_control(hParamsMng, PMCMD_G_DAYNIGHTCFG, data, CTRL_MSG_BUF_LEN);
 			respLen = sizeof(CamDayNightModeCfg);
 			break;
-		case ICAMCMD_S_PLATERECOGCFG:
-			ret = params_mng_control(hParamsMng, PMCMD_S_PLATERECOGCFG, data, msgHdr->dataLen);
-			if(!ret)
-				ret = data_capture_cfg_plate_recog(hCtrlSrv->hDataCap, hCtrlSrv->hMsg, (CamPlateRecogCfg *)data);
-			break;
-		case ICAMCMD_G_PLATERECOGCFG:
-			ret = params_mng_control(hParamsMng, PMCMD_G_PLATERECOGCFG, data, CTRL_MSG_BUF_LEN);
-			respLen = sizeof(CamPlateRecogCfg);
-			break;
-		case ICAMCMD_S_VIDDETECTCFG:
-			ret = params_mng_control(hParamsMng, PMCMD_S_VIDDETECTCFG, data, msgHdr->dataLen);
-			if(!ret)
-				ret = data_capture_cfg_vid_detect(hCtrlSrv->hDataCap, hCtrlSrv->hMsg, (CamVidDetectCfg *)data);
-			break;
-		case ICAMCMD_G_VIDDETECTCFG:
-			ret = params_mng_control(hParamsMng, PMCMD_G_VIDDETECTCFG, data, CTRL_MSG_BUF_LEN);
-			respLen = sizeof(CamVidDetectCfg);
-			break;
 		case ICAMCMD_S_CAPCTRL:
 			/* tell other tasks to update params */
 			ret = data_capture_ctrl(hCtrlSrv->hDataCap, hCtrlSrv->hMsg, *(Int32 *)data);
@@ -658,6 +646,17 @@ static void *ctrl_server_thread(void *arg)
 			break;
 		case ICAMCMD_S_RESTORECFG:
 			ret = params_mng_control(hParamsMng, PMCMD_S_RESTOREDEFAULT, data, msgHdr->dataLen);
+			break;
+		case ICAMCMD_S_DSP:
+			ret = target_set_params(data, msgHdr->dataLen);
+			break;
+		case ICAMCMD_G_DSP:
+			ret = target_get_params(data, msgHdr->dataLen, data, 1024);
+			break;
+		case ICAMCMD_G_CFG_NAME:
+			respLen = sprintf(data, "%s/%s", HOME_PATH, hCtrlSrv->cfgFileName);
+			respLen += 1;
+			ret = E_NO;
 			break;
 		default:
 			ERR("unkown cmd: 0x%X", (unsigned int)msgHdr->cmd);
@@ -793,10 +792,6 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 			&dataCapAttrs.detectorParams, sizeof(dataCapAttrs.detectorParams));
 	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_CONVTERPARAMS, 
 			&dataCapAttrs.convParams, sizeof(dataCapAttrs.convParams));
-	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_VIDDETECTCFG, 
-			&dataCapAttrs.vidDetectCfg, sizeof(dataCapAttrs.vidDetectCfg));
-	ret |= params_mng_control(hCtrlSrv->hParamsMng, PMCMD_G_PLATERECOGCFG, 
-			&dataCapAttrs.plateRecogCfg, sizeof(dataCapAttrs.plateRecogCfg));
 	assert(ret == E_NO);
 
 	DBG("creating data capture...");
@@ -869,6 +864,8 @@ CtrlSrvHandle ctrl_server_create(CtrlSrvAttrs *attrs)
 	if(!hCtrlSrv->hNtpSync) {
 		goto exit;
 	}
+
+	target_ctrl_init(5000);
 	
 	return hCtrlSrv;
 
@@ -1030,6 +1027,9 @@ Int32 ctrl_server_delete(CtrlSrvHandle hCtrlSrv, MsgHandle hCurMsg)
 	if(hCtrlSrv->hParamsMng) {
 		params_mng_delete(hCtrlSrv->hParamsMng);
 	}
+
+	/* exit target ctrl module */
+	target_ctrl_exit();
 
 	free(hCtrlSrv);
 

@@ -100,20 +100,15 @@ static Int32 broadcast_info_init(ICamCtrlHandle hCamCtrl, CamBroadcastInfo *info
 
 	/* sleep a while so that icam will start */
 	sleep(2);
-	
-	/* using road name for dev description */
-	CamRoadInfo roadInfo;
-	Int32 err = icam_get_road_info(hCamCtrl, &roadInfo);
-	if(err)
-		return err;
-	strncpy(info->description, roadInfo.roadName, sizeof(info->description));
 
-	/* get device SN */
+	/* get device info */
 	CamDeviceInfo devInfo;
-	err = icam_get_dev_info(hCamCtrl, &devInfo);
+	Int32 err = icam_get_dev_info(hCamCtrl, &devInfo);
 	if(err)
 		return err;
 	info->devSN = devInfo.deviceSN;
+	strncpy(info->description, devInfo.name, sizeof(info->description));
+	strncpy(info->location, devInfo.location, sizeof(info->location));
 	
 	return E_NO;
 	

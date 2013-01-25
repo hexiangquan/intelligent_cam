@@ -20,6 +20,7 @@
 #include "add_osd.h"
 #include "cam_time.h"
 #include "log.h"
+#include "cam_detector.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -151,7 +152,7 @@ Int32 add_osd(OsdHandle hOsd, ImgMsg *imgMsg, CamOsdInfo *osdInfo)
 		inArgs.startY += yStep;
 	}
 
-	CaptureInfo	*capInfo = &imgMsg->capInfo;
+	CaptureInfo	*capInfo = (CaptureInfo *)imgMsg->capInfo;
 	Int32 		offset, i;
 
 	if(capInfo->capCnt > APP_MAX_CAP_CNT)

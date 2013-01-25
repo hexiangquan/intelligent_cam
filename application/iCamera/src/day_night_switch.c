@@ -26,7 +26,6 @@
 #include "log.h"
 #include "cam_time.h"
 #include <pthread.h>
-#include "target_ctrl.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -91,6 +90,8 @@ Int32 day_night_cfg_params(DayNightHandle hDayNight, const CamDayNightModeCfg *c
 
 	pthread_mutex_lock(&hDayNight->mutex);
 	hDayNight->cfg = *cfg;
+	/* convert from 8 bits to 12 bits so we can compare with raw info */
+	hDayNight->cfg.threshold <<= 4;
 	pthread_mutex_unlock(&hDayNight->mutex);
 
 	if(cfg->switchMethod == CAM_DN_SWT_TIME)
@@ -101,9 +102,6 @@ Int32 day_night_cfg_params(DayNightHandle hDayNight, const CamDayNightModeCfg *c
 			cfg->threshold, hDayNight->minSwitchCnt);
 	else
 		DBG("day night cfg params, none-switch.");
-
-	/* tell target to set current day night mode */
-	target_day_night_cfg(-1, hDayNight->cfg.mode);
 	
 	return E_NO;
 }
@@ -255,10 +253,6 @@ Int32 day_night_delete(DayNightHandle hDayNight)
 *****************************************************************************/
 static Int32 day_night_notify_switch(DayNightHandle hDayNight, MsgHandle hCurMsg)
 {
-	/* notify target to switch, using invalid fd because it will be opened in the function */
-	int fd = -1;
-	target_day_night_cfg(fd, hDayNight->cfg.mode);
-
 	if(!hCurMsg || !hDayNight->dstMsg)
 		return E_MODE;
 
@@ -374,8 +368,10 @@ Int32 day_night_check_by_lum(DayNightHandle hDayNight, Uint16 lumVal, MsgHandle 
 			cfg->mode = CAM_DAY_MODE;
 
 		/* If switch mode failed, we need to keep previous mode */
-		if(day_night_notify_switch(hDayNight, hCurMsg) != E_NO)
+		Int32 err = day_night_notify_switch(hDayNight, hCurMsg);
+		if(err != E_NO)
 			cfg->mode = oldMode;
+		return err;
 	}
 
 	return E_AGAIN;	

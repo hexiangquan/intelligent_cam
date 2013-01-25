@@ -20,20 +20,6 @@
 #define __TARGET_SRV_H__
 
 #include "common.h"
-#include "cam_plate_recog.h"
-#include "cam_detector.h"
-#include "cam_status.h"
-
-/* struct for keep data from target */
-typedef struct {
-	Bool				vidDetectFlag;
-	Bool				plateInfoFlag;
-	Uint32				trigFrameId;
-	VideoDetectResult 	vidDetectInfo;
-	Uint32				plateFrameId;		// frame id of this plate info
-	LicensePlateInfo 	plateInfo;
-}TargetInfo;
-
 
 #ifdef __cplusplus
 #if __cplusplus
@@ -42,24 +28,34 @@ extern "C"{
 #endif /* __cplusplus */
 
 /**
- * target_ctrl_process -- recv and process msg from target processor
+ * target_ctrl_init -- init target ctrl module 
  */
-extern Int32 target_ctrl_process(Int32 fd, TargetInfo *info);
+extern Int32 target_ctrl_init(Uint32 timeout);
 
 /**
- * target_plate_recog_cfg -- cfg plate recog alg
+ * target_ctrl_exit -- exit target ctrl module 
  */
-extern Int32 target_plate_recog_cfg(Int32 fdSyslink, const CamPlateRecogCfg *cfg);
+extern Int32 target_ctrl_exit();
 
 /**
- * target_vid_detect_cfg -- cfg video detect alg
+ * target_set_params -- cfg params to target
  */
-extern Int32 target_vid_detect_cfg(Int32 fdSyslink, const CamVidDetectCfg *cfg);
+extern Int32 target_set_params(const void *data, size_t dataLen);
 
 /**
- * target_day_night_cfg -- notify target to switch day night mode
+ * target_get_params -- get params from target
  */
-extern Int32 target_day_night_cfg(Int32 fdSyslink, CamDayNightMode mode);
+extern Int32 target_get_params(const void *info, size_t infoLen, void *data, size_t dataLen);
+
+/**
+ * target_reset -- reset target
+ */
+extern Int32 target_reset();
+
+/**
+ * target_day_night_switch -- switch day night mode
+ */
+extern Int32 target_day_night_switch(Bool isNightMode);
 
 
 #ifdef __cplusplus

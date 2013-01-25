@@ -39,6 +39,7 @@
 #include "net_utils.h"
 #include "display.h"
 #include "cam_plate_recog.h"
+#include "cam_face_recog.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -2952,148 +2953,6 @@ static Int32 get_spec_cap_params(ParamsMngHandle hParamsMng, void *data, Int32 s
 }
 
 /*****************************************************************************
- Prototype    : set_plate_recog_cfg
- Description  : set plate recog cfg
- Input        : ParamsMngHandle hParamsMng  
-                void *data                  
-                Int32 size                  
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/11/13
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static Int32 set_plate_recog_cfg(ParamsMngHandle hParamsMng, void *data, Int32 size)
-{
-	if(!data || size != sizeof(CamPlateRecogCfg)) 
-		return E_INVAL;
-
-	CamPlateRecogCfg *params = (CamPlateRecogCfg *)data;
-	AppParams *appCfg = &hParamsMng->appParams;
-	Int32 err = validate_region(hParamsMng, (CamRect *)&params->recogRegion);
-	/* validate data */
-	if( err != E_NO || 
-		params->minPlateWidth > params->maxPlateWidth ||
-		params->locateThreshold > PR_MAX_LOCATE_THRESHOLD || 
-		params->recogThreshold > PR_MAX_RECOG_THRESHOLD) {
-		ERR("invalid spec cap params");
-		return E_INVAL;
-	}
-
-	/* Copy data */
-	appCfg->plateRecogCfg = *params;
-
-	return E_NO;
-}
-
-/*****************************************************************************
- Prototype    : get_plate_recog_cfg
- Description  : get plate recog cfg
- Input        : ParamsMngHandle hParamsMng  
-                void *data                  
-                Int32 size                  
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/11/13
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static Int32 get_plate_recog_cfg(ParamsMngHandle hParamsMng, void *data, Int32 size)
-{
-	if(!data || size < sizeof(CamPlateRecogCfg)) 
-		return E_INVAL;
-
-	AppParams *appCfg = &hParamsMng->appParams;
-	
-	/* Copy data */
-	*(CamPlateRecogCfg *)data = appCfg->plateRecogCfg;
-
-	return E_NO;
-}
-
-/*****************************************************************************
- Prototype    : set_vid_dectect_cfg
- Description  : set video detect cfg params
- Input        : ParamsMngHandle hParamsMng  
-                void *data                  
-                Int32 size                  
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/11/13
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static Int32 set_vid_detect_cfg(ParamsMngHandle hParamsMng, void *data, Int32 size)
-{
-	if(!data || size != sizeof(CamVidDetectCfg)) 
-		return E_INVAL;
-
-	AppParams 		*appCfg = &hParamsMng->appParams;
-	CamVidDetectCfg *params = (CamVidDetectCfg *)data;
-	Int32			err;	
-	Int32 			i;
-	
-	for(i = 0; i != APP_MAX_CAP_CNT; ++i) {
-		err = validate_region(hParamsMng, (CamRect *)&params->region[i]);
-		if(err)
-			break;
-	}
-
-	if(err)
-		return E_INVAL;
-
-	appCfg->videoDetectCfg = *params;
-
-	return E_NO;
-}
-
-/*****************************************************************************
- Prototype    : get_vid_detect_cfg
- Description  : get video detect params
- Input        : ParamsMngHandle hParamsMng  
-                void *data                  
-                Int32 size                  
- Output       : None
- Return Value : static
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/11/13
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-static Int32 get_vid_detect_cfg(ParamsMngHandle hParamsMng, void *data, Int32 size)
-{
-	if(!data || size < sizeof(CamVidDetectCfg)) 
-		return E_INVAL;
-
-	AppParams *appCfg = &hParamsMng->appParams;
-	
-	/* Copy data */
-	*(CamVidDetectCfg *)data = appCfg->videoDetectCfg;
-
-	return E_NO;
-}
-
-
-/*****************************************************************************
  Prototype    : get_img_osd_info
  Description  : get osd info for image
  Input        : ParamsMngHandle hParamsMng  
@@ -3423,10 +3282,6 @@ static const PmCtrlInfo g_paramsConfig[] = {
 	{.cmd = PMCMD_S_SPECCAPPARAMS, .fxn = set_spec_cap_params, .flags = PM_CTRL_INFO_SAVE,},
 	{.cmd = PMCMD_G_SPECCAPPARAMS, .fxn = get_spec_cap_params, .flags = 0,},
 	{.cmd = PMCMD_S_RESTOREDEFAULT, .fxn = restore_default, .flags = PM_CTRL_INFO_SAVE,},
-	{.cmd = PMCMD_S_PLATERECOGCFG, .fxn = set_plate_recog_cfg, .flags = PM_CTRL_INFO_SAVE,},
-	{.cmd = PMCMD_G_PLATERECOGCFG, .fxn = get_plate_recog_cfg, .flags = 0,},
-	{.cmd = PMCMD_S_VIDDETECTCFG, .fxn = set_vid_detect_cfg, .flags = PM_CTRL_INFO_SAVE,},
-	{.cmd = PMCMD_G_VIDDETECTCFG, .fxn = get_vid_detect_cfg, .flags = 0,},
 	{.cmd = PMCMD_MAX0, .fxn = NULL, .flags = 0,},
 };
 

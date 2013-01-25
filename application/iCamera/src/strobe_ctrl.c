@@ -181,7 +181,7 @@ static Int32 strobe_ctrl_sync_hw(StrobeHandle hStrobe)
 
 		info.status = params->status & 0x0F;
 		info.sigVal = params->sigVal & 0x0F;
-		info.mode = params->mode & 0x0F;
+		info.mode = params->outMode & 0x0F;
 		info.syncAC = params->acSyncEn & 0x0F;
 		info.offset = params->offset;
 		
@@ -246,6 +246,10 @@ Int32 strobe_ctrl_set_cfg(StrobeHandle hStrobe, const CamStrobeCtrlParam *params
 	if(params->ctrlFlags & 0x04)
 		hStrobe->enableCnt++;
 
+	/* convert orginal threshold from 8 bits to 12 bits so we can compare with raw info */
+	hStrobe->params.thresholdOn <<= 4;
+	hStrobe->params.thresholdOff <<= 4;
+	hStrobe->lumKeepCnt = 0;
 	DBG("strobe set switch mode: %d, enable flag: 0x%x, cur status: 0x%x",
 		params->switchMode, params->ctrlFlags, params->status);
 
@@ -285,10 +289,13 @@ Int32 strobe_ctrl_get_cfg(StrobeHandle hStrobe, CamStrobeCtrlParam *params)
 		hStrobe->params.offset = info.offset;
 		hStrobe->params.sigVal = info.sigVal;
 		hStrobe->params.acSyncEn = info.syncAC;
-		hStrobe->params.mode = info.mode;
+		hStrobe->params.outMode = info.mode;
 	}
 
 	*params = hStrobe->params;
+	/* convert back to 8 bits -- original value */
+	params->thresholdOn >>= 4;
+	params->thresholdOff >>= 4;
 	DBG("strobe get cfg: time: %u:%u - %u:%u", params->enStartHour, params->enStartMin,
 		params->enEndHour, params->enEndMin);
 	return E_NO;
@@ -392,12 +399,12 @@ static Int32 strobe_switch_by_time(StrobeHandle hStrobe, const DateTime *curTime
 Int32 strobe_switch_by_lum(StrobeHandle hStrobe, Uint16 lumVal)
 {
 	if(hStrobe->outputEnable) {
-		if(lumVal <= hStrobe->params.threshold) 
+		if(lumVal <= hStrobe->params.thresholdOff) 
 			hStrobe->lumKeepCnt = 0;
 		else
 			hStrobe->lumKeepCnt++;
 	} else {
-		if(lumVal > hStrobe->params.threshold) 
+		if(lumVal > hStrobe->params.thresholdOn) 
 			hStrobe->lumKeepCnt = 0;
 		else
 			hStrobe->lumKeepCnt++;
@@ -409,6 +416,7 @@ Int32 strobe_switch_by_lum(StrobeHandle hStrobe, Uint16 lumVal)
 		} else
 			hStrobe->outputEnable = TRUE;
 
+		hStrobe->lumKeepCnt = 0;
 		return E_NO;
 	}
 
@@ -527,14 +535,15 @@ Int32 strobe_ctrl_test()
 	attrs.params.status = 0x03;
 	attrs.params.switchMode = CAM_STROBE_SWITCH_OFF;
 	attrs.params.ctrlFlags = CAM_STROBE_FLAG_AUTO0 | CAM_STROBE_FLAG_AUTO1 | CAM_STROBE_FLAG_AUTO2;
-	attrs.params.threshold = 255;
+	attrs.params.thresholdOn = 200;
+	attrs.params.thresholdOff = 230;
 	attrs.params.offset = 500;
 	attrs.params.enStartHour = 18;
 	attrs.params.enStartMin = 10;
 	attrs.params.enEndHour = 5;
 	attrs.params.enEndMin = 30;
 	attrs.params.sigVal = CAM_STROBE_SIG_HIGH << 1;
-	attrs.params.mode = 0;
+	attrs.params.outMode = 0;
 	attrs.params.acSyncEn = CAM_STROBE_AC_SYNC_EN;
 
 	StrobeHandle hStrobe;
@@ -621,7 +630,7 @@ Int32 strobe_ctrl_test()
 	assert(err == E_NO);
 
 	for(i = 0; i <= minSwitchCnt; ++i) {
-		err = strobe_ctrl_auto_switch(hStrobe, &curTime, params.threshold - i - 1);
+		err = strobe_ctrl_auto_switch(hStrobe, &curTime, params.thresholdOn - i - 1);
 		if(i < minSwitchCnt)
 			assert(err == E_AGAIN);
 		else

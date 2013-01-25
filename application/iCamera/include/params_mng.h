@@ -28,7 +28,6 @@
 #include "cam_detector.h"
 #include "cam_status.h"
 #include "cam_file.h"
-#include "cam_plate_recog.h"
 #include <pthread.h>
 
 /*----------------------------------------------*
@@ -96,8 +95,6 @@ typedef struct _AppParams {
 	CamDayNightModeCfg		dayNightCfg;		//day night mode config
 	CamAVParam				avParams;			//analog video params
 	CamSpecCapParams		specCapParams;		//special capture params
-	CamPlateRecogCfg		plateRecogCfg;		//plate recognize params
-	CamVidDetectCfg			videoDetectCfg;		//video detect cfg
 }AppParams;
 
 typedef struct ParamsMngObj *ParamsMngHandle;
@@ -160,10 +157,6 @@ typedef enum {
 	PMCMD_S_SPECCAPPARAMS,
 	PMCMD_G_SPECCAPPARAMS,
 	PMCMD_S_RESTOREDEFAULT,
-	PMCMD_S_PLATERECOGCFG,
-	PMCMD_G_PLATERECOGCFG,
-	PMCMD_S_VIDDETECTCFG,
-	PMCMD_G_VIDDETECTCFG,
 	PMCMD_MAX0,
 
 	/* app module cmds */

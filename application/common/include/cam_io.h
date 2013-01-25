@@ -51,14 +51,15 @@ typedef struct {
 	Uint16	status;			//current status, bit[0:1]--strobe[0:1]
 	Uint16	switchMode;		//switch mode, see CamStrobeSwitchMode
 	Uint16	ctrlFlags;		//see macros for CAM_STROBE_FLAG_XXX above
-	Uint16	threshold;		//lum threshold for auto switch
-	Int32	offset;			//offset for pre-enable strobe, Uinit: us
+	Uint16	thresholdOn;	//lum threshold for turn on strobe in auto switch mode
+	Uint16	thresholdOff;	//lum threshold for turn off strobe in auto switch mode
+	Uint16	offset;			//offset for pre-enable strobe, Uinit: us
 	Uint8	enStartHour;	//start hour, 0~23
 	Uint8	enStartMin;		//start minute, 0~59
 	Uint8	enEndHour;		//end hour
 	Uint8	enEndMin;		//end minute, 0~59
 	Uint8	sigVal;			//output signals value, bit[0:2]-stobe[0:2], 
-	Uint8	mode;			//trig or freq output, bit[0:2]-strobe[0:2]
+	Uint8	outMode;		//trig or freq output, bit[0:2]-strobe[0:2]
 	Uint8	acSyncEn;		//sync with AC signals or not
 	Uint8	reserved[5];		
 } CamStrobeCtrlParam;

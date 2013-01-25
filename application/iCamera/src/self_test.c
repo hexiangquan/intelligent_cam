@@ -28,6 +28,9 @@ extern Int32 day_night_test();
 /* self test function */
 extern Int32 strobe_ctrl_test();
 
+/* target commu test */
+extern Int32 target_ctrl_test();
+
 
 /*****************************************************************************
  Prototype    : self_test
@@ -74,6 +77,9 @@ Int32 self_test(Int32 flags)
 
 	if(flags & SELF_TEST_STROBE)
 		err = strobe_ctrl_test();
+
+	if(flags & SELF_TEST_TARGETCTRL)
+		err = target_ctrl_test();
 	
 	INFO("self test pass...\n");
 

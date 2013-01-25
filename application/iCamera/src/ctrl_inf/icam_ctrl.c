@@ -2206,6 +2206,44 @@ Int32 icam_restore_cfg(ICamCtrlHandle hCtrl)
 }
 
 /*****************************************************************************
+ Prototype    : icam_get_cfg_name
+ Description  : get cfg file name
+ Input        : ICamCtrlHandle hCtrl  
+                char *fname           
+                size_t bufLen         
+ Output       : None
+ Return Value : 
+ Calls        : 
+ Called By    : 
+ 
+  History        :
+  1.Date         : 2013/1/24
+    Author       : Sun
+    Modification : Created function
+
+*****************************************************************************/
+Int32 icam_get_cfg_name(ICamCtrlHandle hCtrl, char *fname, size_t bufLen)
+{
+	if(!hCtrl || !fname || !bufLen)
+		return E_INVAL;
+
+	char buf[256];
+	MsgHeader *msg = (MsgHeader *)buf;
+
+	bzero(buf, sizeof(buf));
+	msg->cmd = ICAMCMD_G_CFG_NAME;
+
+	Int32 ret = icam_send_cmd(hCtrl, ICAMCMD_G_CFG_NAME, msg, sizeof(*msg), sizeof(buf));
+	if(ret != E_NO)
+		return ret;
+
+	char *name = buf + sizeof(*msg);
+	strncpy(fname, name, bufLen);
+
+	return E_NO;
+}
+
+/*****************************************************************************
  Prototype    : icam_sys_reset
  Description  : reset icamera and system
  Input        : ICamCtrlHandle hCtrl  
@@ -2397,154 +2435,6 @@ Int32 icam_get_sd_dir_info(ICamCtrlHandle hCtrl, const char *dirPath, void *buf,
 
 	/* result of this cmd */
 	return E_NO;
-}
-
-/*****************************************************************************
- Prototype    : icam_set_plate_recog_cfg
- Description  : set plate recog cfg 
- Input        : ICamCtrlHandle hCtrl         
-                const CamPlateRecogCfg *cfg  
- Output       : None
- Return Value : 
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/11/13
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-Int32 icam_set_plate_recog_cfg(ICamCtrlHandle hCtrl, const CamPlateRecogCfg *cfg)
-{
-	struct {
-		MsgHeader 			hdr;
-		CamPlateRecogCfg 	params;
-	}msgBuf;
-
-	Int32 ret;
-
-	if(!hCtrl || !cfg)
-		return E_INVAL;
-
-	msgBuf.params = *cfg;
-	ret = icam_send_cmd(hCtrl, ICAMCMD_S_PLATERECOGCFG, &msgBuf, sizeof(msgBuf), sizeof(msgBuf));
-	if(ret)
-		return ret;
-
-	/* result of this cmd */
-	return msgBuf.hdr.param[0];
-}
-
-/*****************************************************************************
- Prototype    : icam_get_plate_recog_cfg
- Description  : get cam plate recog cfg params
- Input        : ICamCtrlHandle hCtrl   
-                CamPlateRecogCfg *cfg  
- Output       : None
- Return Value : 
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/11/13
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-Int32 icam_get_plate_recog_cfg(ICamCtrlHandle hCtrl, CamPlateRecogCfg *cfg)
-{
-	struct {
-		MsgHeader 			hdr;
-		CamPlateRecogCfg 	params;
-	}msgBuf;
-
-	Int32 ret;
-
-	if(!hCtrl || !cfg)
-		return E_INVAL;
-	
-	ret = icam_send_cmd(hCtrl, ICAMCMD_G_PLATERECOGCFG, &msgBuf, sizeof(msgBuf.hdr), sizeof(msgBuf));
-	if(ret)
-		return ret;
-
-	*cfg = msgBuf.params;
-	/* result of this cmd */
-	return msgBuf.hdr.param[0];
-}
-
-/*****************************************************************************
- Prototype    : icam_set_vid_detect_cfg
- Description  : set vidoe detect cfg
- Input        : ICamCtrlHandle hCtrl        
-                const CamVidDetectCfg *cfg  
- Output       : None
- Return Value : 
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/11/13
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-Int32 icam_set_vid_detect_cfg(ICamCtrlHandle hCtrl, const CamVidDetectCfg *cfg)
-{
-	struct {
-		MsgHeader 			hdr;
-		CamVidDetectCfg 	params;
-	}msgBuf;
-
-	Int32 ret;
-
-	if(!hCtrl || !cfg)
-		return E_INVAL;
-
-	msgBuf.params = *cfg;
-	ret = icam_send_cmd(hCtrl, ICAMCMD_S_VIDDETECTCFG, &msgBuf, sizeof(msgBuf), sizeof(msgBuf));
-	if(ret)
-		return ret;
-
-	/* result of this cmd */
-	return msgBuf.hdr.param[0];
-}
-
-/*****************************************************************************
- Prototype    : icam_get_vid_detect_cfg
- Description  : get video detect cfg
- Input        : ICamCtrlHandle hCtrl  
-                CamVidDetectCfg *cfg  
- Output       : None
- Return Value : 
- Calls        : 
- Called By    : 
- 
-  History        :
-  1.Date         : 2012/11/13
-    Author       : Sun
-    Modification : Created function
-
-*****************************************************************************/
-Int32 icam_get_vid_detect_cfg(ICamCtrlHandle hCtrl, CamVidDetectCfg *cfg)
-{
-	struct {
-		MsgHeader 			hdr;
-		CamVidDetectCfg 	params;
-	}msgBuf;
-
-	Int32 ret;
-
-	if(!hCtrl || !cfg)
-		return E_INVAL;
-	
-	ret = icam_send_cmd(hCtrl, ICAMCMD_G_VIDDETECTCFG, &msgBuf, sizeof(msgBuf.hdr), sizeof(msgBuf));
-	if(ret)
-		return ret;
-
-	*cfg = msgBuf.params;
-	/* result of this cmd */
-	return msgBuf.hdr.param[0];
 }
 
 /*****************************************************************************

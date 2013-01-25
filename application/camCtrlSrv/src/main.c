@@ -25,6 +25,7 @@
 #include <pthread.h>
 #include "cam_ctrl_thread.h"
 #include "udp_process.h"
+#include "sys_commu.h"
 
 /*----------------------------------------------*
  * external variables                           *

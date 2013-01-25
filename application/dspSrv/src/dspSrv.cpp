@@ -5,6 +5,7 @@
 #include "img_trans.h"
 #include "sys_commu.h"
 #include "net_utils.h"
+#include "syslink_proto.h"
 
 #define MSG_NAME			"/tmp/msgDspSrv"
 #define MSG_TRANS_TIMEOUT	10
@@ -149,8 +150,8 @@ int DspSrv::ReadDspImg(int& fd)
 	}
 
 	// check if this msg is new image 
-	if(msgBuf->cmd != SYS_CMD_NEW_JPG) {
-		ERR("read msg not new jpeg, magic: 0x%X, cmd 0x%X.", msgBuf->magic, msgBuf->cmd);
+	if(msgBuf->cmd != SYS_CMD_WR_FILE) {
+		//ERR("read msg not new jpeg, magic: 0x%X, cmd 0x%X.", msgBuf->magic, msgBuf->cmd);
 		return E_AGAIN;	
 	}
 

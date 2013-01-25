@@ -49,8 +49,7 @@ typedef struct {
 	Uint16			frameType;		
 	DateTime		timeStamp;	
 	ImgRoadInfo		roadInfo;		// info of road
-	Uint8			capInfo[80];	// info of trigger such as way num,  trigger id, etc.
-	Uint8			plateInfo[100];	// info of vehicle licence plate
+	Uint8			capInfo[1024];	// info of trigger such as way num,  trigger id, etc.
 	Uint32			offset;			// offset to start of append info
 	Uint32			magicNum;		// magic num for info recg
 }ImgAppendInfo;

@@ -61,7 +61,7 @@ $(LIB): $(LIB_OBJ)
 	$(CC) -shared -o $@ $^
 endif
 
-$(EXEC): $(SRC) 
+$(EXEC): $(SRC) $(LIB)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) 
 	
 $(EXEC1): $(SRC1) 

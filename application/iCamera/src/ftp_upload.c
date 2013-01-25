@@ -29,6 +29,7 @@
 #include "path_name.h"
 #include "cam_time.h"
 #include "cap_info_parse.h"
+#include "cam_detector.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -476,7 +477,7 @@ Int32 ftp_upload_test(const char *username, const char *passwd, const char *srvi
 
 	/* send file */
 	ImgMsg img;
-	CaptureInfo *capInfo = &img.capInfo;
+	CaptureInfo *capInfo = (CaptureInfo *)img.capInfo;
 	bzero(&img, sizeof(img));
 	img.dimension.colorSpace = FMT_JPG;
 	img.dimension.width = img.dimension.bytesPerLine = 1600;

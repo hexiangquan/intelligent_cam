@@ -2,7 +2,7 @@
 
 include Rules.make
 
-SUBDIRS = iCamera camCtrlSrv camBroadcast
+SUBDIRS = iCamera camCtrlSrv camBroadcast onvifSrv dspSrv
 
 CLEAN_SUBDIRS = $(addsuffix .clean, $(SUBDIRS))
 INSTALL_SUBDIRS = $(addsuffix .install, $(SUBDIRS))
