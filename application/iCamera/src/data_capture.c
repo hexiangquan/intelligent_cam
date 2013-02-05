@@ -845,6 +845,7 @@ DataCapHandle data_capture_create(const DataCapAttrs *attrs)
 	/* open syslink dev for capture cmd response */
 	struct syslink_attrs syslinkAttrs;
 	syslinkAttrs.info_base = LINK_CAP_BASE;
+	strncpy(syslinkAttrs.name, "capCtrl", sizeof(syslinkAttrs.name));
 	hDataCap->fdSyslink = -1;//sys_commu_open(&syslinkAttrs);
 	if(hDataCap->fdSyslink < 0) {
 		ERR("open syslink err");

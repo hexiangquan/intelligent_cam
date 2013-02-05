@@ -4,39 +4,25 @@
 #include <iostream>
 #include <string>
 #include <unistd.h>
-#include "icam_ctrl.h"
-#include "img_trans.h"
-
-#define DSP_SRV_BUF_SIZE	(3 * 1024 * 1024)
+#include <pthread.h>
 
 class DspSrv {
 public:
-	DspSrv(): srvPort(0), srvIp(""), hCamCtrl(NULL), bufSize(DSP_SRV_BUF_SIZE), buf(NULL), bytesRecv(0), lastShowTime(0), frameCnt(0) {}
-	DspSrv(const std::string &ip, uint16_t port): srvPort(port), srvIp(ip), hCamCtrl(NULL), bufSize(DSP_SRV_BUF_SIZE), buf(NULL), 
-		bytesRecv(0), lastShowTime(0), frameCnt(0) {}
-	~DspSrv() 
-		{ if(hCamCtrl) icam_ctrl_delete(hCamCtrl); }
+	DspSrv(uint32_t addr): baseAddr(addr), pid(0), isRunning(0), exit(0) {}
+	~DspSrv() { if(isRunning) Stop(); }
 	int Run();
-	void SetSrvInfo(const std::string &ip, uint16_t port)
-		{ srvIp = ip; srvPort = port; }
-	static void Stop()
-		{ exit = TRUE; }
+	int Stop();
 
 private:
-	uint16_t srvPort;	
-	std::string srvIp;
-	ICamCtrlHandle hCamCtrl;
-	size_t bufSize;
-	void *buf;
-	static bool exit;
-	size_t bytesRecv;
-	time_t lastShowTime;
-	uint32_t frameCnt;
+	uint32_t baseAddr;
+	pthread_t pid;
+	bool isRunning;
+	bool exit;
 
 private:
-	int GetSrvInfo();
-	int ReadDspImg(int &fd);
-	int SendImg(ImgTransHandle hImgTrans, bool &isConnected, int &imgCnt);
+	int WaitOpen(int fd, uint32_t& type);
+	int SyslinkOpen();
+	static void *ProcessThread(void *arg);
 };
 
 #endif

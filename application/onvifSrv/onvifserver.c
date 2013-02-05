@@ -40,11 +40,15 @@ static int  ONVIF_EVENT_RORT=9099;
 
 #define MAX_USER_NUM 20
 
+#define ONVIF__timg__
+#define ONVIF__tptz__
+
+//#define ONVIF__TEST__
 
 
 ICamCtrlHandle g_icam_ctrl_handle;
 
-#if 0
+#ifdef ONVIF__TEST__
 
 ICamCtrlHandle icam_ctrl_create(IN const char *pathName, IN Int32 flags, IN Int32 transTimeout)
 {
@@ -115,11 +119,13 @@ Int32 icam_ctrl_delete(IN ICamCtrlHandle hCtrl){
 
 }
 
+
 /* get h.264 params */
  Int32 icam_get_h264_params(IN ICamCtrlHandle hCtrl, OUT CamH264Params *params)
 {
 	params->bitRate=800;
 	params->frameRate=25;
+	params->IPRatio=25;
 
  return E_NO;
 }
@@ -168,6 +174,7 @@ return E_NO;
  Int32 icam_get_ntp_srv_info(IN ICamCtrlHandle hCtrl, OUT CamNtpServerInfo *srvInfo)
 {
  sprintf(srvInfo->serverIP,"192.168.12.25");
+ srvInfo->syncPrd=72;
 return E_NO;
 }
 
@@ -290,8 +297,12 @@ return E_NO;}
 return E_NO;}
 
 /* set h.264 params */
- Int32 icam_set_h264_params(IN ICamCtrlHandle hCtrl, IN const CamH264Params *params){
-return E_NO;}
+ Int32 icam_set_h264_params(IN ICamCtrlHandle hCtrl, IN const CamH264Params *params)
+{
+if(params->IPRatio>200)
+	return -1;
+return E_NO;
+}
 
 /* set img encode params */
  Int32 icam_set_img_enc_params(IN ICamCtrlHandle hCtrl, IN const CamImgEncParams *params){
@@ -439,10 +450,26 @@ onvif://www.onvif.org/name/js"};
 typedef struct ONVIF_STATUS
 {
     int running;
+	 int sendbyeflag;
 	int relayreset;
 	struct tt__RelayOutputSettings alarmout[8];
 }ONVIF_STATUS;
 static ONVIF_STATUS g_onvif_status;
+
+
+
+int check_ipaddr(char *ip)
+{
+unsigned int a,b,c,d;
+if(!ip)
+	return -1;
+if (sscanf(ip, "%d.%d.%d.%d",&a, &b,&c,&d) != 4)
+		return -1;
+if(a>255||b>255||c>255||d>255)
+	return -1;
+return 0;
+
+}
 
 int get_dns(char *dns1, char *dns2)
 {
@@ -656,6 +683,7 @@ int init_sys_config()
 	   sprintf(g_sys_info.user[0].Username,"admin");
 	   sprintf(g_sys_info.user[0].Password,"admin");
 	   g_sys_info.user[0].UserLevel=tt__UserLevel__Administrator;
+	   g_sys_info.WS_DiscoveryMode=tt__DiscoveryMode__Discoverable;
 
 	    fp = fopen(SYSFILE, "wb");
 	    fwrite((char*)&g_sys_info, 1, sizeof(g_sys_info), fp);
@@ -665,7 +693,7 @@ int init_sys_config()
 	{
 	fread((char*)&g_sys_info, 1, sizeof(g_sys_info), fp);
 	fclose(fp);
-		fp=NULL;
+	fp=NULL;
 	}
 	
     get_ip("eth0",&g_sys_info.network);
@@ -712,10 +740,9 @@ int init_sys_config()
 	sprintf(g_sys_info.rtpParamsbuf.streamName,"h264");
    	}
    	g_sys_info.httpParamsbuf.rtspSrvPort=ONVIF_HTTP_SNAP_RORT;
+	g_sys_info.httpParamsbuf.flags=0;
 	sprintf(g_sys_info.httpParamsbuf.streamName,"snapshot");
-	
-	g_sys_info.WS_DiscoveryMode=tt__DiscoveryMode__Discoverable;
-
+	return 0;
 }
 
 Int32 utc_to_local(CamDateTime *dateTime)
@@ -723,6 +750,13 @@ Int32 utc_to_local(CamDateTime *dateTime)
 		time_t atime ;
 		struct tm timeptr;
 		struct tm p;
+		if(dateTime->year<2011||dateTime->year>2100
+			||dateTime->month<1||dateTime->month>12
+			||dateTime->day<1||dateTime->day>31
+			||dateTime->hour>23
+			||dateTime->minute>59
+			||dateTime->second>59)
+			return -1;
 		timeptr.tm_year=dateTime->year-1900;
 		timeptr.tm_mon=dateTime->month-1;
 		timeptr.tm_mday=dateTime->day;
@@ -898,12 +932,12 @@ soap_wsse_verify_Password(struct soap *soap, const char *password)
 { _wsse__UsernameToken *token = soap_wsse_UsernameToken(soap, NULL);
   DBGFUN("soap_wsse_verify_Password");
  // printf("usr=%s Passwordtype=%s passwordtypeitem=%s \n Nonce=%s wsu__Created=%s wsu__Id=%s\n",
-//	  token->Username,
-//	  token->Password->Type,
-//	  token->Password->__item,
-//	  token->Nonce,
-//	  token->wsu__Created,
-//	  token->wsu__Id);
+	//  token->Username,
+	//  token->Password->Type,
+	//  token->Password->__item,
+	//  token->Nonce,
+	//  token->wsu__Created,
+	 // token->wsu__Id);
   
   /* if we have a UsernameToken with a Password, check it */
   if (token && token->Password)
@@ -950,16 +984,15 @@ soap_wsse_verify_Password(struct soap *soap, const char *password)
 
 SOAP_FMAC5 int SOAP_FMAC6 soap_wsse_confirm(struct soap* soap)
 {
-    char passwd[128];
+    char passwd[128]={0};
 	if(soap->header&&soap->header->wsse__Security&&soap->header->wsse__Security->UsernameToken)
 	{
 	get_passwd_of_usr(soap->header->wsse__Security->UsernameToken->Username,passwd);
-	
-	soap_wsse_verify_Password(soap,passwd );
+	soap->error=soap_wsse_verify_Password(soap,passwd );
 	}
 	else
 		soap->error=SOAP_USER_ERROR;
-		//printf("soap->error=%d\n",soap->error);
+	//printf("soap->error=%d\n",soap->error);
 	return soap->error;
 }
 
@@ -967,7 +1000,6 @@ SOAP_FMAC5 int SOAP_FMAC6 soap_wsse_confirm(struct soap* soap)
 
 SOAP_FMAC5 int SOAP_FMAC6 SOAP_ENV__Fault(struct soap* soap, char *faultcode, char *faultstring, char *faultactor, struct SOAP_ENV__Detail *detail, struct SOAP_ENV__Code *SOAP_ENV__Code, struct SOAP_ENV__Reason *SOAP_ENV__Reason, char *SOAP_ENV__Node, char *SOAP_ENV__Role, struct SOAP_ENV__Detail *SOAP_ENV__Detail)
 {
-
 fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 return 0;
 }
@@ -1101,7 +1133,57 @@ return 0;
 SOAP_FMAC5 int SOAP_FMAC6 __tds__GetServiceCapabilities(struct soap* soap, struct _tds__GetServiceCapabilities *tds__GetServiceCapabilities, struct _tds__GetServiceCapabilitiesResponse *tds__GetServiceCapabilitiesResponse)
 {
 fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
-//tds__GetServiceCapabilitiesResponse->Capabilities
+tds__GetServiceCapabilitiesResponse->Capabilities=
+	(struct tds__DeviceServiceCapabilities*)soap_malloc(soap,sizeof(struct tds__DeviceServiceCapabilities));
+
+
+tds__GetServiceCapabilitiesResponse->Capabilities->Network=	
+	(struct tds__NetworkCapabilities*)soap_malloc(soap,sizeof(struct tds__NetworkCapabilities));
+tds__GetServiceCapabilitiesResponse->Capabilities->Network->IPFilter=
+	(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+tds__GetServiceCapabilitiesResponse->Capabilities->Network->ZeroConfiguration=
+	(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+tds__GetServiceCapabilitiesResponse->Capabilities->Network->IPVersion6=
+	(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+tds__GetServiceCapabilitiesResponse->Capabilities->Network->DynDNS=
+	(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+tds__GetServiceCapabilitiesResponse->Capabilities->Network->Dot11Configuration=
+	(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+tds__GetServiceCapabilitiesResponse->Capabilities->Network->HostnameFromDHCP=
+	(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+*tds__GetServiceCapabilitiesResponse->Capabilities->Network->IPFilter=xsd__boolean__false_;
+*tds__GetServiceCapabilitiesResponse->Capabilities->Network->ZeroConfiguration=xsd__boolean__false_;
+*tds__GetServiceCapabilitiesResponse->Capabilities->Network->IPVersion6=xsd__boolean__false_;
+*tds__GetServiceCapabilitiesResponse->Capabilities->Network->DynDNS=xsd__boolean__false_;
+*tds__GetServiceCapabilitiesResponse->Capabilities->Network->Dot11Configuration=xsd__boolean__false_;
+*tds__GetServiceCapabilitiesResponse->Capabilities->Network->HostnameFromDHCP=xsd__boolean__false_;
+
+tds__GetServiceCapabilitiesResponse->Capabilities->Network->NTP=
+	(int*)soap_malloc(soap,sizeof(int));
+*tds__GetServiceCapabilitiesResponse->Capabilities->Network->NTP=1;
+
+
+
+tds__GetServiceCapabilitiesResponse->Capabilities->Security=	
+	(struct tds__SecurityCapabilities*)soap_malloc(soap,sizeof(struct tds__SecurityCapabilities));
+tds__GetServiceCapabilitiesResponse->Capabilities->Security->UsernameToken=
+	(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+*tds__GetServiceCapabilitiesResponse->Capabilities->Security->UsernameToken=xsd__boolean__true_;
+
+
+tds__GetServiceCapabilitiesResponse->Capabilities->System=	
+	(struct tds__SystemCapabilities*)soap_malloc(soap,sizeof(struct tds__SystemCapabilities));
+
+tds__GetServiceCapabilitiesResponse->Capabilities->System->DiscoveryBye=
+		(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+tds__GetServiceCapabilitiesResponse->Capabilities->System->SystemBackup=
+		(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+tds__GetServiceCapabilitiesResponse->Capabilities->System->FirmwareUpgrade=
+		(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+
+*tds__GetServiceCapabilitiesResponse->Capabilities->System->DiscoveryBye=xsd__boolean__true_;
+*tds__GetServiceCapabilitiesResponse->Capabilities->System->SystemBackup=xsd__boolean__true_;
+*tds__GetServiceCapabilitiesResponse->Capabilities->System->FirmwareUpgrade=xsd__boolean__true_;
 
 return 0;
 }
@@ -1124,11 +1206,14 @@ return 0;
 SOAP_FMAC5 int SOAP_FMAC6 __tds__SetSystemDateAndTime(struct soap* soap, struct _tds__SetSystemDateAndTime *tds__SetSystemDateAndTime, struct _tds__SetSystemDateAndTimeResponse *tds__SetSystemDateAndTimeResponse)
 {
 fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
-if(tds__SetSystemDateAndTime->DateTimeType==tt__SetDateTimeType__NTP)
-{
 	CamNtpServerInfo srvInfo;
 	if(icam_get_ntp_srv_info(g_icam_ctrl_handle,&srvInfo))
 		return SOAP_ERR;
+
+	if(tds__SetSystemDateAndTime->DateTimeType==tt__SetDateTimeType__NTP)
+	{
+	if(srvInfo.syncPrd==0)
+		srvInfo.syncPrd=72;
 	if(icam_set_ntp_srv_info(g_icam_ctrl_handle,&srvInfo))
 		return SOAP_ERR;
 	}else
@@ -1144,7 +1229,17 @@ if(tds__SetSystemDateAndTime->DateTimeType==tt__SetDateTimeType__NTP)
 			dateTime.hour=tds__SetSystemDateAndTime->UTCDateTime->Time->Hour;
 			dateTime.minute=tds__SetSystemDateAndTime->UTCDateTime->Time->Minute;
 			dateTime.second=tds__SetSystemDateAndTime->UTCDateTime->Time->Second;
-			utc_to_local(&dateTime);
+			if(utc_to_local(&dateTime)<0)
+			{
+			  soap_sender_fault_subcode(soap, "ter:InvalidArgVal/ter:InvalidDateTime", NULL, NULL);
+			  return SOAP_ERR;
+			}
+			if(srvInfo.syncPrd!=0)
+			{
+			srvInfo.syncPrd=0;
+			if(icam_get_ntp_srv_info(g_icam_ctrl_handle,&srvInfo))
+				return SOAP_ERR;
+			}
 			icam_set_time(g_icam_ctrl_handle, &dateTime);
 		}
 	}
@@ -1154,52 +1249,61 @@ return 0;
 
 SOAP_FMAC5 int SOAP_FMAC6 __tds__GetSystemDateAndTime(struct soap* soap, struct _tds__GetSystemDateAndTime *tds__GetSystemDateAndTime, struct _tds__GetSystemDateAndTimeResponse *tds__GetSystemDateAndTimeResponse)
 {
-fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
-time_t timep;
-struct tm *p;
-time(&timep);
+	fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+	time_t timep;
+	struct tm *p;
+	time(&timep);
 
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime=
-	(struct tt__SystemDateTime*)soap_malloc(soap,sizeof(struct tt__SystemDateTime));
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->DateTimeType=tt__SetDateTimeType__Manual;//手动或NTP
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->DaylightSavings=xsd__boolean__false_;//夏令时标志
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->TimeZone=
-	(struct tt__TimeZone*)soap_malloc(soap,sizeof(struct tt__TimeZone));
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->TimeZone->TZ="CST-8";//"GTM -8";
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime=
+		(struct tt__SystemDateTime*)soap_malloc(soap,sizeof(struct tt__SystemDateTime));
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->DateTimeType=tt__SetDateTimeType__Manual;//手动或NTP
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->DaylightSavings=xsd__boolean__false_;//夏令时标志
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->TimeZone=
+		(struct tt__TimeZone*)soap_malloc(soap,sizeof(struct tt__TimeZone));
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->TimeZone->TZ="CST-8";//"GTM -8";
 
-#if 0
-p=gmtime(&timep);
+CamNtpServerInfo srvInfo;
+if(icam_get_ntp_srv_info(g_icam_ctrl_handle,&srvInfo))
+	return SOAP_ERR;
+if(srvInfo.syncPrd==0)
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->DateTimeType=tt__SetDateTimeType__Manual;
+else
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->DateTimeType=tt__SetDateTimeType__NTP;
+tds__GetSystemDateAndTimeResponse->SystemDateAndTime->DaylightSavings=xsd__boolean__false_;
 
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime=
-(struct tt__DateTime*)soap_malloc(soap,sizeof(struct tt__DateTime));
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Date=
-	(struct tt__Date*)soap_malloc(soap,sizeof(struct tt__Date));
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Time=
-	(struct tt__Time*)soap_malloc(soap,sizeof(struct tt__Time));
+#if 1
+	p=gmtime(&timep);
 
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Date->Year=1900+p->tm_year;
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Date->Month=1+p->tm_mon;
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Date->Day= p->tm_mday;
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Time->Hour=p->tm_hour;
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Time->Minute= p->tm_min;
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Time->Second= p->tm_sec;
-//fprintf(stderr,"UTCDateTime %d,%d,%d %d,%d,%d\n",(1900+p->tm_year),( 1+p->tm_mon),p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec);
-#endif
-p=localtime(&timep); /*取得当地时间*/
-
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime=
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime=
 	(struct tt__DateTime*)soap_malloc(soap,sizeof(struct tt__DateTime));
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Date=
-	(struct tt__Date*)soap_malloc(soap,sizeof(struct tt__Date));
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Time=
-	(struct tt__Time*)soap_malloc(soap,sizeof(struct tt__Time));
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Date->Year=1900+p->tm_year;
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Date->Month=1+p->tm_mon;
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Date->Day= p->tm_mday;
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Time->Hour=p->tm_hour;
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Time->Minute= p->tm_min;
-tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Time->Second= p->tm_sec;
-//fprintf(stderr,"LocalDateTime %d,%d,%d %d,%d,%d\n",(1900+p->tm_year),( 1+p->tm_mon),p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec);
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Date=
+		(struct tt__Date*)soap_malloc(soap,sizeof(struct tt__Date));
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Time=
+		(struct tt__Time*)soap_malloc(soap,sizeof(struct tt__Time));
+
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Date->Year=1900+p->tm_year;
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Date->Month=1+p->tm_mon;
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Date->Day= p->tm_mday;
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Time->Hour=p->tm_hour;
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Time->Minute= p->tm_min;
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->UTCDateTime->Time->Second= p->tm_sec;
+	//fprintf(stderr,"UTCDateTime %d,%d,%d %d,%d,%d\n",(1900+p->tm_year),( 1+p->tm_mon),p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec);
+#endif
+	p=localtime(&timep); /*取得当地时间*/
+
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime=
+		(struct tt__DateTime*)soap_malloc(soap,sizeof(struct tt__DateTime));
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Date=
+		(struct tt__Date*)soap_malloc(soap,sizeof(struct tt__Date));
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Time=
+		(struct tt__Time*)soap_malloc(soap,sizeof(struct tt__Time));
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Date->Year=1900+p->tm_year;
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Date->Month=1+p->tm_mon;
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Date->Day= p->tm_mday;
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Time->Hour=p->tm_hour;
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Time->Minute= p->tm_min;
+	tds__GetSystemDateAndTimeResponse->SystemDateAndTime->LocalDateTime->Time->Second= p->tm_sec;
+	//fprintf(stderr,"LocalDateTime %d,%d,%d %d,%d,%d\n",(1900+p->tm_year),( 1+p->tm_mon),p->tm_mday,p->tm_hour,p->tm_min,p->tm_sec);
 
 return 0;
 }
@@ -1251,7 +1355,9 @@ return ret;
 SOAP_FMAC5 int SOAP_FMAC6 __tds__SystemReboot(struct soap* soap, struct _tds__SystemReboot *tds__SystemReboot, struct _tds__SystemRebootResponse *tds__SystemRebootResponse)
 {
 	fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
-	g_onvif_status.running=0;
+	//g_onvif_status.running=0;//IPC负责重启
+	g_onvif_status.sendbyeflag=1;
+	sleep(5);
 	icam_sys_reset(g_icam_ctrl_handle);
 return 0;
 }
@@ -1309,7 +1415,7 @@ return 0;
 
 SOAP_FMAC5 int SOAP_FMAC6 __tds__GetSystemBackup(struct soap* soap, struct _tds__GetSystemBackup *tds__GetSystemBackup, struct _tds__GetSystemBackupResponse *tds__GetSystemBackupResponse)
 {
-fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+    fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 	char fname[128]={0};
 	int ret=0;
 	tds__GetSystemBackupResponse->__sizeBackupFiles=1;
@@ -1378,15 +1484,21 @@ SOAP_FMAC5 int SOAP_FMAC6 __tds__GetSystemSupportInformation(struct soap* soap, 
 
 SOAP_FMAC5 int SOAP_FMAC6 __tds__GetScopes(struct soap* soap, struct _tds__GetScopes *tds__GetScopes, struct _tds__GetScopesResponse *tds__GetScopesResponse)
 {
-	tds__GetScopesResponse->__sizeScopes=5;
-	tds__GetScopesResponse->Scopes=
+	CamDeviceInfo DeviceInfo;
+	if(icam_get_dev_info(g_icam_ctrl_handle,&DeviceInfo)==E_NO)
+	{
+	 snprintf(g_ipc_scopes,1024,"onvif://www.onvif.org/Profile/Streaming onvif://www.onvif.org/type/NetworkVideoTransmitter onvif://www.onvif.org/location/%s onvif://www.onvif.org/hardware/%s onvif://www.onvif.org/name/%s",DeviceInfo.location,DeviceInfo.hardware,DeviceInfo.name);
+	 g_sys_info.DeviceInfo=DeviceInfo;
+	}
+	    tds__GetScopesResponse->__sizeScopes=5;
+    	tds__GetScopesResponse->Scopes=
 		(struct tt__Scope*)soap_malloc(soap,tds__GetScopesResponse->__sizeScopes*sizeof(struct tt__Scope));
 		tds__GetScopesResponse->Scopes->ScopeItem="onvif://www.onvif.org/Profile/Streaming";
 		tds__GetScopesResponse->Scopes->ScopeDef=tt__ScopeDefinition__Fixed;
 
 		(tds__GetScopesResponse->Scopes+1)->ScopeItem=(char*)soap_malloc(soap,128);
 		snprintf((tds__GetScopesResponse->Scopes+1)->ScopeItem,128,"onvif://www.onvif.org/location/%s",g_sys_info.DeviceInfo.location);
-		(tds__GetScopesResponse->Scopes+1)->ScopeDef=tt__ScopeDefinition__Fixed;
+		(tds__GetScopesResponse->Scopes+1)->ScopeDef=tt__ScopeDefinition__Configurable;
 
 		(tds__GetScopesResponse->Scopes+2)->ScopeItem=(char*)soap_malloc(soap,128);
 		snprintf((tds__GetScopesResponse->Scopes+2)->ScopeItem,128,"onvif://www.onvif.org/type/NetworkVideoTransmitter");
@@ -1399,13 +1511,42 @@ SOAP_FMAC5 int SOAP_FMAC6 __tds__GetScopes(struct soap* soap, struct _tds__GetSc
 
 		(tds__GetScopesResponse->Scopes+4)->ScopeItem=(char*)soap_malloc(soap,128);
 		snprintf((tds__GetScopesResponse->Scopes+4)->ScopeItem,128,"onvif://www.onvif.org/name/%s",g_sys_info.DeviceInfo.name);
-		(tds__GetScopesResponse->Scopes+4)->ScopeDef=tt__ScopeDefinition__Fixed;
-
-fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+		(tds__GetScopesResponse->Scopes+4)->ScopeDef=tt__ScopeDefinition__Configurable;
+		fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 return 0;
 }
 
-SOAP_FMAC5 int SOAP_FMAC6 __tds__SetScopes(struct soap* soap, struct _tds__SetScopes *tds__SetScopes, struct _tds__SetScopesResponse *tds__SetScopesResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __tds__SetScopes(struct soap* soap, struct _tds__SetScopes *tds__SetScopes, struct _tds__SetScopesResponse *tds__SetScopesResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+int i;
+char *p;
+char *q;
+CamDeviceInfo DeviceInfo;
+if(icam_get_dev_info(g_icam_ctrl_handle,&DeviceInfo))
+	return SOAP_ERR;
+for(i=0;i<tds__SetScopes->__sizeScopes;i++)
+{
+    p=*(tds__SetScopes->Scopes+i);
+	//printf("Scopes=%s\n",p);
+	if(q=strstr(p,"name:"))
+	{
+		printf("Scopes=%s\n",q+strlen("name:"));
+		snprintf(DeviceInfo.name,sizeof(DeviceInfo.name),q+strlen("name:"));
+	}else if(q=strstr(p,"location:"))
+	{
+		printf("Scopes=%s\n",q+strlen("location:"));
+		snprintf(DeviceInfo.location,sizeof(DeviceInfo.location),q+strlen("location:"));
+	}
+}
+if(icam_set_dev_info(g_icam_ctrl_handle,&DeviceInfo))
+	return SOAP_ERR;
+
+snprintf(g_ipc_scopes,1024,"onvif://www.onvif.org/Profile/Streaming onvif://www.onvif.org/type/NetworkVideoTransmitter onvif://www.onvif.org/location/%s onvif://www.onvif.org/hardware/%s onvif://www.onvif.org/name/%s",DeviceInfo.location,DeviceInfo.hardware,DeviceInfo.name);
+g_sys_info.DeviceInfo=DeviceInfo;
+
+return 0;
+}
 
 SOAP_FMAC5 int SOAP_FMAC6 __tds__AddScopes(struct soap* soap, struct _tds__AddScopes *tds__AddScopes, struct _tds__AddScopesResponse *tds__AddScopesResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
@@ -1418,10 +1559,12 @@ fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 return 0;
 }
 
+
 SOAP_FMAC5 int SOAP_FMAC6 __tds__SetDiscoveryMode(struct soap* soap, struct _tds__SetDiscoveryMode *tds__SetDiscoveryMode, struct _tds__SetDiscoveryModeResponse *tds__SetDiscoveryModeResponse)
 {
 fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 g_sys_info.WS_DiscoveryMode=tds__SetDiscoveryMode->DiscoveryMode;
+write_sys_file();
 return 0;
 }
 
@@ -1477,6 +1620,21 @@ fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 	{
 		for(j=0;j<MAX_USER_NUM;j++)
 		{
+			if(g_sys_info.user[j].enable)
+			{
+				if(strcmp((tds__CreateUsers->User+i)->Username,g_sys_info.user[j].Username)==0)
+				{
+				 return soap_sender_fault_subcode(soap, "ter:OperationProhibited/ter:UsernameClash" , NULL, NULL);
+				}
+			}
+		}
+	}
+
+
+	for(i=0;i<tds__CreateUsers->__sizeUser;i++)
+	{
+		for(j=0;j<MAX_USER_NUM;j++)
+		{
 			if(!g_sys_info.user[j].enable)
 			{
 			g_sys_info.user[j].enable=1;
@@ -1497,24 +1655,44 @@ SOAP_FMAC5 int SOAP_FMAC6 __tds__DeleteUsers(struct soap* soap, struct _tds__Del
 fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 int i=0;
 int j=0;
+int find=0;
+int deletemap=0;
+int deleteNum=0;
+
 for(i=0;i<tds__DeleteUsers->__sizeUsername;i++)
 {
 	if(strcmp("admin",*(tds__DeleteUsers->Username+i))==0)
-		return SOAP_ERR;
-
+	{
+	 return soap_sender_fault_subcode(soap, "ter:InvalidArgVal/ter:FixedUser" , NULL, NULL);
+	}
+	find=0;
 	for(j=0;j<MAX_USER_NUM;j++)
 	{
 		if(g_sys_info.user[j].enable)
 		{
 			if(strcmp(g_sys_info.user[j].Username,*(tds__DeleteUsers->Username+i))==0)
 			{
-			g_sys_info.user[j].enable=0;
-			g_sys_info.usernum--;
+			find=1;
+			deletemap|=(1<<j);
 			break;
 			}
 		}
 	}
+	if(find==0)
+	{
+	return soap_sender_fault_subcode(soap, "ter:InvalidArgVal/ter:UsernameMissing" , NULL, NULL);
+	}	
 }
+
+	for(j=0;j<MAX_USER_NUM;j++)
+	{
+		if((1<<j)&deletemap)
+		{
+		g_sys_info.user[j].enable=0;
+		deleteNum++;
+		}
+	}
+	g_sys_info.usernum-=deleteNum;
    write_sys_file();
 return 0;
 }
@@ -1524,6 +1702,28 @@ SOAP_FMAC5 int SOAP_FMAC6 __tds__SetUser(struct soap* soap, struct _tds__SetUser
 fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 int i=0;
 int j=0;
+int find=0;
+for(i=0;i<tds__SetUser->__sizeUser;i++)
+{
+	find=0;
+	for(j=0;j<MAX_USER_NUM;j++)
+	{
+		if(g_sys_info.user[j].enable)
+		{
+			if(strcmp(g_sys_info.user[j].Username,(tds__SetUser->User+i)->Username)==0)
+			{
+			find=1;
+			break;
+			}
+		}
+	}
+	if(find==0)
+	{
+	return soap_sender_fault_subcode(soap, "ter:InvalidArgVal/ter:UsernameMissing" , NULL, NULL);
+	}	
+}
+
+
 for(i=0;i<tds__SetUser->__sizeUser;i++)
 {
 	for(j=0;j<MAX_USER_NUM;j++)
@@ -1618,7 +1818,7 @@ if((Category==tt__CapabilityCategory__All)||(Category&(1<<tt__CapabilityCategory
 		tds__GetCapabilitiesResponse->Capabilities->Device->System->SystemBackup
 			=xsd__boolean__true_;//系统参数备份
 		tds__GetCapabilitiesResponse->Capabilities->Device->System->SystemLogging
-			=xsd__boolean__true_;//系统日志
+			=xsd__boolean__false_;//系统日志
 		tds__GetCapabilitiesResponse->Capabilities->Device->System->FirmwareUpgrade
 			=xsd__boolean__true_;//固件升级
 		tds__GetCapabilitiesResponse->Capabilities->Device->System->__sizeSupportedVersions=1;
@@ -1641,6 +1841,8 @@ if((Category==tt__CapabilityCategory__All)||(Category&(1<<tt__CapabilityCategory
 			(struct tt__SecurityCapabilities*)soap_malloc(soap,sizeof(struct tt__SecurityCapabilities));
 		tds__GetCapabilitiesResponse->Capabilities->Device->Security->AccessPolicyConfig=xsd__boolean__true_;//用户权限管理
 	}
+	
+#ifdef ONVIF__TEST__
 	if((Category==tt__CapabilityCategory__All)||(Category&(1<<tt__CapabilityCategory__Events)))
 	{
 		tds__GetCapabilitiesResponse->Capabilities->Events=
@@ -1653,7 +1855,7 @@ if((Category==tt__CapabilityCategory__All)||(Category&(1<<tt__CapabilityCategory
 		tds__GetCapabilitiesResponse->Capabilities->Events->WSSubscriptionPolicySupport
 			=xsd__boolean__false_;
 	}
-
+#endif
 
 #ifdef ONVIF__timg__
 	if((Category==tt__CapabilityCategory__All)||(Category&(1<<tt__CapabilityCategory__Imaging)))
@@ -1685,12 +1887,13 @@ if((Category==tt__CapabilityCategory__All)||(Category&(1<<tt__CapabilityCategory
 		(struct tt__ProfileCapabilities*)soap_malloc(soap,sizeof(struct tt__ProfileCapabilities));
 		tds__GetCapabilitiesResponse->Capabilities->Media->Extension->ProfileCapabilities->MaximumNumberOfProfiles=3;
 	}
-#ifdef ONVIF__tse__
+	
+#ifdef ONVIF__tptz__
 	if((Category==tt__CapabilityCategory__All)||(Category&(1<<tt__CapabilityCategory__PTZ)))
 	{
-		tds__GetCapabilitiesResponse->Capabilities->PTZ=
-		(struct tt__PTZCapabilities*)soap_malloc(soap,sizeof(struct tt__PTZCapabilities));;
-		tds__GetCapabilitiesResponse->Capabilities->PTZ->XAddr=XAddr;
+		//tds__GetCapabilitiesResponse->Capabilities->PTZ=
+		//(struct tt__PTZCapabilities*)soap_malloc(soap,sizeof(struct tt__PTZCapabilities));;
+		//tds__GetCapabilitiesResponse->Capabilities->PTZ->XAddr=XAddr;
 	}
 #endif
 	if(Category==tt__CapabilityCategory__All)
@@ -1719,9 +1922,27 @@ tds__GetHostnameResponse->HostnameInformation->Name=g_sys_info.network.hostname;
 return 0;
 }
 
-SOAP_FMAC5 int SOAP_FMAC6 __tds__SetHostname(struct soap* soap, struct _tds__SetHostname *tds__SetHostname, struct _tds__SetHostnameResponse *tds__SetHostnameResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __tds__SetHostname(struct soap* soap, struct _tds__SetHostname *tds__SetHostname, struct _tds__SetHostnameResponse *tds__SetHostnameResponse)
+{
+	CamNetworkInfo info;
+	if(icam_get_network_info(g_icam_ctrl_handle,&info))
+	   return SOAP_ERR;
+	snprintf(info.hostName,sizeof(info.hostName),tds__SetHostname->Name);
+	if(icam_set_network_info(g_icam_ctrl_handle,&info))
+	   return SOAP_ERR;
+	snprintf(g_sys_info.network.hostname,sizeof(info.hostName),tds__SetHostname->Name);
+	fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
 
-SOAP_FMAC5 int SOAP_FMAC6 __tds__SetHostnameFromDHCP(struct soap* soap, struct _tds__SetHostnameFromDHCP *tds__SetHostnameFromDHCP, struct _tds__SetHostnameFromDHCPResponse *tds__SetHostnameFromDHCPResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __tds__SetHostnameFromDHCP(struct soap* soap, struct _tds__SetHostnameFromDHCP *tds__SetHostnameFromDHCP, struct _tds__SetHostnameFromDHCPResponse *tds__SetHostnameFromDHCPResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+if(tds__SetHostnameFromDHCP->FromDHCP==xsd__boolean__true_)
+	return SOAP_ERR;
+
+return 0;
+}
 
 SOAP_FMAC5 int SOAP_FMAC6 __tds__GetDNS(struct soap* soap, struct _tds__GetDNS *tds__GetDNS, struct _tds__GetDNSResponse *tds__GetDNSResponse)
 {
@@ -1737,6 +1958,13 @@ tds__GetDNSResponse->DNSInformation->DNSManual=
 tds__GetDNSResponse->DNSInformation->DNSManual->Type=tt__IPType__IPv4;
 tds__GetDNSResponse->DNSInformation->DNSManual->IPv4Address=g_sys_info.network.DNS1;
 
+tds__GetDNSResponse->DNSInformation->__sizeSearchDomain=1;
+tds__GetDNSResponse->DNSInformation->SearchDomain=
+	(char**)soap_malloc(soap,tds__GetDNSResponse->DNSInformation->__sizeSearchDomain*sizeof(char*));
+*tds__GetDNSResponse->DNSInformation->SearchDomain=g_sys_info.network.domainName;
+
+
+
 return 0;
 }
 
@@ -1744,13 +1972,12 @@ SOAP_FMAC5 int SOAP_FMAC6 __tds__SetDNS(struct soap* soap, struct _tds__SetDNS *
 {
 fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 CamNetworkInfo info;
-
+int setret=0;
 if(icam_get_network_info(g_icam_ctrl_handle,&info))
    return SOAP_ERR;
 
 if(tds__SetDNS->FromDHCP==xsd__boolean__true_)
-{
-	// sprintf(info.ipAddr,"0.0.0.0");
+{	// sprintf(info.ipAddr,"0.0.0.0");
 	// if(icam_set_network_info(g_icam_ctrl_handle,&info))
 	//	return SOAP_ERR;
 	return SOAP_ERR;
@@ -1759,9 +1986,26 @@ else if(tds__SetDNS->__sizeDNSManual&&tds__SetDNS->DNSManual)
 {
 	if(!tds__SetDNS->DNSManual->IPv4Address)
 		return SOAP_ERR;
-	sprintf(info.dnsServer,tds__SetDNS->DNSManual->IPv4Address);
-	 if(icam_set_network_info(g_icam_ctrl_handle,&info))
+	
+	if(check_ipaddr(tds__SetDNS->DNSManual->IPv4Address)<0)
+	{
+		soap_sender_fault_subcode(soap, "ter:InvalidArgVal/ter:InvalidIPv4Address", NULL, NULL);
 		return SOAP_ERR;
+	}
+	sprintf(info.dnsServer,tds__SetDNS->DNSManual->IPv4Address);
+	setret=1;
+
+}
+if(tds__SetDNS->__sizeSearchDomain&&tds__SetDNS->SearchDomain)
+{
+	if(*tds__SetDNS->SearchDomain)
+		snprintf(info.domainName,sizeof(info.domainName),*tds__SetDNS->SearchDomain);
+	setret=1;
+}
+if(setret)
+{
+   if(icam_set_network_info(g_icam_ctrl_handle,&info))
+      return SOAP_ERR;
 }
 return 0;
 }
@@ -1799,7 +2043,14 @@ CamNtpServerInfo *srvInfo=
 if(icam_get_ntp_srv_info(g_icam_ctrl_handle,srvInfo)!=E_NO)
 		return SOAP_ERR;
 if(tds__SetNTP->NTPManual->IPv4Address)
+{
+	if(check_ipaddr(tds__SetNTP->NTPManual->IPv4Address)<0)
+	{
+		soap_sender_fault_subcode(soap, "ter:InvalidArgVal/ter:InvalidIPv4Address", NULL, NULL);
+		return SOAP_ERR;
+	}
 	snprintf(srvInfo->serverIP,16,tds__SetNTP->NTPManual->IPv4Address);
+}
 if(icam_set_ntp_srv_info(g_icam_ctrl_handle,srvInfo)!=E_NO)
 	return SOAP_ERR;
 
@@ -1824,7 +2075,7 @@ static int PrefixLength_to_mask(int PrefixLength,char *mask)
 	ip.s_addr=htonl(u32ipmask);
 
 	sprintf(mask, "%s", inet_ntoa(ip));
-	printf("mask=%s\n",mask);
+	//printf("mask=%s\n",mask);
 	return 0;
 }
 
@@ -1880,39 +2131,50 @@ SOAP_FMAC5 int SOAP_FMAC6 __tds__GetNetworkInterfaces(struct soap* soap, struct 
 return 0;
 }
 
-
-
-
 SOAP_FMAC5 int SOAP_FMAC6 __tds__SetNetworkInterfaces(struct soap* soap, struct _tds__SetNetworkInterfaces *tds__SetNetworkInterfaces, struct _tds__SetNetworkInterfacesResponse *tds__SetNetworkInterfacesResponse)
 {
 fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
-
-if(strcmp(tds__SetNetworkInterfaces->InterfaceToken,"eth0")!=0)
-	return SOAP_ERR;
-CamNetworkInfo info;
-if(icam_get_network_info(g_icam_ctrl_handle,&info))
-  return SOAP_ERR;
-
-
-
-if(tds__SetNetworkInterfaces->NetworkInterface->IPv4)
+if(tds__SetNetworkInterfaces->InterfaceToken)
 {
-	if(tds__SetNetworkInterfaces->NetworkInterface->IPv4->DHCP&&
-		*tds__SetNetworkInterfaces->NetworkInterface->IPv4->DHCP==xsd__boolean__true_)
+     if(strcmp(tds__SetNetworkInterfaces->InterfaceToken,"eth0")!=0)
+	     return SOAP_ERR;
+}
+CamNetworkInfo info;
+
+if(tds__SetNetworkInterfaces->NetworkInterface)
+{
+	if(tds__SetNetworkInterfaces->NetworkInterface->IPv4)
 	{
-	       sprintf(info.ipAddr,"0.0.0.0");
+	  if(icam_get_network_info(g_icam_ctrl_handle,&info))
+        return SOAP_ERR;
+		if(tds__SetNetworkInterfaces->NetworkInterface->IPv4->DHCP&&
+			*tds__SetNetworkInterfaces->NetworkInterface->IPv4->DHCP==xsd__boolean__true_)
+		{
+		       sprintf(info.ipAddr,"0.0.0.0");
+				if(icam_set_network_info(g_icam_ctrl_handle,&info))
+			       return SOAP_ERR;
+		}
+	     else if(tds__SetNetworkInterfaces->NetworkInterface->IPv4->__sizeManual)
+		{
+			if(check_ipaddr(tds__SetNetworkInterfaces->NetworkInterface->IPv4->Manual->Address)<0)
+			{
+			soap_sender_fault_subcode(soap, "ter:InvalidArgVal/ter:InvalidIPv4Address", NULL, NULL);
+			return SOAP_ERR;
+			}
+
+		
+			snprintf(info.ipAddr,sizeof(info.ipAddr),tds__SetNetworkInterfaces->NetworkInterface->IPv4->Manual->Address);
+	    	PrefixLength_to_mask(tds__SetNetworkInterfaces->NetworkInterface->IPv4->Manual->PrefixLength,info.ipMask);	
 			if(icam_set_network_info(g_icam_ctrl_handle,&info))
-		       return SOAP_ERR;
+			   return SOAP_ERR;
+			//sprintf(g_sys_info.network.ipaddr,info.ipAddr);
+			//sprintf(g_sys_info.network.netmask,info.ipMask);
+		}
+		 tds__SetNetworkInterfacesResponse->RebootNeeded=xsd__boolean__true_;
 	}
-     else if(tds__SetNetworkInterfaces->NetworkInterface->IPv4->__sizeManual)
-	{
-		snprintf(info.ipAddr,sizeof(info.ipAddr),tds__SetNetworkInterfaces->NetworkInterface->IPv4->Manual->Address);
-    	PrefixLength_to_mask(tds__SetNetworkInterfaces->NetworkInterface->IPv4->Manual->PrefixLength,info.ipMask);	
-		if(icam_set_network_info(g_icam_ctrl_handle,&info))
-		   return SOAP_ERR;
-		//sprintf(g_sys_info.network.ipaddr,info.ipAddr);
-		//sprintf(g_sys_info.network.netmask,info.ipMask);
-	}
+	else if(tds__SetNetworkInterfaces->NetworkInterface->IPv6)
+		 return SOAP_ERR;
+
 }
 
 return 0;
@@ -1920,21 +2182,35 @@ return 0;
 
 SOAP_FMAC5 int SOAP_FMAC6 __tds__GetNetworkProtocols(struct soap* soap, struct _tds__GetNetworkProtocols *tds__GetNetworkProtocols, struct _tds__GetNetworkProtocolsResponse *tds__GetNetworkProtocolsResponse)
 {
-tds__GetNetworkProtocolsResponse->__sizeNetworkProtocols=1;
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+struct tt__NetworkProtocol *NetworkProtocols;
+tds__GetNetworkProtocolsResponse->__sizeNetworkProtocols=2;
 tds__GetNetworkProtocolsResponse->NetworkProtocols=
 	(struct tt__NetworkProtocol*)soap_malloc(soap,tds__GetNetworkProtocolsResponse->__sizeNetworkProtocols*sizeof(struct tt__NetworkProtocol));
-tds__GetNetworkProtocolsResponse->NetworkProtocols->Name=tt__NetworkProtocolType__RTSP;
-tds__GetNetworkProtocolsResponse->NetworkProtocols->Enabled=xsd__boolean__true_;
-tds__GetNetworkProtocolsResponse->NetworkProtocols->__sizePort=1;
-tds__GetNetworkProtocolsResponse->NetworkProtocols->Port=
+
+NetworkProtocols=tds__GetNetworkProtocolsResponse->NetworkProtocols;
+
+NetworkProtocols->Name=tt__NetworkProtocolType__RTSP;
+if(g_sys_info.rtpParamsbuf.flags&CAM_RTP_FLAG_EN)
+	NetworkProtocols->Enabled=xsd__boolean__true_;
+else
+	NetworkProtocols->Enabled=xsd__boolean__false_;
+NetworkProtocols->__sizePort=1;
+NetworkProtocols->Port=
 (int*)soap_malloc(soap,tds__GetNetworkProtocolsResponse->NetworkProtocols->__sizePort*sizeof(int));
-*tds__GetNetworkProtocolsResponse->NetworkProtocols->Port=g_sys_info.rtpParamsbuf.rtspSrvPort;
+*NetworkProtocols->Port=g_sys_info.rtpParamsbuf.rtspSrvPort;
 
+NetworkProtocols++;
+	NetworkProtocols->Name=tt__NetworkProtocolType__HTTP;
+if(g_sys_info.httpParamsbuf.flags)
+	NetworkProtocols->Enabled=xsd__boolean__true_;
+else
+	NetworkProtocols->Enabled=xsd__boolean__false_;
+NetworkProtocols->__sizePort=1;
+NetworkProtocols->Port=
+(int*)soap_malloc(soap,tds__GetNetworkProtocolsResponse->NetworkProtocols->__sizePort*sizeof(int));
+*NetworkProtocols->Port=g_sys_info.httpParamsbuf.rtspSrvPort;
 
-
-
-
-fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 return 0;
 }
 
@@ -1949,19 +2225,35 @@ CamRtpParams rtpParamsbuf;
 for(i=0;i<tds__SetNetworkProtocols->__sizeNetworkProtocols;i++)
 {
 	NetworkProtocols=tds__SetNetworkProtocols->NetworkProtocols+i;
-	if(NetworkProtocols->Name==tt__NetworkProtocolType__RTSP
-		&&NetworkProtocols->Enabled&&NetworkProtocols->__sizePort)
+	if(NetworkProtocols->Name==tt__NetworkProtocolType__RTSP)
 	 {
 		 if(icam_get_rtp_params(g_icam_ctrl_handle,&rtpParamsbuf))
 		 	return SOAP_ERR;
-		 rtpParamsbuf.rtspSrvPort=*NetworkProtocols->Port;
+		 if(NetworkProtocols->__sizePort)
+		 	rtpParamsbuf.rtspSrvPort=*NetworkProtocols->Port;
+		 if(NetworkProtocols->Enabled)
+		 	rtpParamsbuf.flags|=~CAM_RTP_FLAG_EN;
+		 else
+			rtpParamsbuf.flags&=CAM_RTP_FLAG_EN;
 		 if(icam_set_rtp_params(g_icam_ctrl_handle,&rtpParamsbuf))
 		 	return SOAP_ERR;
 		 g_sys_info.rtpParamsbuf=rtpParamsbuf;
-		 return SOAP_OK; 
 	 } 
+	else if(NetworkProtocols->Name==tt__NetworkProtocolType__HTTP)
+	{
+		if(NetworkProtocols->__sizePort)
+		   g_sys_info.httpParamsbuf.rtspSrvPort=*NetworkProtocols->Port;
+		if(NetworkProtocols->Enabled)
+		   g_sys_info.httpParamsbuf.flags=1;
+		else
+		  g_sys_info.httpParamsbuf.flags=0;
+	}
+	else
+	{
+	    soap_sender_fault_subcode(soap, "ter:InvalidArgVal/ter:ServiceNotSupported", NULL, NULL);
+	    return SOAP_ERR;
+	}
 } 
-
 return 0;
 }
 
@@ -1986,30 +2278,59 @@ SOAP_FMAC5 int SOAP_FMAC6 __tds__SetNetworkDefaultGateway(struct soap* soap, str
 fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 CamNetworkInfo info;
 
-if(tds__SetNetworkDefaultGateway->__sizeIPv4Address)
+if(0==tds__SetNetworkDefaultGateway->__sizeIPv4Address)
 	 return SOAP_ERR;
+if(tds__SetNetworkDefaultGateway->IPv4Address)
+{
+	if(check_ipaddr(*tds__SetNetworkDefaultGateway->IPv4Address)<0)
+	{
+	   soap_sender_fault_subcode(soap, "ter:InvalidArgVal/ter:InvalidGatewayAddress", NULL, NULL);
+		return SOAP_ERR;
+	}
+}
 if(icam_get_network_info(g_icam_ctrl_handle,&info))
    return SOAP_ERR;
 
 snprintf(info.gatewayIP,sizeof(info.gatewayIP),*tds__SetNetworkDefaultGateway->IPv4Address);
 if(icam_set_network_info(g_icam_ctrl_handle,&info))
    return SOAP_ERR;
+
 sprintf(g_sys_info.network.gateway,info.gatewayIP);
 
 return 0;
 }
 
-SOAP_FMAC5 int SOAP_FMAC6 __tds__GetZeroConfiguration(struct soap* soap, struct _tds__GetZeroConfiguration *tds__GetZeroConfiguration, struct _tds__GetZeroConfigurationResponse *tds__GetZeroConfigurationResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __tds__GetZeroConfiguration(struct soap* soap, struct _tds__GetZeroConfiguration *tds__GetZeroConfiguration, struct _tds__GetZeroConfigurationResponse *tds__GetZeroConfigurationResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
 
 SOAP_FMAC5 int SOAP_FMAC6 __tds__SetZeroConfiguration(struct soap* soap, struct _tds__SetZeroConfiguration *tds__SetZeroConfiguration, struct _tds__SetZeroConfigurationResponse *tds__SetZeroConfigurationResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
-SOAP_FMAC5 int SOAP_FMAC6 __tds__GetIPAddressFilter(struct soap* soap, struct _tds__GetIPAddressFilter *tds__GetIPAddressFilter, struct _tds__GetIPAddressFilterResponse *tds__GetIPAddressFilterResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __tds__GetIPAddressFilter(struct soap* soap, struct _tds__GetIPAddressFilter *tds__GetIPAddressFilter, struct _tds__GetIPAddressFilterResponse *tds__GetIPAddressFilterResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
 
-SOAP_FMAC5 int SOAP_FMAC6 __tds__SetIPAddressFilter(struct soap* soap, struct _tds__SetIPAddressFilter *tds__SetIPAddressFilter, struct _tds__SetIPAddressFilterResponse *tds__SetIPAddressFilterResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __tds__SetIPAddressFilter(struct soap* soap, struct _tds__SetIPAddressFilter *tds__SetIPAddressFilter, struct _tds__SetIPAddressFilterResponse *tds__SetIPAddressFilterResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
 
-SOAP_FMAC5 int SOAP_FMAC6 __tds__AddIPAddressFilter(struct soap* soap, struct _tds__AddIPAddressFilter *tds__AddIPAddressFilter, struct _tds__AddIPAddressFilterResponse *tds__AddIPAddressFilterResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __tds__AddIPAddressFilter(struct soap* soap, struct _tds__AddIPAddressFilter *tds__AddIPAddressFilter, struct _tds__AddIPAddressFilterResponse *tds__AddIPAddressFilterResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
 
-SOAP_FMAC5 int SOAP_FMAC6 __tds__RemoveIPAddressFilter(struct soap* soap, struct _tds__RemoveIPAddressFilter *tds__RemoveIPAddressFilter, struct _tds__RemoveIPAddressFilterResponse *tds__RemoveIPAddressFilterResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __tds__RemoveIPAddressFilter(struct soap* soap, struct _tds__RemoveIPAddressFilter *tds__RemoveIPAddressFilter, struct _tds__RemoveIPAddressFilterResponse *tds__RemoveIPAddressFilterResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
 
 SOAP_FMAC5 int SOAP_FMAC6 __tds__GetAccessPolicy(struct soap* soap, struct _tds__GetAccessPolicy *tds__GetAccessPolicy, struct _tds__GetAccessPolicyResponse *tds__GetAccessPolicyResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
@@ -2057,7 +2378,6 @@ SOAP_FMAC5 int SOAP_FMAC6 __tds__GetRelayOutputs(struct soap* soap, struct _tds_
 			RelayOutput->Properties->DelayTime=g_sys_info.alarmout[g_alarmout[i]].DelayTime;//单位ms
 			RelayOutput++;
 	   }
-		
     }  
 return 0;
 }
@@ -2077,6 +2397,7 @@ SOAP_FMAC5 int SOAP_FMAC6 __tds__SetRelayOutputSettings(struct soap* soap, struc
 	
 	g_sys_info.alarmout[relayidx].Mode=tds__SetRelayOutputSettings->Properties->Mode;
 	g_sys_info.alarmout[relayidx].DelayTime=tds__SetRelayOutputSettings->Properties->DelayTime;
+	//printf("tds__SetRelayOutputSettings->Properties->DelayTime=%d\n",tds__SetRelayOutputSettings->Properties->DelayTime);
 	g_sys_info.alarmout[relayidx].IdleState=tds__SetRelayOutputSettings->Properties->IdleState;
 	write_sys_file();
 return 0;
@@ -2169,7 +2490,6 @@ SOAP_FMAC5 int SOAP_FMAC6 __tds__StartFirmwareUpgrade(struct soap* soap, struct 
 SOAP_FMAC5 int SOAP_FMAC6 __tds__StartSystemRestore(struct soap* soap, struct _tds__StartSystemRestore *tds__StartSystemRestore, struct _tds__StartSystemRestoreResponse *tds__StartSystemRestoreResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
 
-
 SOAP_FMAC5 int SOAP_FMAC6 __tev__PullMessages(struct soap* soap, struct _tev__PullMessages *tev__PullMessages, struct _tev__PullMessagesResponse *tev__PullMessagesResponse)
 {
 fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
@@ -2177,7 +2497,10 @@ unsigned int ntime= time(NULL);
 int i=0;
 struct wsnt__NotificationMessageHolderType *wsnt__NotificationMessage;
 
-sleep(50);
+if(soap->header)
+	soap->header->wsa5__Action=	"http://www.onvif.org/ver10/events/wsdl/PullPointSubscription/PullMessagesResponse";
+
+sleep(2);
 tev__PullMessagesResponse->CurrentTime=ntime;
 tev__PullMessagesResponse->TerminationTime=ntime+600;
 tev__PullMessagesResponse->__sizeNotificationMessage=1;
@@ -2185,19 +2508,99 @@ tev__PullMessagesResponse->wsnt__NotificationMessage=
 	(struct wsnt__NotificationMessageHolderType *)soap_malloc(soap,tev__PullMessagesResponse->__sizeNotificationMessage*sizeof(struct wsnt__NotificationMessageHolderType ));
 wsnt__NotificationMessage=tev__PullMessagesResponse->wsnt__NotificationMessage;
 
+
 for(i=0;i<tev__PullMessagesResponse->__sizeNotificationMessage;i++)
 {
-	//wsnt__NotificationMessage->SubscriptionReference
-	//wsnt__NotificationMessage->Topic->
-}
+	wsnt__NotificationMessage =tev__PullMessagesResponse->wsnt__NotificationMessage+i;
 
+	wsnt__NotificationMessage->SubscriptionReference=	
+		(struct wsa5__EndpointReferenceType *)soap_malloc(soap,sizeof(struct wsa5__EndpointReferenceType ));
+	wsnt__NotificationMessage->SubscriptionReference->Address=g_sys_info.network.ipaddr;
+	
+
+	wsnt__NotificationMessage->Topic=	
+		(struct wsnt__TopicExpressionType *)soap_malloc(soap,sizeof(struct wsnt__TopicExpressionType ));
+	wsnt__NotificationMessage->Topic->Dialect="http://www.onvif.org/ver10/tev/topicExpression/ConcreteSet";
+	wsnt__NotificationMessage->Topic->__mixed="tns1:Device/HardwareFailure/StorageFailure";
+
+
+	wsnt__NotificationMessage->ProducerReference=	
+		(struct wsa5__EndpointReferenceType *)soap_malloc(soap,sizeof(struct wsa5__EndpointReferenceType ));
+	wsnt__NotificationMessage->ProducerReference->Address=g_sys_info.network.ipaddr;
+
+   wsnt__NotificationMessage->Message.message=
+   			(struct _tt__Message *)soap_malloc(soap,sizeof(struct _tt__Message));
+   wsnt__NotificationMessage->Message.message->UtcTime=ntime;
+   
+   wsnt__NotificationMessage->Message.message->Source=
+	   (struct tt__ItemList *)soap_malloc(soap,sizeof(struct tt__ItemList));
+   wsnt__NotificationMessage->Message.message->Source->__sizeSimpleItem=1;
+   wsnt__NotificationMessage->Message.message->Source->SimpleItem=
+	   (struct _tt__ItemList_SimpleItem *)soap_malloc(soap,wsnt__NotificationMessage->Message.message->Source->__sizeSimpleItem*sizeof(struct _tt__ItemList_SimpleItem));
+   wsnt__NotificationMessage->Message.message->Source->SimpleItem->Name="HardDiskNo";
+   wsnt__NotificationMessage->Message.message->Source->SimpleItem->Value="1";
+
+#if 0
+   wsnt__NotificationMessage->Message.message->Data=
+	   (struct tt__ItemList *)soap_malloc(soap,sizeof(struct tt__ItemList));
+   wsnt__NotificationMessage->Message.message->Data->__sizeSimpleItem=1;
+   wsnt__NotificationMessage->Message.message->Data->SimpleItem=
+	   (struct _tt__ItemList_SimpleItem *)soap_malloc(soap,wsnt__NotificationMessage->Message.message->Data->__sizeSimpleItem*sizeof(struct _tt__ItemList_SimpleItem));
+   wsnt__NotificationMessage->Message.message->Data->SimpleItem->Name="IsInside";
+   wsnt__NotificationMessage->Message.message->Data->SimpleItem->Value="false";
+
+
+   wsnt__NotificationMessage->Message.message->Key=
+	   (struct tt__ItemList *)soap_malloc(soap,sizeof(struct tt__ItemList));
+   wsnt__NotificationMessage->Message.message->Key->__sizeSimpleItem=1;
+   wsnt__NotificationMessage->Message.message->Key->SimpleItem=
+	   (struct _tt__ItemList_SimpleItem *)soap_malloc(soap,wsnt__NotificationMessage->Message.message->Key->__sizeSimpleItem*sizeof(struct _tt__ItemList_SimpleItem));
+   wsnt__NotificationMessage->Message.message->Key->SimpleItem->Name="ObjectId";
+   wsnt__NotificationMessage->Message.message->Key->SimpleItem->Value="5";
+
+
+   
+	wsnt__NotificationMessage->Message.message->PropertyOperation=
+		(enum tt__PropertyOperation*)soap_malloc(soap,sizeof(enum tt__PropertyOperation));
+	*wsnt__NotificationMessage->Message.message->PropertyOperation=tt__PropertyOperation__Initialized;
+#endif
+
+}
 //wsnt__NotificationMessage->Topic
 return 0;
 }
 
-SOAP_FMAC5 int SOAP_FMAC6 __tev__SetSynchronizationPoint(struct soap* soap, struct _tev__SetSynchronizationPoint *tev__SetSynchronizationPoint, struct _tev__SetSynchronizationPointResponse *tev__SetSynchronizationPointResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __tev__SetSynchronizationPoint(struct soap* soap, struct _tev__SetSynchronizationPoint *tev__SetSynchronizationPoint, struct _tev__SetSynchronizationPointResponse *tev__SetSynchronizationPointResponse)
+{
+if(soap->header)
+	soap->header->wsa5__Action="http://www.onvif.org/ver10/events/wsdl/PullPointSubscription/SetSynchronizationPointResponse";
 
-SOAP_FMAC5 int SOAP_FMAC6 __tev__GetServiceCapabilities(struct soap* soap, struct _tev__GetServiceCapabilities *tev__GetServiceCapabilities, struct _tev__GetServiceCapabilitiesResponse *tev__GetServiceCapabilitiesResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
+
+SOAP_FMAC5 int SOAP_FMAC6 __tev__GetServiceCapabilities(struct soap* soap, struct _tev__GetServiceCapabilities *tev__GetServiceCapabilities, struct _tev__GetServiceCapabilitiesResponse *tev__GetServiceCapabilitiesResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+tev__GetServiceCapabilitiesResponse->Capabilities=
+	(struct tev__Capabilities *)soap_malloc(soap,sizeof(struct tev__Capabilities));
+
+tev__GetServiceCapabilitiesResponse->Capabilities->WSPullPointSupport=
+	(enum xsd__boolean *)soap_malloc(soap,sizeof(enum xsd__boolean));
+tev__GetServiceCapabilitiesResponse->Capabilities->WSSubscriptionPolicySupport=
+	(enum xsd__boolean *)soap_malloc(soap,sizeof(enum xsd__boolean));
+tev__GetServiceCapabilitiesResponse->Capabilities->WSPausableSubscriptionManagerInterfaceSupport=
+	(enum xsd__boolean *)soap_malloc(soap,sizeof(enum xsd__boolean));
+
+*tev__GetServiceCapabilitiesResponse->Capabilities->WSPullPointSupport=xsd__boolean__true_;
+*tev__GetServiceCapabilitiesResponse->Capabilities->WSSubscriptionPolicySupport=xsd__boolean__true_;
+*tev__GetServiceCapabilitiesResponse->Capabilities->WSPausableSubscriptionManagerInterfaceSupport=xsd__boolean__true_;
+
+
+
+return 0;
+}
+
 
 SOAP_FMAC5 int SOAP_FMAC6 __tev__CreatePullPointSubscription(struct soap* soap, struct _tev__CreatePullPointSubscription *tev__CreatePullPointSubscription, struct _tev__CreatePullPointSubscriptionResponse *tev__CreatePullPointSubscriptionResponse)
 {
@@ -2284,16 +2687,57 @@ fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 return 0;
 }
 
-SOAP_FMAC5 int SOAP_FMAC6 __tev__Renew(struct soap* soap, struct _wsnt__Renew *wsnt__Renew, struct _wsnt__RenewResponse *wsnt__RenewResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __tev__Renew(struct soap* soap, struct _wsnt__Renew *wsnt__Renew, struct _wsnt__RenewResponse *wsnt__RenewResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+if(soap->header)
+	soap->header->wsa5__Action="http://docs.oasis-open.org/wsn/bw-2/SubscriptionManager/RenewResponse";
+unsigned int ntime= time(NULL);
+wsnt__RenewResponse->CurrentTime=
+	(time_t*)soap_malloc(soap,sizeof(time_t));
+*wsnt__RenewResponse->CurrentTime=ntime;
+wsnt__RenewResponse->TerminationTime=ntime+600;
+
+return 0;
+}
 
 SOAP_FMAC5 int SOAP_FMAC6 __tev__Unsubscribe(struct soap* soap, struct _wsnt__Unsubscribe *wsnt__Unsubscribe, struct _wsnt__UnsubscribeResponse *wsnt__UnsubscribeResponse)
 {
+if(soap->header)
+	soap->header->wsa5__Action="http://docs.oasis-open.org/wsn/bw-2/SubscriptionManager/UnsubscribeResponse";
+
 fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 
 return 0;
 }
 
-SOAP_FMAC5 int SOAP_FMAC6 __tev__Subscribe(struct soap* soap, struct _wsnt__Subscribe *wsnt__Subscribe, struct _wsnt__SubscribeResponse *wsnt__SubscribeResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __tev__Subscribe(struct soap* soap, struct _wsnt__Subscribe *wsnt__Subscribe, struct _wsnt__SubscribeResponse *wsnt__SubscribeResponse)
+{
+if(soap->header)
+	soap->header->wsa5__Action="http://docs.oasis-open.org/wsn/bw-2/NotificationProducer/SubscribeResponse";
+wsnt__Subscribe->ConsumerReference.Address;
+wsnt__Subscribe->InitialTerminationTime;
+wsnt__SubscribeResponse->SubscriptionReference;
+unsigned int ntime= time(NULL);
+
+wsnt__SubscribeResponse->SubscriptionReference.Address=
+	(char*)soap_malloc(soap,128);
+sprintf(wsnt__SubscribeResponse->SubscriptionReference.Address,
+	"http://%s:%d/onvif/Events/PullSubManager_%u",
+	g_sys_info.network.ipaddr,ONVIF_EVENT_RORT,ntime);
+
+wsnt__SubscribeResponse->CurrentTime=
+	(time_t*)soap_malloc(soap,sizeof(time_t));
+wsnt__SubscribeResponse->TerminationTime=
+	(time_t*)soap_malloc(soap,sizeof(time_t));
+
+*wsnt__SubscribeResponse->CurrentTime=ntime;
+*wsnt__SubscribeResponse->TerminationTime=ntime+600;
+
+
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
 
 SOAP_FMAC5 int SOAP_FMAC6 __tev__GetCurrentMessage(struct soap* soap, struct _wsnt__GetCurrentMessage *wsnt__GetCurrentMessage, struct _wsnt__GetCurrentMessageResponse *wsnt__GetCurrentMessageResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
@@ -2316,30 +2760,424 @@ SOAP_FMAC5 int SOAP_FMAC6 __tev__PauseSubscription(struct soap* soap, struct _ws
 SOAP_FMAC5 int SOAP_FMAC6 __tev__ResumeSubscription(struct soap* soap, struct _wsnt__ResumeSubscription *wsnt__ResumeSubscription, struct _wsnt__ResumeSubscriptionResponse *wsnt__ResumeSubscriptionResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
 #ifdef ONVIF__timg__
-SOAP_FMAC5 int SOAP_FMAC6 __timg__GetServiceCapabilities(struct soap* soap, struct _timg__GetServiceCapabilities *timg__GetServiceCapabilities, struct _timg__GetServiceCapabilitiesResponse *timg__GetServiceCapabilitiesResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __timg__GetServiceCapabilities(struct soap* soap, struct _timg__GetServiceCapabilities *timg__GetServiceCapabilities, struct _timg__GetServiceCapabilitiesResponse *timg__GetServiceCapabilitiesResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 
-SOAP_FMAC5 int SOAP_FMAC6 __timg__GetImagingSettings(struct soap* soap, struct _timg__GetImagingSettings *timg__GetImagingSettings, struct _timg__GetImagingSettingsResponse *timg__GetImagingSettingsResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+timg__GetServiceCapabilitiesResponse->Capabilities=
+	(struct timg__Capabilities*)soap_malloc(soap,sizeof(struct timg__Capabilities));
+timg__GetServiceCapabilitiesResponse->Capabilities->ImageStabilization
+	=(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+*timg__GetServiceCapabilitiesResponse->Capabilities->ImageStabilization=xsd__boolean__false_;
+
+
+return 0;
+}
+
+SOAP_FMAC5 int SOAP_FMAC6 __timg__GetImagingSettings(struct soap* soap, struct _timg__GetImagingSettings *timg__GetImagingSettings, struct _timg__GetImagingSettingsResponse *timg__GetImagingSettingsResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+	if(strcmp(timg__GetImagingSettings->VideoSourceToken,VIDEOSOURCETOLEN)!=0)
+		return SOAP_ERR;
+
+	CamAEParam aeparams={0};
+	CamAWBParam awbparams={0};
+	CamExprosureParam Exprosureparams={0};
+	CamRGBGains rgbparams={0};
+	CamImgEnhanceParams ImgEnhanceparams={0};
+
+	/* get auto exposure params */
+	icam_get_ae_params(g_icam_ctrl_handle, &aeparams);
+	/* get auto white balance params */
+	icam_get_awb_params(g_icam_ctrl_handle, &awbparams);
+	icam_get_exposure_params(g_icam_ctrl_handle, &Exprosureparams);
+	icam_get_rgb_gains(g_icam_ctrl_handle, &rgbparams);
+	icam_get_img_enhance_params(g_icam_ctrl_handle, &ImgEnhanceparams);
+
+	CamImgAdjCfg *onImgAdjCfg=&ImgEnhanceparams.dayCfg;
+
+	timg__GetImagingSettingsResponse->ImagingSettings=
+		(struct tt__ImagingSettings20*)soap_malloc(soap,sizeof(struct tt__ImagingSettings20));
+
+	timg__GetImagingSettingsResponse->ImagingSettings->BacklightCompensation=NULL;
+
+	timg__GetImagingSettingsResponse->ImagingSettings->Brightness=
+		(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->ColorSaturation=
+		(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->Contrast=
+		(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->Sharpness=
+		(float*)soap_malloc(soap,sizeof(float));
+
+	*timg__GetImagingSettingsResponse->ImagingSettings->Brightness=onImgAdjCfg->brightness;
+	*timg__GetImagingSettingsResponse->ImagingSettings->ColorSaturation=onImgAdjCfg->saturation;
+	*timg__GetImagingSettingsResponse->ImagingSettings->Contrast=onImgAdjCfg->contrast;
+	*timg__GetImagingSettingsResponse->ImagingSettings->Sharpness=onImgAdjCfg->sharpness;
+
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure=
+		(struct tt__Exposure20*)soap_malloc(soap,sizeof(struct tt__Exposure20));
+	if(aeparams.flags&CAM_AE_FLAG_AE_EN)
+		timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Mode=tt__ExposureMode__AUTO;
+	else
+		timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Mode=tt__ExposureMode__MANUAL;
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Priority=
+		(enum tt__ExposurePriority*)soap_malloc(soap,sizeof(enum tt__ExposurePriority));
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Priority=tt__ExposurePriority__FrameRate;
+	//tt__ExposurePriority__LowNoise = 0, tt__ExposurePriority__FrameRate 
+
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Window=
+		(struct tt__Rectangle*)soap_malloc(soap,sizeof(struct tt__Rectangle));
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Window->top=(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Window->bottom=(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Window->right=(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Window->left=(float*)soap_malloc(soap,sizeof(float));
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Window->top=aeparams.roi[0].startY;
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Window->bottom=aeparams.roi[0].endY;
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Window->right=aeparams.roi[0].endX;
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Window->left=aeparams.roi[0].startX;
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->MinExposureTime=(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->MaxExposureTime=(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->MinGain=(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->MaxGain=(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->MinIris=(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->MaxIris=(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->ExposureTime=(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Gain=(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Iris=(float*)soap_malloc(soap,sizeof(float));
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->MinExposureTime=aeparams.minShutterTime;
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->MaxExposureTime=aeparams.maxShutterTime;
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->MinGain=aeparams.minGainValue;
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->MaxGain=aeparams.maxGainValue;
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->MinIris=aeparams.minAperture;
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->MaxIris=aeparams.maxAperture;
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->ExposureTime=Exprosureparams.shutterTime;
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Gain=Exprosureparams.globalGain;
+	*timg__GetImagingSettingsResponse->ImagingSettings->Exposure->Iris=Exprosureparams.reserved;
+
+
+	timg__GetImagingSettingsResponse->ImagingSettings->Focus=NULL;
+	timg__GetImagingSettingsResponse->ImagingSettings->IrCutFilter=NULL;
+
+	timg__GetImagingSettingsResponse->ImagingSettings->WideDynamicRange=
+		(struct tt__WideDynamicRange20*)soap_malloc(soap,sizeof(struct tt__WideDynamicRange20));
+	if(onImgAdjCfg->flags&CAM_IMG_DRC_EN)
+	timg__GetImagingSettingsResponse->ImagingSettings->WideDynamicRange->Mode=tt__WideDynamicMode__ON;
+	else
+	timg__GetImagingSettingsResponse->ImagingSettings->WideDynamicRange->Mode=tt__WideDynamicMode__OFF;
+	//tt__WideDynamicMode__OFF = 0, tt__WideDynamicMode__ON CAM_IMG_DRC_EN
+	timg__GetImagingSettingsResponse->ImagingSettings->WideDynamicRange->Level=(float*)soap_malloc(soap,sizeof(float));
+	*timg__GetImagingSettingsResponse->ImagingSettings->WideDynamicRange->Level=onImgAdjCfg->drcStrength;
+
+	timg__GetImagingSettingsResponse->ImagingSettings->WhiteBalance=
+		(struct tt__WhiteBalance20*)soap_malloc(soap,sizeof(struct tt__WhiteBalance20));
+	if(awbparams.flags&AWB_FLAG_EN)
+		timg__GetImagingSettingsResponse->ImagingSettings->WhiteBalance->Mode=tt__WhiteBalanceMode__AUTO;//flags
+	else
+		timg__GetImagingSettingsResponse->ImagingSettings->WhiteBalance->Mode=tt__WhiteBalanceMode__MANUAL;//flags
+		//tt__WhiteBalanceMode__AUTO = 0, tt__WhiteBalanceMode__MANUAL
+	timg__GetImagingSettingsResponse->ImagingSettings->WhiteBalance->CbGain=(float*)soap_malloc(soap,sizeof(float));
+	timg__GetImagingSettingsResponse->ImagingSettings->WhiteBalance->CrGain=(float*)soap_malloc(soap,sizeof(float));
+	*timg__GetImagingSettingsResponse->ImagingSettings->WhiteBalance->CbGain=rgbparams.blueGain;
+	*timg__GetImagingSettingsResponse->ImagingSettings->WhiteBalance->CrGain=rgbparams.redGain;
+	timg__GetImagingSettingsResponse->ImagingSettings->Extension=NULL;
+#if 0
+	float *Brightness;	/* optional element of type xsd:float */
+	float *ColorSaturation; /* optional element of type xsd:float */
+	float *Contrast;	/* optional element of type xsd:float */
+	struct tt__Exposure20 *Exposure;	/* optional element of type tt:Exposure20 */
+	float *Sharpness;	/* optional element of type xsd:float */
+	struct tt__WideDynamicRange20 *WideDynamicRange;	/* optional element of type tt:WideDynamicRange20 */
+	struct tt__WhiteBalance20 *WhiteBalance;	/* optional element of type tt:WhiteBalance20 */
+#endif
+return 0;
+}
 
 SOAP_FMAC5 int SOAP_FMAC6 __timg__SetImagingSettings(struct soap* soap, struct _timg__SetImagingSettings *timg__SetImagingSettings, struct _timg__SetImagingSettingsResponse *timg__SetImagingSettingsResponse)
 {
 fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 
+	CamAEParam aeparams={0};
+	CamAWBParam awbparams={0};
+	CamExprosureParam Exprosureparams={0};
+	CamRGBGains rgbparams={0};
+	CamImgEnhanceParams ImgEnhanceparams={0};
+	CamImgAdjCfg *onImgAdjCfg=NULL;
+
+	if(strcmp(timg__SetImagingSettings->VideoSourceToken,VIDEOSOURCETOLEN)!=0)
+		return SOAP_ERR;
+
+	if(icam_get_img_enhance_params(g_icam_ctrl_handle, &ImgEnhanceparams))
+		return SOAP_ERR;
+	onImgAdjCfg=&ImgEnhanceparams.dayCfg;
+
+	if(timg__SetImagingSettings->ImagingSettings->Brightness)
+		onImgAdjCfg->brightness=*timg__SetImagingSettings->ImagingSettings->Brightness;
+	if(timg__SetImagingSettings->ImagingSettings->ColorSaturation)
+		onImgAdjCfg->saturation=*timg__SetImagingSettings->ImagingSettings->ColorSaturation;
+	if(timg__SetImagingSettings->ImagingSettings->Contrast)
+		onImgAdjCfg->contrast=*timg__SetImagingSettings->ImagingSettings->Contrast;
+	if(timg__SetImagingSettings->ImagingSettings->Sharpness)
+		onImgAdjCfg->sharpness=*timg__SetImagingSettings->ImagingSettings->Sharpness;
+
+if(timg__SetImagingSettings->ImagingSettings->Exposure)
+{
+	/* get auto exposure params */
+	if(icam_get_ae_params(g_icam_ctrl_handle, &aeparams))
+		return SOAP_ERR;
+
+	if(timg__SetImagingSettings->ImagingSettings->Exposure->Mode==tt__ExposureMode__AUTO)
+	{
+	    aeparams.flags|=CAM_AE_FLAG_AE_EN|CAM_AE_FLAG_AE_EN|CAM_AE_FLAG_AE_EN;
+		if(timg__SetImagingSettings->ImagingSettings->Exposure->MinExposureTime)
+			aeparams.minShutterTime=*timg__SetImagingSettings->ImagingSettings->Exposure->MinExposureTime;
+		if(timg__SetImagingSettings->ImagingSettings->Exposure->MaxExposureTime)
+			aeparams.maxShutterTime=*timg__SetImagingSettings->ImagingSettings->Exposure->MaxExposureTime;
+		if(timg__SetImagingSettings->ImagingSettings->Exposure->MinGain)
+			aeparams.minGainValue=*timg__SetImagingSettings->ImagingSettings->Exposure->MinGain;
+		if(timg__SetImagingSettings->ImagingSettings->Exposure->MaxGain)
+			aeparams.maxGainValue=*timg__SetImagingSettings->ImagingSettings->Exposure->MaxGain;
+		if(timg__SetImagingSettings->ImagingSettings->Exposure->MinIris)
+			aeparams.minAperture=*timg__SetImagingSettings->ImagingSettings->Exposure->MinIris;
+		if(timg__SetImagingSettings->ImagingSettings->Exposure->MaxIris)
+			aeparams.maxAperture=*timg__SetImagingSettings->ImagingSettings->Exposure->MaxIris;
+	}else
+	{
+	     if(icam_get_exposure_params(g_icam_ctrl_handle, &Exprosureparams))
+		     return SOAP_ERR;
+	     aeparams.flags&=~(CAM_AE_FLAG_AE_EN|CAM_AE_FLAG_AE_EN|CAM_AE_FLAG_AE_EN);
+		 if(timg__SetImagingSettings->ImagingSettings->Exposure->ExposureTime)
+			Exprosureparams.shutterTime=*timg__SetImagingSettings->ImagingSettings->Exposure->ExposureTime;
+		 if(timg__SetImagingSettings->ImagingSettings->Exposure->Gain)
+			Exprosureparams.globalGain=*timg__SetImagingSettings->ImagingSettings->Exposure->Gain;
+		 if(timg__SetImagingSettings->ImagingSettings->Exposure->Iris)
+			Exprosureparams.reserved=*timg__SetImagingSettings->ImagingSettings->Exposure->Iris;
+		 if(icam_set_exposure_params(g_icam_ctrl_handle, &Exprosureparams))
+		     return SOAP_ERR;
+	}
+	    if(timg__SetImagingSettings->ImagingSettings->Exposure->Window)
+		{
+			if(timg__SetImagingSettings->ImagingSettings->Exposure->Window->top
+				&&timg__SetImagingSettings->ImagingSettings->Exposure->Window->bottom
+				&&timg__SetImagingSettings->ImagingSettings->Exposure->Window->right
+				&&timg__SetImagingSettings->ImagingSettings->Exposure->Window->left)
+			{
+			aeparams.roi[0].startY=*timg__SetImagingSettings->ImagingSettings->Exposure->Window->top;
+			aeparams.roi[0].endY=*timg__SetImagingSettings->ImagingSettings->Exposure->Window->bottom;
+			aeparams.roi[0].endX=*timg__SetImagingSettings->ImagingSettings->Exposure->Window->right;
+			aeparams.roi[0].startX=*timg__SetImagingSettings->ImagingSettings->Exposure->Window->left;
+
+			}
+		}
+	if(icam_set_ae_params(g_icam_ctrl_handle, &aeparams))
+		return SOAP_ERR;
+}
+
+if(timg__SetImagingSettings->ImagingSettings->WideDynamicRange)
+{
+	if(timg__SetImagingSettings->ImagingSettings->WideDynamicRange->Mode==tt__WideDynamicMode__ON)
+	{
+		onImgAdjCfg->flags|=CAM_IMG_DRC_EN;
+		if(timg__SetImagingSettings->ImagingSettings->WideDynamicRange->Level)
+		{
+		onImgAdjCfg->drcStrength=*timg__SetImagingSettings->ImagingSettings->WideDynamicRange->Level;
+		}
+	}
+	else
+		onImgAdjCfg->flags&=~CAM_IMG_DRC_EN;
+}
+
+if(timg__SetImagingSettings->ImagingSettings->WhiteBalance)
+{
+	/* get auto white balance params */
+	if(icam_get_awb_params(g_icam_ctrl_handle, &awbparams))
+		return SOAP_ERR;
+
+	if(timg__SetImagingSettings->ImagingSettings->WhiteBalance->Mode==tt__WhiteBalanceMode__AUTO)
+	{
+		awbparams.flags|=AWB_FLAG_EN;
+	}
+	else
+	{
+	    onImgAdjCfg->flags&=~AWB_FLAG_EN;
+		if(icam_get_rgb_gains(g_icam_ctrl_handle, &rgbparams))
+			return SOAP_ERR;
+		if(timg__SetImagingSettings->ImagingSettings->WhiteBalance->CbGain)
+			rgbparams.blueGain=*timg__SetImagingSettings->ImagingSettings->WhiteBalance->CbGain;
+		if(timg__SetImagingSettings->ImagingSettings->WhiteBalance->CrGain)
+			rgbparams.redGain=*timg__SetImagingSettings->ImagingSettings->WhiteBalance->CrGain;
+		if(icam_set_rgb_gains(g_icam_ctrl_handle, &rgbparams))
+			return SOAP_ERR;
+	}
+	if(icam_set_awb_params(g_icam_ctrl_handle, &awbparams))
+		return SOAP_ERR;
+}
+	if(icam_set_img_enhance_params(g_icam_ctrl_handle, &ImgEnhanceparams))
+		return SOAP_ERR;
 return 0;
 }
 
-SOAP_FMAC5 int SOAP_FMAC6 __timg__GetOptions(struct soap* soap, struct _timg__GetOptions *timg__GetOptions, struct _timg__GetOptionsResponse *timg__GetOptionsResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __timg__GetOptions(struct soap* soap, struct _timg__GetOptions *timg__GetOptions, struct _timg__GetOptionsResponse *timg__GetOptionsResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+if(strcmp(timg__GetOptions->VideoSourceToken,VIDEOSOURCETOLEN)!=0)
+	return SOAP_ERR;
+timg__GetOptionsResponse->ImagingOptions=
+	(struct tt__ImagingOptions20*)soap_malloc(soap,sizeof(struct tt__ImagingOptions20));
+timg__GetOptionsResponse->ImagingOptions->Brightness=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->ColorSaturation=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->Contrast=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->Sharpness=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->Brightness->Min=0;
+timg__GetOptionsResponse->ImagingOptions->Brightness->Max=255;
+timg__GetOptionsResponse->ImagingOptions->ColorSaturation->Min=0;
+timg__GetOptionsResponse->ImagingOptions->ColorSaturation->Max=255;
+timg__GetOptionsResponse->ImagingOptions->Contrast->Min=0;
+timg__GetOptionsResponse->ImagingOptions->Contrast->Max=255;
+timg__GetOptionsResponse->ImagingOptions->Sharpness->Min=0;
+timg__GetOptionsResponse->ImagingOptions->Sharpness->Max=255;
 
-SOAP_FMAC5 int SOAP_FMAC6 __timg__Move(struct soap* soap, struct _timg__Move *timg__Move, struct _timg__MoveResponse *timg__MoveResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+timg__GetOptionsResponse->ImagingOptions->Exposure=
+	(struct tt__ExposureOptions20*)soap_malloc(soap,sizeof(struct tt__ExposureOptions20));
+timg__GetOptionsResponse->ImagingOptions->Exposure->__sizeMode=2;
+timg__GetOptionsResponse->ImagingOptions->Exposure->Mode=
+	(enum tt__ExposureMode*)soap_malloc(soap,timg__GetOptionsResponse->ImagingOptions->Exposure->__sizeMode*sizeof(enum tt__ExposureMode));
 
-SOAP_FMAC5 int SOAP_FMAC6 __timg__Stop(struct soap* soap, struct _timg__Stop *timg__Stop, struct _timg__StopResponse *timg__StopResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+*timg__GetOptionsResponse->ImagingOptions->Exposure->Mode=tt__ExposureMode__AUTO;
+*(timg__GetOptionsResponse->ImagingOptions->Exposure->Mode+1)=tt__ExposureMode__MANUAL;
 
-SOAP_FMAC5 int SOAP_FMAC6 __timg__GetStatus(struct soap* soap, struct _timg__GetStatus *timg__GetStatus, struct _timg__GetStatusResponse *timg__GetStatusResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
-SOAP_FMAC5 int SOAP_FMAC6 __timg__GetMoveOptions(struct soap* soap, struct _timg__GetMoveOptions *timg__GetMoveOptions, struct _timg__GetMoveOptionsResponse *timg__GetMoveOptionsResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+timg__GetOptionsResponse->ImagingOptions->Exposure->__sizePriority=1;
+timg__GetOptionsResponse->ImagingOptions->Exposure->Priority=
+	(enum tt__ExposurePriority*)soap_malloc(soap,timg__GetOptionsResponse->ImagingOptions->Exposure->__sizePriority*sizeof(enum tt__ExposurePriority));
+*timg__GetOptionsResponse->ImagingOptions->Exposure->Priority=tt__ExposurePriority__FrameRate;
+
+timg__GetOptionsResponse->ImagingOptions->Exposure->MinExposureTime=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->Exposure->MaxExposureTime=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->Exposure->MinGain=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->Exposure->MaxGain=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->Exposure->MinIris=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->Exposure->MaxIris=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->Exposure->ExposureTime=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->Exposure->Gain=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->Exposure->Iris=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+
+timg__GetOptionsResponse->ImagingOptions->Exposure->MinExposureTime->Min=0;
+timg__GetOptionsResponse->ImagingOptions->Exposure->MinExposureTime->Max=60000000;
+timg__GetOptionsResponse->ImagingOptions->Exposure->MaxExposureTime->Min=0;
+timg__GetOptionsResponse->ImagingOptions->Exposure->MaxExposureTime->Max=60000000;
+timg__GetOptionsResponse->ImagingOptions->Exposure->MinGain->Min=1;
+timg__GetOptionsResponse->ImagingOptions->Exposure->MinGain->Max=1023;
+timg__GetOptionsResponse->ImagingOptions->Exposure->MaxGain->Min=1;
+timg__GetOptionsResponse->ImagingOptions->Exposure->MaxGain->Max=1023;
+timg__GetOptionsResponse->ImagingOptions->Exposure->MinIris->Min=0;
+timg__GetOptionsResponse->ImagingOptions->Exposure->MinIris->Max=255;
+timg__GetOptionsResponse->ImagingOptions->Exposure->MaxIris->Min=0;
+timg__GetOptionsResponse->ImagingOptions->Exposure->MaxIris->Max=255;
+timg__GetOptionsResponse->ImagingOptions->Exposure->ExposureTime->Min=0;
+timg__GetOptionsResponse->ImagingOptions->Exposure->ExposureTime->Max=60000000;
+timg__GetOptionsResponse->ImagingOptions->Exposure->Gain->Min=0;
+timg__GetOptionsResponse->ImagingOptions->Exposure->Gain->Max=1023;
+timg__GetOptionsResponse->ImagingOptions->Exposure->Iris->Min=0;
+timg__GetOptionsResponse->ImagingOptions->Exposure->Iris->Max=255;
+
+
+
+timg__GetOptionsResponse->ImagingOptions->WideDynamicRange=
+	(struct tt__WideDynamicRangeOptions20*)soap_malloc(soap,sizeof(struct tt__WideDynamicRangeOptions20));
+timg__GetOptionsResponse->ImagingOptions->WideDynamicRange->__sizeMode=2;
+timg__GetOptionsResponse->ImagingOptions->WideDynamicRange->Mode=
+	(enum tt__WideDynamicMode*)soap_malloc(soap,timg__GetOptionsResponse->ImagingOptions->WideDynamicRange->__sizeMode*sizeof(enum tt__WideDynamicMode));
+*timg__GetOptionsResponse->ImagingOptions->WideDynamicRange->Mode=tt__WideDynamicMode__OFF;
+*(timg__GetOptionsResponse->ImagingOptions->WideDynamicRange->Mode+1)=tt__WideDynamicMode__ON;
+timg__GetOptionsResponse->ImagingOptions->WideDynamicRange->Level=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->WideDynamicRange->Level->Min=0;
+timg__GetOptionsResponse->ImagingOptions->WideDynamicRange->Level->Max=255;
+
+
+timg__GetOptionsResponse->ImagingOptions->WhiteBalance=
+	(struct tt__WhiteBalanceOptions20*)soap_malloc(soap,sizeof(struct tt__WhiteBalanceOptions20));
+timg__GetOptionsResponse->ImagingOptions->WhiteBalance->__sizeMode=2;
+timg__GetOptionsResponse->ImagingOptions->WhiteBalance->Mode=
+	(enum tt__WhiteBalanceMode*)soap_malloc(soap,timg__GetOptionsResponse->ImagingOptions->WhiteBalance->__sizeMode*sizeof(enum tt__WhiteBalanceMode));
+*timg__GetOptionsResponse->ImagingOptions->WhiteBalance->Mode=tt__WhiteBalanceMode__AUTO;
+*(timg__GetOptionsResponse->ImagingOptions->WhiteBalance->Mode+1)=tt__WhiteBalanceMode__MANUAL;
+
+timg__GetOptionsResponse->ImagingOptions->WhiteBalance->YrGain=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->WhiteBalance->YrGain->Min=0;
+timg__GetOptionsResponse->ImagingOptions->WhiteBalance->YrGain->Max=255;
+
+timg__GetOptionsResponse->ImagingOptions->WhiteBalance->YbGain=
+	(struct tt__FloatRange*)soap_malloc(soap,sizeof(struct tt__FloatRange));
+timg__GetOptionsResponse->ImagingOptions->WhiteBalance->YbGain->Min=0;
+timg__GetOptionsResponse->ImagingOptions->WhiteBalance->YbGain->Max=255;
+#if 0
+struct tt__FloatRange *Brightness;	/* optional element of type tt:FloatRange */
+struct tt__FloatRange *ColorSaturation; /* optional element of type tt:FloatRange */
+struct tt__FloatRange *Contrast;	/* optional element of type tt:FloatRange */
+struct tt__ExposureOptions20 *Exposure; /* optional element of type tt:ExposureOptions20 */
+struct tt__FloatRange *Sharpness;	/* optional element of type tt:FloatRange */
+struct tt__WideDynamicRangeOptions20 *WideDynamicRange; /* optional element of type tt:WideDynamicRangeOptions20 */
+struct tt__WhiteBalanceOptions20 *WhiteBalance; /* optional element of type tt:WhiteBalanceOptions20 */
+#endif
+return 0;
+}
+
+SOAP_FMAC5 int SOAP_FMAC6 __timg__Move(struct soap* soap, struct _timg__Move *timg__Move, struct _timg__MoveResponse *timg__MoveResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
+
+SOAP_FMAC5 int SOAP_FMAC6 __timg__Stop(struct soap* soap, struct _timg__Stop *timg__Stop, struct _timg__StopResponse *timg__StopResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
+
+SOAP_FMAC5 int SOAP_FMAC6 __timg__GetStatus(struct soap* soap, struct _timg__GetStatus *timg__GetStatus, struct _timg__GetStatusResponse *timg__GetStatusResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
+
+SOAP_FMAC5 int SOAP_FMAC6 __timg__GetMoveOptions(struct soap* soap, struct _timg__GetMoveOptions *timg__GetMoveOptions, struct _timg__GetMoveOptionsResponse *timg__GetMoveOptionsResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
 #endif
 
 
-SOAP_FMAC5 int SOAP_FMAC6 __tmd__GetServiceCapabilities(struct soap* soap, struct _tmd__GetServiceCapabilities *tmd__GetServiceCapabilities, struct _tmd__GetServiceCapabilitiesResponse *tmd__GetServiceCapabilitiesResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __tmd__GetServiceCapabilities(struct soap* soap, struct _tmd__GetServiceCapabilities *tmd__GetServiceCapabilities, struct _tmd__GetServiceCapabilitiesResponse *tmd__GetServiceCapabilitiesResponse)
+{
+	tmd__GetServiceCapabilitiesResponse->Capabilities=
+		(struct tmd__Capabilities*)soap_malloc(soap,sizeof(struct tmd__Capabilities));
+	tmd__GetServiceCapabilitiesResponse->Capabilities->VideoSources=1;
+	tmd__GetServiceCapabilitiesResponse->Capabilities->VideoOutputs=0;
+	tmd__GetServiceCapabilitiesResponse->Capabilities->AudioSources=0;
+	tmd__GetServiceCapabilitiesResponse->Capabilities->AudioOutputs=0;
+	tmd__GetServiceCapabilitiesResponse->Capabilities->RelayOutputs=RELAY_OUTPUTS_NUM;
+	tmd__GetServiceCapabilitiesResponse->Capabilities->SerialPorts=0;
+	tmd__GetServiceCapabilitiesResponse->Capabilities->DigitalInputs=INPUT_CONNECTORS_NUM;
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
 
 SOAP_FMAC5 int SOAP_FMAC6 __tmd__GetRelayOutputOptions(struct soap* soap, struct _tmd__GetRelayOutputOptions *tmd__GetRelayOutputOptions, struct _tmd__GetRelayOutputOptionsResponse *tmd__GetRelayOutputOptionsResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
@@ -2507,7 +3345,42 @@ SOAP_FMAC5 int SOAP_FMAC6 __trp__GetReplayConfiguration(struct soap* soap, struc
 SOAP_FMAC5 int SOAP_FMAC6 __trp__SetReplayConfiguration(struct soap* soap, struct _trp__SetReplayConfiguration *trp__SetReplayConfiguration, struct _trp__SetReplayConfigurationResponse *trp__SetReplayConfigurationResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
 #endif
-SOAP_FMAC5 int SOAP_FMAC6 __trt__GetServiceCapabilities(struct soap* soap, struct _trt__GetServiceCapabilities *trt__GetServiceCapabilities, struct _trt__GetServiceCapabilitiesResponse *trt__GetServiceCapabilitiesResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __trt__GetServiceCapabilities(struct soap* soap, struct _trt__GetServiceCapabilities *trt__GetServiceCapabilities, struct _trt__GetServiceCapabilitiesResponse *trt__GetServiceCapabilitiesResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+trt__GetServiceCapabilitiesResponse->Capabilities=
+	(struct trt__Capabilities*)soap_malloc(soap,sizeof(struct trt__Capabilities));
+trt__GetServiceCapabilitiesResponse->Capabilities->ProfileCapabilities=
+	(struct trt__ProfileCapabilities*)soap_malloc(soap,sizeof(struct trt__ProfileCapabilities));
+trt__GetServiceCapabilitiesResponse->Capabilities->ProfileCapabilities->MaximumNumberOfProfiles=
+	(int*)soap_malloc(soap,sizeof(int));
+*trt__GetServiceCapabilitiesResponse->Capabilities->ProfileCapabilities->MaximumNumberOfProfiles=1;
+
+trt__GetServiceCapabilitiesResponse->Capabilities->StreamingCapabilities=
+	(struct trt__StreamingCapabilities*)soap_malloc(soap,sizeof(struct trt__StreamingCapabilities));
+trt__GetServiceCapabilitiesResponse->Capabilities->StreamingCapabilities->RTPMulticast=
+	(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+trt__GetServiceCapabilitiesResponse->Capabilities->StreamingCapabilities->RTP_USCORETCP=
+	(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+trt__GetServiceCapabilitiesResponse->Capabilities->StreamingCapabilities->RTP_USCORERTSP_USCORETCP=
+	(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+trt__GetServiceCapabilitiesResponse->Capabilities->StreamingCapabilities->NonAggregateControl=
+	(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+
+*trt__GetServiceCapabilitiesResponse->Capabilities->StreamingCapabilities->RTPMulticast=xsd__boolean__true_;
+*trt__GetServiceCapabilitiesResponse->Capabilities->StreamingCapabilities->RTP_USCORETCP=xsd__boolean__true_;
+*trt__GetServiceCapabilitiesResponse->Capabilities->StreamingCapabilities->RTP_USCORERTSP_USCORETCP=xsd__boolean__true_;
+*trt__GetServiceCapabilitiesResponse->Capabilities->StreamingCapabilities->NonAggregateControl=xsd__boolean__false_;
+
+trt__GetServiceCapabilitiesResponse->Capabilities->SnapshotUri=
+	(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+trt__GetServiceCapabilitiesResponse->Capabilities->Rotation=
+	(enum xsd__boolean*)soap_malloc(soap,sizeof(enum xsd__boolean));
+*trt__GetServiceCapabilitiesResponse->Capabilities->SnapshotUri=xsd__boolean__false_;
+*trt__GetServiceCapabilitiesResponse->Capabilities->Rotation=xsd__boolean__false_;
+
+return 0;
+}
 
 SOAP_FMAC5 int SOAP_FMAC6 __trt__GetVideoSources(struct soap* soap, struct _trt__GetVideoSources *trt__GetVideoSources, struct _trt__GetVideoSourcesResponse *trt__GetVideoSourcesResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
@@ -2517,7 +3390,8 @@ SOAP_FMAC5 int SOAP_FMAC6 __trt__GetAudioOutputs(struct soap* soap, struct _trt_
 
 SOAP_FMAC5 int SOAP_FMAC6 __trt__CreateProfile(struct soap* soap, struct _trt__CreateProfile *trt__CreateProfile, struct _trt__CreateProfileResponse *trt__CreateProfileResponse)
 {
-	fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+	fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);	
+	return soap_sender_fault_subcode(soap, "ter:Action/ter:MaxNVTProfiles", NULL, NULL);
 	return 0;
 }
 
@@ -2617,7 +3491,7 @@ SOAP_FMAC5 int SOAP_FMAC6 __trt__GetVideoSourceConfigurations(struct soap* soap,
 	int ret;
 	trt__GetVideoSourceConfigurationsResponse->__sizeConfigurations=1;
 	trt__GetVideoSourceConfigurationsResponse->Configurations=
-		(struct tt__VideoSourceConfiguration*)soap_malloc(soap,sizeof(struct tt__VideoSourceConfiguration));
+		(struct tt__VideoSourceConfiguration*)soap_malloc(soap,trt__GetVideoSourceConfigurationsResponse->__sizeConfigurations*sizeof(struct tt__VideoSourceConfiguration));
 	trt__GetVideoSourceConfiguration.ConfigurationToken=VIDEOSOURCECONFIG;
 	trt__GetVideoSourceConfigurationResponse.Configuration=trt__GetVideoSourceConfigurationsResponse->Configurations;
 	ret=__trt__GetVideoSourceConfiguration(soap,&trt__GetVideoSourceConfiguration,&trt__GetVideoSourceConfigurationResponse);
@@ -2759,9 +3633,39 @@ SOAP_FMAC5 int SOAP_FMAC6 __trt__GetAudioOutputConfiguration(struct soap* soap, 
 
 SOAP_FMAC5 int SOAP_FMAC6 __trt__GetAudioDecoderConfiguration(struct soap* soap, struct _trt__GetAudioDecoderConfiguration *trt__GetAudioDecoderConfiguration, struct _trt__GetAudioDecoderConfigurationResponse *trt__GetAudioDecoderConfigurationResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
-SOAP_FMAC5 int SOAP_FMAC6 __trt__GetCompatibleVideoEncoderConfigurations(struct soap* soap, struct _trt__GetCompatibleVideoEncoderConfigurations *trt__GetCompatibleVideoEncoderConfigurations, struct _trt__GetCompatibleVideoEncoderConfigurationsResponse *trt__GetCompatibleVideoEncoderConfigurationsResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __trt__GetCompatibleVideoEncoderConfigurations(struct soap* soap, struct _trt__GetCompatibleVideoEncoderConfigurations *trt__GetCompatibleVideoEncoderConfigurations, struct _trt__GetCompatibleVideoEncoderConfigurationsResponse *trt__GetCompatibleVideoEncoderConfigurationsResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+	if(strcmp(trt__GetCompatibleVideoEncoderConfigurations->ProfileToken,IPCPROFILE_1)!=0)
+		return SOAP_ERR;
+	trt__GetCompatibleVideoEncoderConfigurationsResponse->__sizeConfigurations=1;
+	trt__GetCompatibleVideoEncoderConfigurationsResponse->Configurations=
+		(struct tt__VideoEncoderConfiguration*)soap_malloc(soap,trt__GetCompatibleVideoEncoderConfigurationsResponse->__sizeConfigurations*sizeof(struct tt__VideoEncoderConfiguration));
+	struct _trt__GetVideoEncoderConfiguration trt__GetVideoEncoderConfiguration;
+	trt__GetVideoEncoderConfiguration.ConfigurationToken=VIDEOENCODER1;
+	struct _trt__GetVideoEncoderConfigurationResponse trt__GetVideoEncoderConfigurationResponse;
+	trt__GetVideoEncoderConfigurationResponse.Configuration=trt__GetCompatibleVideoEncoderConfigurationsResponse->Configurations;
+	return __trt__GetVideoEncoderConfiguration(soap, &trt__GetVideoEncoderConfiguration, &trt__GetVideoEncoderConfigurationResponse);
+return 0;
+}
 
-SOAP_FMAC5 int SOAP_FMAC6 __trt__GetCompatibleVideoSourceConfigurations(struct soap* soap, struct _trt__GetCompatibleVideoSourceConfigurations *trt__GetCompatibleVideoSourceConfigurations, struct _trt__GetCompatibleVideoSourceConfigurationsResponse *trt__GetCompatibleVideoSourceConfigurationsResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __trt__GetCompatibleVideoSourceConfigurations(struct soap* soap, struct _trt__GetCompatibleVideoSourceConfigurations *trt__GetCompatibleVideoSourceConfigurations, struct _trt__GetCompatibleVideoSourceConfigurationsResponse *trt__GetCompatibleVideoSourceConfigurationsResponse)
+{
+	if(strcmp(trt__GetCompatibleVideoSourceConfigurations->ProfileToken,IPCPROFILE_1)!=0)
+		return SOAP_ERR;
+	struct _trt__GetVideoSourceConfiguration trt__GetVideoSourceConfiguration;
+	struct _trt__GetVideoSourceConfigurationResponse trt__GetVideoSourceConfigurationResponse;
+	int ret;
+	trt__GetCompatibleVideoSourceConfigurationsResponse->__sizeConfigurations=1;
+	trt__GetCompatibleVideoSourceConfigurationsResponse->Configurations=
+		(struct tt__VideoSourceConfiguration*)soap_malloc(soap,trt__GetCompatibleVideoSourceConfigurationsResponse->__sizeConfigurations*sizeof(struct tt__VideoSourceConfiguration));
+	trt__GetVideoSourceConfiguration.ConfigurationToken=VIDEOSOURCECONFIG;
+	trt__GetVideoSourceConfigurationResponse.Configuration=trt__GetCompatibleVideoSourceConfigurationsResponse->Configurations;
+	ret=__trt__GetVideoSourceConfiguration(soap,&trt__GetVideoSourceConfiguration,&trt__GetVideoSourceConfigurationResponse);
+
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return ret;
+}
 
 SOAP_FMAC5 int SOAP_FMAC6 __trt__GetCompatibleAudioEncoderConfigurations(struct soap* soap, struct _trt__GetCompatibleAudioEncoderConfigurations *trt__GetCompatibleAudioEncoderConfigurations, struct _trt__GetCompatibleAudioEncoderConfigurationsResponse *trt__GetCompatibleAudioEncoderConfigurationsResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
@@ -2775,7 +3679,27 @@ SOAP_FMAC5 int SOAP_FMAC6 __trt__GetCompatibleAudioOutputConfigurations(struct s
 
 SOAP_FMAC5 int SOAP_FMAC6 __trt__GetCompatibleAudioDecoderConfigurations(struct soap* soap, struct _trt__GetCompatibleAudioDecoderConfigurations *trt__GetCompatibleAudioDecoderConfigurations, struct _trt__GetCompatibleAudioDecoderConfigurationsResponse *trt__GetCompatibleAudioDecoderConfigurationsResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
-SOAP_FMAC5 int SOAP_FMAC6 __trt__SetVideoSourceConfiguration(struct soap* soap, struct _trt__SetVideoSourceConfiguration *trt__SetVideoSourceConfiguration, struct _trt__SetVideoSourceConfigurationResponse *trt__SetVideoSourceConfigurationResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+
+
+
+SOAP_FMAC5 int SOAP_FMAC6 __trt__SetVideoSourceConfiguration(struct soap* soap, struct _trt__SetVideoSourceConfiguration *trt__SetVideoSourceConfiguration, struct _trt__SetVideoSourceConfigurationResponse *trt__SetVideoSourceConfigurationResponse)
+{
+	if(strcmp(trt__SetVideoSourceConfiguration->Configuration->token,VIDEOSOURCECONFIG)!=0)
+		return SOAP_ERR;
+	if(strcmp(trt__SetVideoSourceConfiguration->Configuration->SourceToken,VIDEOSOURCETOLEN)!=0)
+		return SOAP_ERR;
+
+if(trt__SetVideoSourceConfiguration->Configuration->Bounds)
+{
+	if(trt__SetVideoSourceConfiguration->Configuration->Bounds->width>ONVIF_IMAGE_WIDTH
+		||trt__SetVideoSourceConfiguration->Configuration->Bounds->height>ONVIF_IMAGE_HEIGHT)
+	{
+	return soap_sender_fault_subcode(soap, "ter:InvalidArgVal/ter:ConfigModify", NULL, NULL); 
+	}
+}
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
 
 SOAP_FMAC5 int SOAP_FMAC6 __trt__SetVideoEncoderConfiguration(struct soap* soap, struct _trt__SetVideoEncoderConfiguration *trt__SetVideoEncoderConfiguration, struct _trt__SetVideoEncoderConfigurationResponse *trt__SetVideoEncoderConfigurationResponse)
 {
@@ -2826,8 +3750,6 @@ fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
 
 	if(icam_set_h264_params(g_icam_ctrl_handle, params))
 	   return SOAP_ERR;
-
-
 return 0;
 }
 
@@ -2843,7 +3765,43 @@ SOAP_FMAC5 int SOAP_FMAC6 __trt__SetAudioOutputConfiguration(struct soap* soap, 
 
 SOAP_FMAC5 int SOAP_FMAC6 __trt__SetAudioDecoderConfiguration(struct soap* soap, struct _trt__SetAudioDecoderConfiguration *trt__SetAudioDecoderConfiguration, struct _trt__SetAudioDecoderConfigurationResponse *trt__SetAudioDecoderConfigurationResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
 
-SOAP_FMAC5 int SOAP_FMAC6 __trt__GetVideoSourceConfigurationOptions(struct soap* soap, struct _trt__GetVideoSourceConfigurationOptions *trt__GetVideoSourceConfigurationOptions, struct _trt__GetVideoSourceConfigurationOptionsResponse *trt__GetVideoSourceConfigurationOptionsResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __trt__GetVideoSourceConfigurationOptions(struct soap* soap, struct _trt__GetVideoSourceConfigurationOptions *trt__GetVideoSourceConfigurationOptions, struct _trt__GetVideoSourceConfigurationOptionsResponse *trt__GetVideoSourceConfigurationOptionsResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+//if(strcmp(trt__GetVideoSourceConfigurationOptions->ProfileToken,IPCPROFILE_1)!=0)
+ //  return SOAP_ERR;
+//if(strcmp(trt__GetVideoSourceConfigurationOptions->ConfigurationToken,VIDEOSOURCECONFIG)!=0)
+ //  return SOAP_ERR;
+
+trt__GetVideoSourceConfigurationOptionsResponse->Options=
+	(struct tt__VideoSourceConfigurationOptions*)soap_malloc(soap,sizeof(struct tt__VideoSourceConfigurationOptions));
+
+trt__GetVideoSourceConfigurationOptionsResponse->Options->BoundsRange=
+	(struct tt__IntRectangleRange*)soap_malloc(soap,sizeof(struct tt__IntRectangleRange));
+trt__GetVideoSourceConfigurationOptionsResponse->Options->BoundsRange->XRange=
+	(struct tt__IntRange*)soap_malloc(soap,sizeof(struct tt__IntRange));
+trt__GetVideoSourceConfigurationOptionsResponse->Options->BoundsRange->YRange=
+		(struct tt__IntRange*)soap_malloc(soap,sizeof(struct tt__IntRange));
+trt__GetVideoSourceConfigurationOptionsResponse->Options->BoundsRange->WidthRange=
+	(struct tt__IntRange*)soap_malloc(soap,sizeof(struct tt__IntRange));
+trt__GetVideoSourceConfigurationOptionsResponse->Options->BoundsRange->HeightRange=
+	(struct tt__IntRange*)soap_malloc(soap,sizeof(struct tt__IntRange));
+	
+	trt__GetVideoSourceConfigurationOptionsResponse->Options->BoundsRange->XRange->Min=0;
+	trt__GetVideoSourceConfigurationOptionsResponse->Options->BoundsRange->XRange->Max=0;
+	trt__GetVideoSourceConfigurationOptionsResponse->Options->BoundsRange->YRange->Min=0;
+	trt__GetVideoSourceConfigurationOptionsResponse->Options->BoundsRange->YRange->Max=0;
+	trt__GetVideoSourceConfigurationOptionsResponse->Options->BoundsRange->WidthRange->Min=ONVIF_IMAGE_WIDTH;
+	trt__GetVideoSourceConfigurationOptionsResponse->Options->BoundsRange->WidthRange->Max=ONVIF_IMAGE_WIDTH;
+	trt__GetVideoSourceConfigurationOptionsResponse->Options->BoundsRange->HeightRange->Min=ONVIF_IMAGE_HEIGHT;
+	trt__GetVideoSourceConfigurationOptionsResponse->Options->BoundsRange->HeightRange->Max=ONVIF_IMAGE_HEIGHT;
+	trt__GetVideoSourceConfigurationOptionsResponse->Options->__sizeVideoSourceTokensAvailable=1;
+	trt__GetVideoSourceConfigurationOptionsResponse->Options->VideoSourceTokensAvailable=
+		(char**)soap_malloc(soap,trt__GetVideoSourceConfigurationOptionsResponse->Options->__sizeVideoSourceTokensAvailable*sizeof(char *));
+	*trt__GetVideoSourceConfigurationOptionsResponse->Options->VideoSourceTokensAvailable=VIDEOSOURCETOLEN;
+return 0;
+}
+
 
 SOAP_FMAC5 int SOAP_FMAC6 __trt__GetVideoEncoderConfigurationOptions(struct soap* soap, struct _trt__GetVideoEncoderConfigurationOptions *trt__GetVideoEncoderConfigurationOptions, struct _trt__GetVideoEncoderConfigurationOptionsResponse *trt__GetVideoEncoderConfigurationOptionsResponse)
 {
@@ -2886,7 +3844,7 @@ SOAP_FMAC5 int SOAP_FMAC6 __trt__GetVideoEncoderConfigurationOptions(struct soap
 
 	trt__GetVideoEncoderConfigurationOptionsResponse->Options->H264->GovLengthRange=
 			(struct tt__IntRange*)soap_malloc(soap,sizeof(struct tt__IntRange));
-	trt__GetVideoEncoderConfigurationOptionsResponse->Options->H264->GovLengthRange->Max=75;
+	trt__GetVideoEncoderConfigurationOptionsResponse->Options->H264->GovLengthRange->Max=200;
 	trt__GetVideoEncoderConfigurationOptionsResponse->Options->H264->GovLengthRange->Min=1;
 
 	trt__GetVideoEncoderConfigurationOptionsResponse->Options->H264->FrameRateRange=
@@ -2918,7 +3876,9 @@ SOAP_FMAC5 int SOAP_FMAC6 __trt__GetGuaranteedNumberOfVideoEncoderInstances(stru
 SOAP_FMAC5 int SOAP_FMAC6 __trt__GetStreamUri(struct soap* soap, struct _trt__GetStreamUri *trt__GetStreamUri, struct _trt__GetStreamUriResponse *trt__GetStreamUriResponse)
 {
     if(strcmp(trt__GetStreamUri->ProfileToken,IPCPROFILE_1)!=0)
-	    return SOAP_ERR;
+    {
+	return soap_sender_fault_subcode(soap, "ter:InvalidArgVal/ter:NoProfile", NULL, NULL); 
+    }
 	trt__GetStreamUriResponse->MediaUri=
 		(struct tt__MediaUri*)soap_malloc(soap,sizeof(struct tt__MediaUri));
 	trt__GetStreamUriResponse->MediaUri->Uri=(char*)soap_malloc(soap,128*sizeof(char));
@@ -2929,11 +3889,33 @@ SOAP_FMAC5 int SOAP_FMAC6 __trt__GetStreamUri(struct soap* soap, struct _trt__Ge
 	return 0;
 }
 
-SOAP_FMAC5 int SOAP_FMAC6 __trt__StartMulticastStreaming(struct soap* soap, struct _trt__StartMulticastStreaming *trt__StartMulticastStreaming, struct _trt__StartMulticastStreamingResponse *trt__StartMulticastStreamingResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __trt__StartMulticastStreaming(struct soap* soap, struct _trt__StartMulticastStreaming *trt__StartMulticastStreaming, struct _trt__StartMulticastStreamingResponse *trt__StartMulticastStreamingResponse)
+{
+    if(strcmp(trt__StartMulticastStreaming->ProfileToken,IPCPROFILE_1)!=0)
+    {
+	return soap_sender_fault_subcode(soap, "ter:InvalidArgVal/ter:NoProfile", NULL, NULL); 
+    }
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
 
-SOAP_FMAC5 int SOAP_FMAC6 __trt__StopMulticastStreaming(struct soap* soap, struct _trt__StopMulticastStreaming *trt__StopMulticastStreaming, struct _trt__StopMulticastStreamingResponse *trt__StopMulticastStreamingResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+SOAP_FMAC5 int SOAP_FMAC6 __trt__StopMulticastStreaming(struct soap* soap, struct _trt__StopMulticastStreaming *trt__StopMulticastStreaming, struct _trt__StopMulticastStreamingResponse *trt__StopMulticastStreamingResponse)
+{
+    if(strcmp(trt__StopMulticastStreaming->ProfileToken,IPCPROFILE_1)!=0)
+    {
+	return soap_sender_fault_subcode(soap, "ter:InvalidArgVal/ter:NoProfile", NULL, NULL); 
+    }
 
-SOAP_FMAC5 int SOAP_FMAC6 __trt__SetSynchronizationPoint(struct soap* soap, struct _trt__SetSynchronizationPoint *trt__SetSynchronizationPoint, struct _trt__SetSynchronizationPointResponse *trt__SetSynchronizationPointResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
+
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
+
+SOAP_FMAC5 int SOAP_FMAC6 __trt__SetSynchronizationPoint(struct soap* soap, struct _trt__SetSynchronizationPoint *trt__SetSynchronizationPoint, struct _trt__SetSynchronizationPointResponse *trt__SetSynchronizationPointResponse)
+{
+fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);
+return 0;
+}
 
 SOAP_FMAC5 int SOAP_FMAC6 __trt__GetSnapshotUri(struct soap* soap, struct _trt__GetSnapshotUri *trt__GetSnapshotUri, struct _trt__GetSnapshotUriResponse *trt__GetSnapshotUriResponse)
 {
@@ -2947,7 +3929,6 @@ snprintf(trt__GetSnapshotUriResponse->MediaUri->Uri,128,"http://%s:%d/%s",g_sys_
 
 return 0;
 }
-
 
 #ifdef ONVIF__tse__
 SOAP_FMAC5 int SOAP_FMAC6 __tse__GetServiceCapabilities(struct soap* soap, struct _tse__GetServiceCapabilities *tse__GetServiceCapabilities, struct _tse__GetServiceCapabilitiesResponse *tse__GetServiceCapabilitiesResponse){fprintf(stderr,"%s,%s,%d\n",__FILE__,__func__,__LINE__);return 0;}
@@ -2982,7 +3963,6 @@ SOAP_FMAC5 int SOAP_FMAC6 __tse__GetMetadataSearchResults(struct soap* soap, str
 return 0;
 }
 #endif
-
 
 
 void wsdd_event_Hello(struct soap *soap, unsigned int InstanceId, const char *SequenceId, unsigned int MessageNumber, const char *MessageID, const char *RelatesTo, const char *EndpointReference, const char *Types, const char *Scopes, const char *MatchBy, const char *XAddrs, unsigned int MetadataVersion)
@@ -3426,8 +4406,17 @@ void *soap_discovery_Probe()
 		soap_wsdd_Hello_send(wsdd_soap);
 	while(g_onvif_status.running)
 	{
-	ret=soap_wsdd_listen(wsdd_soap,1);
-	
+	if(g_sys_info.WS_DiscoveryMode==tt__DiscoveryMode__Discoverable)
+	{
+		ret=soap_wsdd_listen(wsdd_soap,1);
+		if(g_onvif_status.sendbyeflag)
+		{
+		soap_wsdd_Bye_send(wsdd_soap);
+		g_onvif_status.sendbyeflag=0;
+		}
+	}
+	else
+		sleep(1);	
 	if(g_onvif_status.relayreset)
 	{ 
 	   relayreset=0xFF;
@@ -3445,7 +4434,6 @@ void *soap_discovery_Probe()
 			else
 			  relayreset&=~(1<<i);
  		}
-		
 		if(!relayreset)
 		{
 		g_onvif_status.relayreset=0;
@@ -3487,11 +4475,11 @@ void *soap_event()
 		m = soap_bind(&add_soap, NULL, ONVIF_EVENT_RORT, 100);    
 		while (m < 0) 
 		{	
-		printf("soap_bind:  <event_server_port> %d  faild\n",ONVIF_EVENT_RORT);   
 		ONVIF_EVENT_RORT+=1;
 		m = soap_bind(&add_soap, NULL, ONVIF_EVENT_RORT, 100);	  
 		sleep(1);
 		}
+		printf("soap_bind:  <event_server_port> %d  n",ONVIF_EVENT_RORT);   
 				
 		if (m < 0) 
 		{	 printf("soap_bind:  <event_server_port> %d  faild\n",ONVIF_EVENT_RORT);   
@@ -3504,7 +4492,8 @@ void *soap_event()
 			 printf("setsockopt\n");  
 		 }	
 		 
-		while(g_onvif_status.running) {    
+		while(g_onvif_status.running) 
+			{    
 				s = soap_accept(&add_soap);    
 				if (s < 0) {	
 					soap_print_fault(&add_soap, stderr);	
@@ -3572,6 +4561,9 @@ int main(int argc, char **argv)
 	
 	soap_init1(&add_soap,SOAP_ENC_MTOM);
     soap_set_namespaces(&add_soap, namespaces); 
+	
+	
+	 
     m = soap_bind(&add_soap, NULL, ONVIF_SERVER_RORT, 100);    
 	while (m < 0)
 	{
@@ -3585,19 +4577,23 @@ int main(int argc, char **argv)
 		printf("soap_bind:  <server_port> %d  faild\n",ONVIF_SERVER_RORT);    
             exit(-1);    
     }    
-	 /* reuse socket addr */  
+    	/* reuse socket addr */  
 	 if ((setsockopt(add_soap.master, SOL_SOCKET, SO_REUSEADDR, (void *) &sock_opt,	
 					 sizeof (sock_opt))) == -1)
 	 {  
 		 printf("setsockopt\n");  
-	 }	
+	 }
+
 
 		pthread_create(&thrProbe,NULL,soap_discovery_Probe,NULL);  
 		// soap_init(&add_soap);
+		
+#ifdef ONVIF__TEST__
 		if(ONVIF_EVENT_RORT!=ONVIF_SERVER_RORT)
 			pthread_create(&thrProbe,NULL,soap_event,NULL);  
-	 
-        fprintf(stderr, "Socket connection successful: master socket = %d\n", m);    
+#endif
+
+        fprintf(stderr, "soap serve start successful: ONVIF_SERVER_RORT = %d\n", ONVIF_SERVER_RORT);    
         while(g_onvif_status.running)
 		{    
             s = soap_accept(&add_soap);    

@@ -7,7 +7,6 @@
 #define PROGRAM_NAME	"dspSrv"
 #define DEF_SRV_IP		""				// get srv ip from cam server
 #define DEF_SRV_PORT	0
-#define DEF_CAM_SRV_MSG	"/tmp/iCamCtrl"
 
 using std::string;
 using std::cin;
@@ -34,7 +33,7 @@ static void usage(void)
 static void sig_handler(int sig)
 {
 	if(sig == SIGINT || sig == SIGABRT)
-		DspSrv::Stop();
+		return ;
 }
 
 /**
@@ -66,10 +65,6 @@ int main(int argc, char **argv)
 	signal(SIGINT, sig_handler);
 	signal(SIGPIPE, SIG_IGN);
 
-	DspSrv *pDspSrv = new DspSrv(srvIp, port);
-	ret = pDspSrv->Run();
-
-	delete pDspSrv;
 
 	return ret;
 }

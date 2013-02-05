@@ -600,8 +600,8 @@ static Int32 set_img_adj_params(ParamsMngHandle hParamsMng, void *data, Int32 si
 	/* Validate data */
 	CamImgEnhanceParams *params = (CamImgEnhanceParams *)data;
 	if( params->dayCfg.brightness > 255 || params->dayCfg.sharpness > 255 ||
-		params->dayCfg.saturation > 255 || params->nightCfg.brightness > 255 ||
-		params->nightCfg.sharpness > 255 || params->nightCfg.saturation > 255) {
+		params->dayCfg.saturation > 255 || params->nightCfg.contrast > 255 ||
+		params->nightCfg.digiGain > 1023 || params->nightCfg.drcStrength > 255) {
 		ERR("invalid img adj data");
 		return E_INVAL;
 	}
