@@ -20,9 +20,13 @@ private:
 	bool exit;
 
 private:
-	int WaitOpen(int fd, uint32_t& type);
 	int SyslinkOpen();
 	static void *ProcessThread(void *arg);
+	virtual int ProcessLoop(int syslinkFd) = 0; 
+		//{ std::cout << "Process loop" << std::endl;  return 0; }
+
+protected:
+	bool StopRunning() { return exit; }
 };
 
 #endif

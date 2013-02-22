@@ -1,8 +1,9 @@
 #include "common.h"
 #include <string>
 #include <iostream>
-#include "dspSrv.h"
+#include "dspNetSrv.h"
 #include <signal.h>
+#include "log.h"
 
 #define PROGRAM_NAME	"dspSrv"
 #define DEF_SRV_IP		""				// get srv ip from cam server
@@ -42,7 +43,7 @@ static void sig_handler(int sig)
 int main(int argc, char **argv)
 {
 	const char *options = "s:p:h";
-	int ret;
+	int ret = 0;
 	string srvIp(DEF_SRV_IP);
 	uint16_t port(DEF_SRV_PORT);
 
@@ -65,6 +66,17 @@ int main(int argc, char **argv)
 	signal(SIGINT, sig_handler);
 	signal(SIGPIPE, SIG_IGN);
 
+	DspNetSrv *netSrv = new DspNetSrv(0);
+
+	netSrv->Run();
+
+	sleep(3);
+
+	DBG("call stop...");
+
+	netSrv->Stop();
+
+	delete netSrv;
 
 	return ret;
 }

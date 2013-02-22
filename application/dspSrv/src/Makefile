@@ -90,3 +90,4 @@ install:
 clean:
 	@echo Removing generated files..
 	$(VERBOSE) -rm -rf $(EXEC) $(OBJ_DIR) *~ *.d .dep
+	$(VERBOSE) -rm -rf $(APP_INC)/*~
