@@ -21,15 +21,16 @@ int DspSrv::SyslinkOpen()
 	//Set base addr
 	struct syslink_attrs attrs;
 	attrs.info_base = baseAddr;
+	strncpy((char *)attrs.name, chanName.c_str(), sizeof(attrs.name));
 	
 	//Open this chan
-	int fd = 1;//sys_commu_open(&attrs);
+	int fd = sys_commu_open(&attrs);
 	if(fd < 0) {
-		ERR("open syslink chan failed!");
+		ERR("%s, open syslink chan failed!", chanName.c_str());
 		return E_IO;
 	}
 
-	DBG("open syslink dev ok, base: 0x%X.", baseAddr);
+	DBG("%s, open syslink dev ok, base: 0x%X.", chanName.c_str(), baseAddr);
 	return fd;
 }
 
@@ -49,14 +50,14 @@ void *DspSrv::ProcessThread(void *arg)
 
 	dspSrv->exit = FALSE;
 
-	DBG("start run process loop.");
-	dspSrv->ProcessLoop(fd);
+	DBG("%s, start run process loop.", dspSrv->chanName.c_str());
+	dspSrv->ProcessLoop(fd, dspSrv->bufSize);
 	
 exit:
-	//if(fd > 0)
-	//	close(fd);
+	if(fd > 0)
+		close(fd);
 
-	cout << "dsp srv, stop running..." << endl;
+	cout << dspSrv->chanName << " ,dsp srv stop running..." << endl;
 
 	pthread_exit(0);
 }
@@ -71,7 +72,7 @@ int DspSrv::Run()
 
 	int err = pthread_create(&pid, NULL, ProcessThread, this);
 	if(err < 0) {
-		ERRSTR("create process thread failed!");
+		ERRSTR("%s, create process thread failed!", chanName.c_str());
 		return E_IO;
 	}
 
@@ -89,7 +90,7 @@ int DspSrv::Stop()
 		return E_MODE;
 
 	exit = 1;
-	DBG("stop running...");
+	DBG("%s, stop running...", chanName.c_str());
 	pthread_join(pid, NULL);
 
 	isRunning = false;
