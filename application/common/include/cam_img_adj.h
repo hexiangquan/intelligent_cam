@@ -67,6 +67,8 @@ typedef struct {
 	Uint16	digiGain;		//digital gain
 	Uint16	drcStrength;	//strength of DRC
 	Uint16	gamma;			//gamma value plus 100
+	Uint8	acSyncOffset;	//offset for AC Sync, 0~200, unit 0.1ms
+	Uint8	reserved[7];	//reserved for further use	
 }CamImgAdjCfg;
 
 typedef struct {
@@ -83,6 +85,7 @@ typedef struct {
 #define CAM_IMG_NF_EN			(1 << 5)	//enable noise filter
 #define CAM_IMG_DRC_EN			(1 << 6)	//enable dynamic range compression
 #define CAM_IMG_BRIGHTNESS_EN	(1 << 7)	//enable brightness
+#define CAM_IMG_ACSYNC_EN		(1 << 8)	//enable AC sync enable
 
 /*
   * special capture params 
@@ -98,10 +101,22 @@ typedef struct {
 	Uint16	aeMaxGain;		// AE for special capture, Max global gain, 0~1023
 	Uint16	aeTargetVal;	// AE for special capture, target lum value
 	Uint16	flags;			// flags for ctrl
-	Uint32	reserved[2];	
+	Uint16	redGain;		// Fixed red gain, 0~511
+	Uint16	greenGain;		// Fixed green gain, 0~511
+	Uint16	blueGain;		// Fixed blue gain, 0~511
+	Uint16	awbMinRedGain;	// AWB for special capture, min red gain, 0~511
+	Uint16	awbMaxRedGain;	// AWB for special capture, max red gain, 0~511
+	Uint16	awbMinGreenGain;// AWB for special capture, min green gain, 0~511
+	Uint16	awbMaxGreenGain;// AWB for special capture, max green gain, 0~511
+	Uint16	awbMinBlueGain; // AWB for special capture, min blue gain, 0~511
+	Uint16	awbMaxBlueGain;	// AWB for special capture, max blue gain, 0~511
+	Uint16	reserved[5];	
 }CamSpecCapParams;
 
-#define CAM_SPEC_CAP_FLAG_AE_EN	(1 << 0)	// enable ae for special trigger
+#define CAM_SPEC_CAP_FLAG_AE_EN		(1 << 0)	// enable ae for special trigger
+#define CAM_SPEC_CAP_FLAG_AG_EN		(1 << 1)	// auto gain
+#define CAM_SPEC_CAP_FLAG_AWB_EN	(1 << 2)	// auto white balance
+#define CAM_SPEC_CAP_FLAG_AI_EN		(1 << 3)	// auto iris
 
 /*
  * Auto exposure params

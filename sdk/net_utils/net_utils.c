@@ -166,7 +166,7 @@ ssize_t sendn(int sockfd, const void *buf, size_t nbytes, int flags)
 	
 	while(left > 0){
 		if((sent = send(sockfd, buf, left, flags)) < 0) {
-			_ES("sendn, send data error");
+			//_ES("sendn, send data error");
 			return E_TRANS;
 		} else if(sent > left) {
 			_E("sendn, Send Data Error, send size > left.");

@@ -25,9 +25,10 @@
 #include <linux/cdev.h> 
 #include <linux/miscdevice.h> 
 #include <linux/spinlock.h>
-#include <linux/fpga.h>
 #include <linux/delay.h>
 #include "img_ctrl.h"
+#include <linux/fpga.h>
+//#include "fpga.h"
 
 #define DEVICE_NAME 		"imgctrl" 
 
@@ -40,7 +41,8 @@
 #define _ERR(fmt, args...)	printk(KERN_ALERT "func: %s, "fmt"\n", __func__, ##args)
 
 /* Lock used for synchronization */
-spinlock_t imgctrl_lock = SPIN_LOCK_UNLOCKED;	
+//spinlock_t imgctrl_lock = SPIN_LOCK_UNLOCKED;	
+static DEFINE_MUTEX(imgctrl_lock);
 
 struct img_ctrl_dev {
 	void __iomem *fpga_base;	/* fpga base addr */
@@ -155,9 +157,11 @@ static int ab_cfg_validate(struct img_ctrl_dev *dev, struct hdcam_ab_cfg *cfg)
 		return -EINVAL;
 	}
 
-	/* validate max gain */
-	if(cfg->maxGainValue > HDCAM_AB_MAX_GAIN) {
-		_ERR("max gain: %d is bigger than max %d", cfg->maxGainValue, HDCAM_AB_MAX_GAIN);
+	/* validate gain */
+	if( cfg->maxGainValue > HDCAM_AB_MAX_GAIN ||
+		cfg->minGainValue > cfg->maxGainValue ) {
+		_ERR("invalid gain: %u - %u, max %u", cfg->minGainValue, 
+			cfg->maxGainValue, HDCAM_AB_MAX_GAIN);
 		return -EINVAL;
 	}
 
@@ -186,7 +190,9 @@ static int ab_hw_setup(struct img_ctrl_dev *dev, struct hdcam_ab_cfg *cfg)
 	u16	gain;
 	
 	/* get lock first */
-	spin_lock(&imgctrl_lock);
+	//spin_lock(&imgctrl_lock);
+	if(mutex_lock_interruptible(&imgctrl_lock) < 0)
+		return -EINTR;
 
 	/* get AB flags first */
 	data = fpga_read(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL);
@@ -210,6 +216,7 @@ static int ab_hw_setup(struct img_ctrl_dev *dev, struct hdcam_ab_cfg *cfg)
 
 		/* set max global gain*/
 		fpga_write(dev->fpga_base, FPGA_REG_AG_MAX_GAIN, cfg->maxGainValue);
+		fpga_write(dev->fpga_base, FPGA_REG_AG_MIN_GAIN, cfg->minGainValue);
 
 		/* set min & max aperture */
 		fpga_write(dev->fpga_base, FPGA_REG_AUTO_APERTURE_PARAM, 
@@ -288,7 +295,8 @@ static int ab_hw_setup(struct img_ctrl_dev *dev, struct hdcam_ab_cfg *cfg)
 	}	
 
 	/* release lock */
-	spin_unlock(&imgctrl_lock);
+	//spin_unlock(&imgctrl_lock);
+	mutex_unlock(&imgctrl_lock);
 
 	return 0;
 }
@@ -381,7 +389,9 @@ static int awb_hw_setup(struct img_ctrl_dev *dev, struct hdcam_awb_cfg *cfg)
 	u16 data;
 	
 	/* get lock first */
-	spin_lock(&imgctrl_lock);
+	//spin_lock(&imgctrl_lock);
+	if(mutex_lock_interruptible(&imgctrl_lock) < 0)
+		return -EINTR;
 
 	/* stop AWB first */
 	data = fpga_read(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL);
@@ -418,7 +428,8 @@ static int awb_hw_setup(struct img_ctrl_dev *dev, struct hdcam_awb_cfg *cfg)
 	fpga_write(dev->fpga_base, FPGA_REG_AUTO_ADJ_CTL, data);
 
 	/* release lock */
-	spin_unlock(&imgctrl_lock);
+	//spin_unlock(&imgctrl_lock);
+	mutex_unlock(&imgctrl_lock);
 
 	return 0;
 }
@@ -493,7 +504,9 @@ static int lum_info_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
 	}
 
 	/* get lock first */
-	spin_lock(&imgctrl_lock);
+	//spin_lock(&imgctrl_lock);
+	if(mutex_lock_interruptible(&imgctrl_lock) < 0)
+		return -EINTR;
 	
 	/* cfg fpga register */
 	fpga_write(dev->fpga_base, FPGA_REG_EXPOSURE_TIME0, 
@@ -504,7 +517,8 @@ static int lum_info_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
 		info.globalGain );
 
 	/* release lock */
-	spin_unlock(&imgctrl_lock);
+	//spin_unlock(&imgctrl_lock);
+	mutex_unlock(&imgctrl_lock);
 	
 	return 0;
 }
@@ -524,7 +538,9 @@ static int lum_info_read(struct img_ctrl_dev *dev, unsigned long usrptr)
 	memset(&info, 0, sizeof(info));
 	
 	/* get lock first */
-	spin_lock(&imgctrl_lock);
+	//spin_lock(&imgctrl_lock);
+	if(mutex_lock_interruptible(&imgctrl_lock) < 0)
+		return -EINTR;
 
 	/* read fpga register */
 	info.exposureTime = fpga_read(dev->fpga_base, FPGA_REG_EXPOSURE_TIME0);
@@ -532,7 +548,8 @@ static int lum_info_read(struct img_ctrl_dev *dev, unsigned long usrptr)
 	info.globalGain  = fpga_read(dev->fpga_base, FPGA_REG_AFE_GAIN);
 
 	/* release lock */
-	spin_unlock(&imgctrl_lock);
+	//spin_unlock(&imgctrl_lock);
+	mutex_unlock(&imgctrl_lock);
 
 	/* Copy config structure passed by user */
 	if (copy_to_user((struct hdcam_lum_info *)usrptr, &info, sizeof(info))) {
@@ -573,9 +590,6 @@ static int chroma_info_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
 	}
 
 
-	/* get lock first */
-	spin_lock(&imgctrl_lock);
-
 	/* cfg fpga register */
 	fpga_write(dev->fpga_base, FPGA_REG_RED_GAIN, 
 	  info.redGain);
@@ -583,9 +597,6 @@ static int chroma_info_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
 	  info.greenGain);
 	fpga_write(dev->fpga_base, FPGA_REG_BLUE_GAIN, 
 	  info.blueGain);
-
-	/* release lock */
-	spin_unlock(&imgctrl_lock);
 
 	return 0;
 }
@@ -604,16 +615,10 @@ static int chroma_info_read(struct img_ctrl_dev *dev, unsigned long usrptr)
 
 	memset(&info, 0, sizeof(info));
 
-	/* get lock first */
-	spin_lock(&imgctrl_lock);
-
 	/* read fpga register */
 	info.redGain = fpga_read(dev->fpga_base, FPGA_REG_RED_GAIN);
 	info.greenGain = fpga_read(dev->fpga_base, FPGA_REG_GREEN_GAIN);
 	info.blueGain = fpga_read(dev->fpga_base, FPGA_REG_BLUE_GAIN);
-
-	/* release lock */
-	spin_unlock(&imgctrl_lock);
 
 	/* Copy config structure passed by user */
 	if (copy_to_user((struct hdcam_chroma_info *)usrptr, &info, sizeof(info))) {
@@ -657,9 +662,6 @@ static int img_enhance_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
 	  return -EINVAL;
 	}
 
-	/* get lock first */
-	spin_lock(&imgctrl_lock);
-
 	/* cfg fpga register */
 	if(cfg.flags & HDCAM_ENH_FLAG_CONTRAST_EN) {
 		/* enable contrast */
@@ -698,9 +700,15 @@ static int img_enhance_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
 
 	/* set enable ctrl reg */
 	fpga_write(dev->fpga_base, FPGA_REG_IMG_ENHANCE_CTL, data);
-	
-	/* release lock */
-	spin_unlock(&imgctrl_lock);
+
+	if(cfg.flags & HDCAM_ENH_FLAG_ACSYNC_EN) {
+		/* enable AC sync */
+		fpga_write(dev->fpga_base, FPGA_REG_AC_SYNC_CTL, BIT(0));
+		fpga_write(dev->fpga_base, FPGA_REG_AC_OFFSET, cfg.acSyncOffset);
+	} else {
+		/* disable AC sync */
+		fpga_write(dev->fpga_base, FPGA_REG_AC_SYNC_CTL, 0);
+	}
 
 	return 0;
 }
@@ -716,7 +724,7 @@ static int img_enhance_setup(struct img_ctrl_dev *dev, unsigned long usrptr)
 static int spec_cap_cfg(struct img_ctrl_dev *dev, unsigned long usrptr)
 {
 	struct hdcam_spec_cap_cfg cfg;
-	u16 data;
+	//u16 data;
 	
 	/* Copy config structure passed by user */
 	if (copy_from_user(&cfg, (struct hdcam_lum_info *)usrptr,
@@ -738,7 +746,9 @@ static int spec_cap_cfg(struct img_ctrl_dev *dev, unsigned long usrptr)
 	}
 
 	/* get lock first */
-	spin_lock(&imgctrl_lock);
+	//spin_lock(&imgctrl_lock);
+	if(mutex_lock_interruptible(&imgctrl_lock) < 0)
+		return -EINTR;
 	
 	/* cfg fpga register */
 	fpga_write(dev->fpga_base, FPGA_REG_SPEC_EXP_TIME0, 
@@ -750,7 +760,9 @@ static int spec_cap_cfg(struct img_ctrl_dev *dev, unsigned long usrptr)
 
 	/* cfg AE regs for spec trig */
 	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AE_MAX_GAIN, 
-		cfg.aeMaxGain & 0xFFFF);
+		cfg.aeMaxGain);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AE_MIN_GAIN, 
+		cfg.aeMinGain);
 	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AE_MIN_EXP1, 
 		(cfg.aeMinExpTime >> 16) & 0xFFFF);
 	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AE_MIN_EXP0, 
@@ -762,19 +774,33 @@ static int spec_cap_cfg(struct img_ctrl_dev *dev, unsigned long usrptr)
 	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AE_TARGET_VAL,
 		cfg.aeTargetVal & 0xFF);
 
-	data = fpga_read(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL);
+	/* cfg AWB regs for spec trig */
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AWB_RED_GAIN, 
+		cfg.redGain);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AWB_GREEN_GAIN, 
+		cfg.greenGain);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AWB_BLUE_GAIN, 
+		cfg.blueGain);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AWB_MIN_RED, 
+		cfg.awbMinRedGain);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AWB_MIN_GREEN, 
+		cfg.awbMinGreenGain);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AWB_MIN_BLUE, 
+		cfg.awbMinBlueGain);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AWB_MAX_RED, 
+		cfg.awbMaxRedGain);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AWB_MAX_GREEN, 
+		cfg.awbMaxGreenGain);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_AWB_MAX_BLUE, 
+		cfg.awbMaxBlueGain);
 
-	/* set strobe enable & AE enable bits */
-	data &= ~(0x000F | BIT(14));
-	data |= (cfg.strobeCtrl & 0x0F);
-	if(cfg.flags & HDCAM_SPEC_CAP_AE_EN)
-		data |= BIT(14);
-	
-	fpga_write(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL, 
-		data);
+	/* enable/disable AE/AG/AWB/AI */
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_ADJ_EN, 
+		cfg.flags & 0x0F);
 
 	/* release lock */
-	spin_unlock(&imgctrl_lock);
+	//spin_unlock(&imgctrl_lock);
+	mutex_unlock(&imgctrl_lock);
 	
 	return 0;
 }
@@ -789,24 +815,63 @@ static int spec_cap_cfg(struct img_ctrl_dev *dev, unsigned long usrptr)
 static int spec_cap_trig(struct img_ctrl_dev *dev, unsigned long usrptr)
 {
 	u16 data;
+	u16 trig_id;
+
+	if(__get_user(trig_id, (u16 __user *)usrptr) < 0) {
+		_ERR("copy from user space failed.");
+		return -EFAULT;
+	}
 	
 	/* cfg fpga register */
 	data = fpga_read(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL);
+
+	/* set trigger info */
+	data &= ~(0xFF << 6);
+	data |= (trig_id & 0xFF) << 6;
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL, data);
+	
 	data |= BIT(15);
-	fpga_write(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL, 
-		data);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL, data);
 	data &= ~BIT(15);
 	/* wait 1 us for fpga to capture the edge */
 	udelay(1);
-	fpga_write(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL, 
-		data);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL, data);
+		
+	return 0;
+}
 
-	if(usrptr) {
-		data = fpga_read(dev->fpga_base, FPGA_REG_NEXT_FRAME_ID);
-		if(__put_user(data, (u16 __user *)usrptr) < 0) {
-			_ERR("copy to user space failed.");
-			return -EFAULT;
-		}
+/**
+ * spec_strobe_cfg - Configure strobe for special capture
+ * @dev:       device pointer
+ * @usrptr:    user space ptr for special strobe params.
+ *
+ * This function configure hardware for sepcial strobe
+ * It returns 0 if successful, otherwise returns negative error value.
+ */
+static int spec_strobe_cfg(struct img_ctrl_dev *dev, unsigned long usrptr)
+{
+	u16 data;
+	u16 strobe;
+
+	if(__get_user(strobe, (u16 __user *)usrptr) < 0) {
+		_ERR("copy from user space failed.");
+		return -EFAULT;
+	}
+	
+	/* read current data */
+	data = fpga_read(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL);
+
+	/* set strobe cfg, bit[3:0] */
+	data &= ~0x000F;
+	data |= (strobe & 0x000F);
+	fpga_write(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL, data);
+
+	/* check result */
+	data = fpga_read(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL);
+	if((data & 0x000F) != (strobe & 0x000F)) {
+		data &= ~0x000F;
+		data |= (strobe & 0x000F);
+		fpga_write(dev->fpga_base, FPGA_REG_SPEC_CAP_CTL, data);
 	}
 		
 	return 0;
@@ -829,6 +894,28 @@ static int normal_cap_trig(struct img_ctrl_dev *dev)
 	fpga_write(dev->fpga_base, FPGA_REG_TRIGGER, 
 		0x0000);
 	
+	return 0;
+}
+
+/**
+ * day_night_cfg - Set day/night mode
+ * @dev:       Device pointer
+ *
+ * This function set day/night mode
+ * It returns 0 if successful, otherwise returns negative error value.
+ */
+static int day_night_cfg(struct img_ctrl_dev *dev, unsigned long usrptr)
+{
+	u16 data;
+
+	if(__get_user(data, (u16 __user *)usrptr) < 0) {
+		_ERR("copy from user space failed.");
+		return -EFAULT;
+	}
+	
+	fpga_write(dev->fpga_base, FPGA_REG_DAY_NIGHT_MODE, 
+		data ? 1 : 0);
+		
 	return 0;
 }
 
@@ -858,24 +945,27 @@ static int fpga_version_read(struct img_ctrl_dev *dev, unsigned long usrptr)
 }
 
 
-#ifdef _DEBUG1
+#ifdef _DEBUG
 /* test fpga reg rw */
 static void fpga_test(void)
 {
-	u16 data;
+	static u16 data_out = 0xE000;
+	u16 data_in;
 	void __iomem *fpga_base = fpga_get_base();
 	
 	_DBG("fpga version: 0x%04X", 
 		(u32)fpga_read(fpga_base, FPGA_REG_VERSION));
 
-	fpga_write(fpga_base, FPGA_REG_EXPOSURE_TIME0, 0x5A5A);
-	data = fpga_read(fpga_base, FPGA_REG_EXPOSURE_TIME0);
+	fpga_write(fpga_base, FPGA_REG_EXPOSURE_TIME0, data_out);
+	data_in = fpga_read(fpga_base, FPGA_REG_EXPOSURE_TIME0);
 
-	if(data != 0x5A5A) {
-		_DBG("rw exposure reg diff.");
+	if(data_in != data_out) {
+		_DBG("rw exposure reg diff, w: 0x%X, r: 0x%X.", data_out, data_in);
 	} else {
-		_DBG("rw exposure reg the same.");
+		_DBG("rw exposure reg the same: 0x%X.", data_out);
 	}
+
+	data_out++;
 }
 #endif
 
@@ -978,8 +1068,18 @@ static int img_ctrl_ioctl(struct inode *inode, struct file *filep,
 	case IMGCTRL_S_SPECCAP:
 		result = spec_cap_cfg(dev, arg);
 		break;
+
+	/* ctrl strobe for special capture */
+	case IMGCTRL_S_SPECSTROBE:
+		result = spec_strobe_cfg(dev, arg);
+		break;
+
+	/* set day/night mode */
+	case IMGCTRL_S_DAYNIGHT:
+		result = day_night_cfg(dev, arg);
+		break;
 		
-#ifdef _DEBUG1
+#ifdef _DEBUG
 	/* test fpag rw */
 	case IMGCTRL_HW_TEST:
 		fpga_test();

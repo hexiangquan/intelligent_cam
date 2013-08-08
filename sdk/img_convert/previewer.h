@@ -48,7 +48,8 @@ typedef struct _PreviewAttrs{
 	Uint8				brightness;
 	Uint8				contrast;
 	Uint8				sharpness;
-	Uint8				reserved[5];
+	Uint8				saturation;	/* saturation, 0~255 */
+	Uint8				reserved[4];
 }PreviewAttrs;
 /*----------------------------------------------*
  * project-wide global variables                *

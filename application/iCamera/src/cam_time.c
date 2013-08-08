@@ -237,6 +237,16 @@ Int32 cam_set_time(const CamDateTime *dateTime)
 *****************************************************************************/
 Int32 cam_get_time(CamDateTime *dateTime)
 {
+	/* For FPGA debug only */
+	int fd = open(EXTIO_DEV_NAME, O_RDWR);
+
+	if(fd > 0) {
+		struct hdcam_rtc_time rtcTime;
+		ioctl(fd, EXTIO_G_RTC, &rtcTime);
+		close(fd);
+	}
+
+	
 	struct timeval 	tv;
 
     gettimeofday(&tv, NULL);

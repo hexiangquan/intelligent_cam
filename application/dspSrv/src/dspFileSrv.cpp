@@ -4,6 +4,10 @@
 #include "dspFileSrv.h"
 #include "syslink_proto.h"
 #include "sys_commu.h"
+#include "writer.h"
+#include "msg.h"
+#include "buffer.h"
+#include "cap_info_parse.h"
 
 using namespace std;
 
@@ -64,6 +68,7 @@ int DspFileSrv::ProcessLoop(int syslink, size_t bufLen)
 		// Wait cmd 
 		err = sys_commu_read(syslink, (SysMsg *)item.addr, item.totalLen);
 		if(err < 0) {
+			usleep(10000);
 			continue;
 		}
 
@@ -147,8 +152,9 @@ int DspFileSrv::Connect(ICamCtrlHandle hCamCtrl, ImgTransHandle hUpload)
 
 	if(err == E_NO) {
 		//set current server info
-		info.serverPort += 100;
+		//info.serverPort += 100;
 		img_trans_set_srv_info(hUpload, info.serverIP, info.serverPort);
+		//DBG("get srv info: %s:%u", info.serverIP, info.serverPort);
 	}
 
 	// Try connect server
@@ -157,18 +163,85 @@ int DspFileSrv::Connect(ICamCtrlHandle hCamCtrl, ImgTransHandle hUpload)
 		m_isConnected = false;
 	} else {
 		m_isConnected = true;
+		INFO("dsp file upload, connect to srv: %s:%u", info.serverIP, info.serverPort);
 	}	
 
 	return err;
 }
+
+#define DEV_SD0			"/dev/mmcblk0"
+#define SD0_MNT_PATH	"/media/mmcblk0"
+
+/* Msg structure for new frame */
+typedef struct _ImgHdr {
+	MsgHeader		header; 			/* Msg header, must be the first field */
+	BufHandle		hBuf;				/* Buffer handle */
+	Int32			index;				/* Frame index */
+	ImgDimension	dimension;			/* Format info of image */
+	DateTime		timeStamp;			/* Capture time */
+	struct timeval	timeCode;			/* Another time stamp */
+	Int32			frameType;			/* Frame type for video */
+	CamRoadInfo 	roadInfo;			/* Road info */
+	RawCapInfo		rawInfo;			/* raw capture info from hardware */
+	Int8			capInfo[512]; 		/* capture info of this frame */
+}ImgHdr;
 
 /**
  * SaveImg -- save img file to local file system
  */
 int DspFileSrv::SaveImg(const BufItem& item)
 {
+	/* check whether sd card has been inserted */
+	int fd = open(DEV_SD0, O_RDONLY);
+	if(fd < 0)
+		return E_NOTEXIST;
+	close(fd);
+	
+	ImgHdr hdr;
+	SysMsg *pMsg = (SysMsg *)item.addr;
 
-	return E_NO;
+	bzero(&hdr, sizeof(hdr));
+	// Fill the feild so that upload module can recognize
+	hdr.header.type = MSG_TYPE_REQU;
+	hdr.dimension.width = 1600;
+	hdr.dimension.height = 1200;
+	hdr.dimension.size = pMsg->dataLen;
+	hdr.dimension.colorSpace = FMT_JPG;
+	hdr.index = 1;
+
+	// Get current time
+	struct timeval *tv = &hdr.timeCode;
+	DateTime *dateTime = &hdr.timeStamp;
+	gettimeofday(tv, NULL);
+
+	struct tm tm;
+	localtime_r(&tv->tv_sec, &tm);
+
+	dateTime->year = tm.tm_year + 1900;
+	dateTime->month = tm.tm_mon + 1;
+	dateTime->day = tm.tm_mday;
+	dateTime->weekDay = tm.tm_wday;
+	dateTime->hour = tm.tm_hour;
+	dateTime->minute = tm.tm_min;
+	dateTime->second = tm.tm_sec;
+	dateTime->ms = tv->tv_usec >> 10; //just convert to a close value
+	dateTime->us = 0;
+
+	// Generate file and dir name
+	char fileName[128];
+	char dirName[64];
+	snprintf(dirName, sizeof(dirName), SD0_MNT_PATH"/%04u_%02u_%02u_%02u",
+             dateTime->year, dateTime->month, dateTime->day, dateTime->hour);
+	snprintf(fileName, sizeof(fileName), "%s/%02u_%02u_%03u.jpg", dirName, 
+			dateTime->minute, dateTime->second, dateTime->ms);
+
+	// Write file and header
+	int err = write_file(dirName, fileName, (Int8 *)&hdr, sizeof(ImgHdr), 
+			(Int8 *)item.addr + sizeof(SysMsg), pMsg->dataLen);
+
+	DBG("write file to sd %s", fileName);
+	
+	return err;
 }
 
 /**
@@ -195,7 +268,24 @@ int DspFileSrv::SendImg(ImgTransHandle hUpload, ImgHdrInfo& hdr)
 	m_listUsed.pop_front();
 	m_listFree.push_back(item);
 
+	if((hdr.serialNumber % 10) == 0) {
+		DBG("file srv, upload img ok~");
+	}
+
 	return err;
+}
+
+/**
+ * ClearList -- clear all the buffer in the list and save
+ */
+void DspFileSrv::ClearList()
+{
+	while(!m_listUsed.empty()) {
+		BufItem item = m_listUsed.front();
+		SaveImg(item);
+		m_listUsed.pop_front();
+		m_listFree.push_back(item);
+	}
 }
 
 /**
@@ -213,6 +303,8 @@ void *DspFileSrv::UploadThread(void *arg)
 
 	memset(&hdr, 0, sizeof(hdr));
 
+	DBG("dsp file upload thread start...");
+
 	// Create cam ctrl handle to get params
 	hCamCtrl = icam_ctrl_create(MSG_NAME, 0, TRANS_TIMEOUT);
 	if(!hCamCtrl) {
@@ -221,7 +313,7 @@ void *DspFileSrv::UploadThread(void *arg)
 	}
 
 	// Create handle for upload
-	hUpload = img_trans_create(NULL, 0, "dspImg", TRANS_TIMEOUT, 0);
+	hUpload = img_trans_create("127.0.0.1", 0, "dspImg", TRANS_TIMEOUT, 0);
 	if(!hUpload) {
 		ERR("create img upload handle failed!");
 		goto exit;
@@ -233,6 +325,7 @@ void *DspFileSrv::UploadThread(void *arg)
 			fileSrv->Connect(hCamCtrl, hUpload);
 			if(!fileSrv->m_isConnected) {
 				// connect failed
+				fileSrv->ClearList();
 				sleep(2);
 				continue;
 			}

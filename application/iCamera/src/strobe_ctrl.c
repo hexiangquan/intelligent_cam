@@ -30,6 +30,7 @@
 #include "strobe_ctrl.h"
 #include "log.h"
 #include "ext_io.h"
+#include "img_ctrl.h"
 #include "cam_time.h"
 #include <sys/ioctl.h>
 
@@ -60,6 +61,7 @@
 /*----------------------------------------------*
  * macros                                       *
  *----------------------------------------------*/
+#define IMGCTRL_DEV		"/dev/imgctrl"
 
 /*----------------------------------------------*
  * routines' implementations                    *
@@ -67,6 +69,7 @@
 struct StrobeObj {
 	CamStrobeCtrlParam	params;
 	int					fdExtIo;
+	int					fdImgCtrl;
 	time_t				lastCheckTime;
 	time_t				checkPrd;
 	Bool				outputEnable;
@@ -75,6 +78,8 @@ struct StrobeObj {
 	int					minSwitchCnt;
 	Uint16				curEnIndex;		// current enable index for enable in turn
 	Uint16				enableCnt;		// count of strobes enabled
+	Uint16				specStrobeEn;	// status for special capture strobe
+	Uint16				specStrobeMask;	// mask for special capture strobe
 };
 
 /*****************************************************************************
@@ -111,6 +116,11 @@ StrobeHandle strobe_ctrl_create(const StrobeCtrlAttrs *attrs)
 	hStrobe->fdExtIo = open(attrs->devName, O_RDWR);
 	if(hStrobe->fdExtIo < 0) {
 		ERRSTR("can't open %s", attrs->devName);
+		goto exit;
+	}
+	hStrobe->fdImgCtrl = open(IMGCTRL_DEV, O_RDWR);
+	if(hStrobe->fdImgCtrl < 0) {
+		ERRSTR("can't open %s", IMGCTRL_DEV);
 		goto exit;
 	}
 
@@ -152,6 +162,9 @@ Int32 strobe_ctrl_delete(StrobeHandle hStrobe)
 	if(hStrobe->fdExtIo > 0)
 		close(hStrobe->fdExtIo);
 
+	if(hStrobe->fdImgCtrl > 0)
+		close(hStrobe->fdImgCtrl);
+
 	free(hStrobe);
 
 	return E_NO;
@@ -188,6 +201,12 @@ static Int32 strobe_ctrl_sync_hw(StrobeHandle hStrobe)
 		if(ioctl(hStrobe->fdExtIo, EXTIO_S_STROBE, &info) < 0) {
 			return E_IO;
 		}
+	}
+
+	if(hStrobe->fdImgCtrl > 0) {
+		if(ioctl(hStrobe->fdImgCtrl, IMGCTRL_S_SPECSTROBE, &hStrobe->specStrobeEn) < 0) {
+			return E_IO;
+		} 
 	}
 
 	return E_NO;
@@ -229,6 +248,9 @@ Int32 strobe_ctrl_set_cfg(StrobeHandle hStrobe, const CamStrobeCtrlParam *params
 		/* all strobe auto switch are disabled, need not switch */
 		hStrobe->params.switchMode = CAM_STROBE_SWITCH_OFF;
 	}
+
+	/* exclude special trigger strobe */
+	hStrobe->autoSwitchMask &= (~params->specCapEn);
 	
 	/* disable if need auto switch */
 	if(params->switchMode != CAM_STROBE_SWITCH_OFF) {
@@ -236,6 +258,10 @@ Int32 strobe_ctrl_set_cfg(StrobeHandle hStrobe, const CamStrobeCtrlParam *params
 		hStrobe->outputEnable = FALSE;
 	} else
 		hStrobe->outputEnable = TRUE;
+
+	/* set sepcial capture strobe cfg */
+	hStrobe->specStrobeMask = params->specCapEn & params->ctrlFlags & 0x0F;
+	hStrobe->specStrobeEn = params->specCapEn & (~(hStrobe->specStrobeMask));
 	
 	/* check auto switch enable num */
 	hStrobe->enableCnt = 0;
@@ -289,7 +315,7 @@ Int32 strobe_ctrl_get_cfg(StrobeHandle hStrobe, CamStrobeCtrlParam *params)
 		hStrobe->params.offset = info.offset;
 		hStrobe->params.sigVal = info.sigVal;
 		hStrobe->params.acSyncEn = info.syncAC;
-		hStrobe->params.outMode = info.mode;
+		//hStrobe->params.outMode = info.mode;
 	}
 
 	*params = hStrobe->params;
@@ -461,6 +487,7 @@ Int32 strobe_ctrl_auto_switch(StrobeHandle hStrobe, const DateTime *curTime, Uin
 			DBG("enable strobe output, status: 0x%x, mask: 0x%x.", hStrobe->params.status, 
 				hStrobe->autoSwitchMask);
 			hStrobe->params.status |= hStrobe->autoSwitchMask;
+			hStrobe->specStrobeEn |= hStrobe->specStrobeMask;
 			err = strobe_ctrl_sync_hw(hStrobe);
 		}
 	} else {
@@ -468,6 +495,7 @@ Int32 strobe_ctrl_auto_switch(StrobeHandle hStrobe, const DateTime *curTime, Uin
 			/* disable output */
 			DBG("disable strobe output.");
 			hStrobe->params.status &= ~(hStrobe->autoSwitchMask);
+			hStrobe->specStrobeEn &= ~(hStrobe->specStrobeMask);
 			err = strobe_ctrl_sync_hw(hStrobe);
 		} 
 	}

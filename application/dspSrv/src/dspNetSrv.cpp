@@ -162,7 +162,8 @@ int DspNetSrv::ProcessLoop(int syslinkFd, size_t bufLen)
 
 		// Delte this proxy
 		DBG("delete proxy.");
-		delete proxy;
+		if(proxy)
+			delete proxy;
 		proxy = NULL;
 	}
 

@@ -456,6 +456,14 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 
 	/* whether we got a triggered image or normal frame */
 	Bool isTrigImg = FALSE;
+
+	if(imgMsg.rawInfo.capMode == RCI_CAP_TYPE_SPEC_TRIG) {
+		/* trigger by dsp */
+		hDataCap->encImg = TRUE;
+		hDataCap->capIndex = CAP_INDEX_NEXT_FRAME; // current frame
+		DBG("recv special trig, id: %d, exp: %u/%u", imgMsg.rawInfo.trigId,
+			imgMsg.rawInfo.exposure, imgMsg.rawInfo.globalGain);
+	}
 	
 	if(hDataCap->encImg) {
 		/* check frame index from img data */
@@ -507,9 +515,12 @@ static Int32 capture_new_img(DataCapHandle hDataCap)
 		//DBG("<%d> cap run ok...", capFrame.index);
 
 #ifdef CAP_TRIG_TEST
-	if((capFrame.index % 150) == 0) {
-		hDataCap->encImg = TRUE;
-		*(CaptureInfo *)hDataCap->capInfo = hDataCap->defCapInfo;
+	if((capFrame.index % 100) == 0) {
+		//hDataCap->encImg = TRUE;
+		//*(CaptureInfo *)hDataCap->capInfo = hDataCap->defCapInfo;
+		static Uint16 trigId = 0;
+		trigId++;
+		ioctl(hDataCap->fdImgCtrl, IMGCTRL_SPECTRIG, &trigId);
 	}
 #endif
 

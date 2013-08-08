@@ -123,6 +123,9 @@ extern Int32 tcp_cmd_recv(int sock, TcpCmdHeader *hdr, void *dataBuf, Int32 bufL
 *****************************************************************************/
 extern Int32 tcp_cmd_reply(int sock, TcpCmdHeader *hdr, const Int8 *dataBuf, Int32 result);
 
+extern Int32 tcp_cmd_hdr_recv(int sock, TcpCmdHeader *hdr);
+
+extern Int32 tcp_cmd_data_recv(int sock, const TcpCmdHeader *hdr, void *dataBuf, Int32 bufLen);
 
 #ifdef __cplusplus
 #if __cplusplus

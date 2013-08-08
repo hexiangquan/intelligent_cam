@@ -1,15 +1,15 @@
 #include "params_mng.h"
 #include "version.h"
 
-#define NET_SEG			"192.168.10."
-#define LOCAL_IP		NET_SEG"245"
+#define NET_SEG			"192.168.1."
+#define LOCAL_IP		NET_SEG"200"
 #define IP_MASK			"255.255.255.0"
 #define GATE_WAY		NET_SEG"1"
 #define DOMAIN_NAME		"WORKGROUP"
 #define HOST_NAME		"dm36x-ipnc"
 #define DNS_SERVER		NET_SEG"1"
-#define SERVER_IP		NET_SEG"10"
-#define NTP_SRV_IP		NET_SEG"10"
+#define SERVER_IP		NET_SEG"102"
+#define NTP_SRV_IP		NET_SEG"102"
 #define TCP_SRV_PORT	9300
 #define OSD_STRING		"HDCAM"
 #define ROAD_NAME		OSD_STRING
@@ -17,8 +17,8 @@
 #define RTP_PAYLOAD		21
 #define FTP_USER_NAME	"test"
 #define FTP_PASS_WORD	"123456"
-#define MANUFACTURE		"iCare Vision"
-#define MODEL			"ITC-200"
+#define MANUFACTURE		"ShineVision"
+#define MODEL			"ITC2-200"
 
 #define DEF_DETECTOR	2
 
@@ -35,13 +35,13 @@ const AppParams c_appParamsDef = {
 		.dnsServer = {DNS_SERVER},
 	},
 	.devInfo = {
-		.macAddr = {0x0C, 0x00, 0x20, 0x12, 0x03, 0x04},
+		.macAddr = {0x0C, 0x00, 0x20, 0x12, 0x03, 0x26},
 		.deviceSN = 20130104,
 		.name = {OSD_STRING},
-		.location = {ROAD_NAME},
+		.location = {__DATE__" "__TIME__},
 		.manufacture = {MANUFACTURE},
 		.model = {MODEL},
-		.firmware = {FIRMWARE_VER},
+		.firmware = {__DATE__},
 		.hardware = {HARDWARE_VER},
 	},
 	.osdParams = {
@@ -110,7 +110,7 @@ const AppParams c_appParamsDef = {
 			.contrast = 128,
 			.sharpness = 100,
 			.brightness = 0,
-			.saturation = 0,
+			.saturation = 128,
 			.digiGain = 32,
 			.drcStrength = 16,
 			.gamma = 200,
@@ -120,7 +120,7 @@ const AppParams c_appParamsDef = {
 			.contrast = 8,
 			.sharpness = 16,
 			.brightness = 0,
-			.saturation = 0,
+			.saturation = 128,
 			.digiGain = 80,
 			.drcStrength = 16,
 			.gamma = 220,
@@ -138,7 +138,7 @@ const AppParams c_appParamsDef = {
 		.QPMin = 1,
 		.encPreset = 0,
 		.packetSize = 1280,
-		.videoLen = 10,
+		.videoLen = 0,
 		.flags = 0,
 	},
 	.workMode = {

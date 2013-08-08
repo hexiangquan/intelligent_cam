@@ -54,6 +54,8 @@
  *----------------------------------------------*/
 
 typedef struct _RawInfoBytes {
+	Uint8	trigId[8];
+	Uint8	envLum[16];
 	Uint8	blueGain[10];
 	Uint8	greenGain[10];
 	Uint8	redGain[10];
@@ -130,6 +132,8 @@ Int32 cap_info_parse(const Uint8 *imgBuf, const ImgDimension *dim, RawCapInfo *i
 	info->redGain = (Uint16)bytes_convert(rawInfo->redGain, sizeof(rawInfo->redGain));
 	info->greenGain = (Uint16)bytes_convert(rawInfo->greenGain, sizeof(rawInfo->greenGain));
 	info->blueGain = (Uint16)bytes_convert(rawInfo->blueGain, sizeof(rawInfo->blueGain));
+	info->envLum = (Uint16)bytes_convert(rawInfo->envLum, sizeof(rawInfo->envLum));
+	info->trigId = (Uint16)bytes_convert(rawInfo->trigId, sizeof(rawInfo->trigId));
 
 	return E_NO;
 }

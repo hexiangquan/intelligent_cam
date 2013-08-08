@@ -29,6 +29,8 @@
 #include "crc16.h"
 #include "sd_ctrl.h"
 #include "dsp_update.h"
+#include "ext_io.h"
+#include <sys/ioctl.h>
 
 /*----------------------------------------------*
  * external variables                           *
@@ -644,7 +646,10 @@ static Int32 ctrl_cmd_process(ICamCtrlHandle hCamCtrl, TcpCmdHeader *cmdHdr, Cam
 		} else if(strncmp(data + strlen(data) - 2, "ko", 2) == 0) {
 			/* update kernel modules */
 			snprintf(fname, sizeof(fname), "/lib/modules/2.6.32.17-davinci1/kernel/drivers/dsp/%s", data + UPDATE_NAME_OFFSET);
-		} else {
+		} else if(strncmp(data + strlen(data) - 2, "sh", 2) == 0) {
+			/* update scripts */
+			snprintf(fname, sizeof(fname), "%s", data + UPDATE_NAME_OFFSET);
+		}else {
 			/* update applications */
 			snprintf(fname, sizeof(fname), "/home/root/update/%s", data + UPDATE_NAME_OFFSET);						
 		}
@@ -723,6 +728,13 @@ static void thread_clean_up(ICamCtrlHandle hCamCtrl, Bool reboot, int sock)
 		/* we are not reset by system, try reset here */
 		ERR("call icamera to reset failed, call sys cmd to reset...");
 		sync();
+
+		int fd = open(EXTIO_DEV_NAME, O_RDWR);
+		if(fd > 0) {
+			ioctl(fd, EXTIO_S_RESET, NULL);
+			sleep(1);
+			close(fd);
+		}
 		system("shutdown -r now\n");
 	}
 
@@ -770,6 +782,7 @@ void *cam_ctrl_thread(void *arg)
 	while(s_curThread == pthread_self() && errCnt < MAX_ERR_CNT && !params->reboot) {
 		/* recv and process cmd */
 		ret = tcp_cmd_recv(sock, &cmdHdr, dataBuf, bufLen);
+		//ret = tcp_cmd_hdr_recv(sock, &cmdHdr);
 
 		if(!ret) {
 			/* process cmd */

@@ -53,6 +53,7 @@
 #define UPLOAD_FLAG_ANSYNC		(1 << 0)	//using ansync upload 
 #define UPLOAD_FLAG_FREE_BUF	(1 << 1)	//free buffer after send
 #define UPLOAD_FLAG_NOT_SAVE	(1 << 2)	//do not save if err occurs
+#define UPLOAD_FLAG_WAIT_INFO	(1 << 3)	//wait capture info from co-processor
 
 /*----------------------------------------------*
  * routines' implementations                    *

@@ -9,22 +9,42 @@ Usage()
 {
 	PROGRAM=`basename $0`
 	echo -e "$PROGRAM -- srcipts for install rootfs and applications" 
-	echo -e  "\tuse [all] for erase flash and install rootfs and apps"
+	echo -e  "\tuse [all] for erase flash and install kernel, rootfs and apps"
 	echo -e  "\tuse [app] for only install applications"
+	echo -e  "\tuse [kernel] for only install kernel"
 	echo -e "Usage: $PROGRAM [all/app] "
 	echo -e "Example: ./$PROGRAM restart\n"
 	exit 0
 }
 
 # Operate by arguments
-if [ "$1" != "all" ] && [ "$1" != "app" ]; then
+if [ "$1" != "all" ] && [ "$1" != "app" ] && [ "$1" != "kernel" ]; then
 	Usage $0
 fi
 
 MNT="/mnt"
 ROOTFS="/boot/rootfs.tar.gz"
+KERNEL="/boot/uImage"
+
+InstallKernel()
+{
+	if [ -e "$KERNEL" ]; then
+		echo -e "Install kernel image ..."
+		flash_eraseall /dev/mtd2
+		nandwrite -pm /dev/mtd2 $KERNEL 
+	else
+		echo -e "Kernel file [$KERNEL] does not exit..."
+	fi
+}
+
+
+if [ "$1" == "kernel" ]; then
+	InstallKernel;
+	exit 0
+fi
 
 if [ "$1" == "all" ]; then
+	InstallKernel;
 	echo -e "Erase mtd block"
 	flash_eraseall /dev/mtd3
 	echo -e "Making UBI filesystem..."
@@ -44,11 +64,11 @@ else
 	ubiattach -m 3
 	mount -t ubifs ubi0:rootfs $MNT
 fi
-           
+
 # Copy application
 echo -e "\nInstall applications..."
 INSTALL_DIR="/home/root"
-APP_LIST="iCamera camCtrlSrv camBroadcast"
+APP_LIST="iCamera camCtrlSrv camBroadcast dspSrv"
 MISC_LIST="run_app.sh fpga.rbf"
 LIST_ALL="$APP_LIST $MISC_LIST"
 

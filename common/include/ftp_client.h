@@ -54,7 +54,7 @@
 #define FTP_MAX_PASSWD_LEN			128
 #define FTP_MAX_LINE_SIZE			512
 #define FTP_MAX_DIR_LEN				(FTP_MAX_LINE_SIZE - 7)
-#define FTP_RECONNECT_TIMEOUT		5u		//s
+#define FTP_RECONNECT_TIMEOUT		10u		//s
 #define FTP_SEND_TIMEOUT			10u 	//s
 #define FTP_RECV_TIMEOUT			15u		//s
 

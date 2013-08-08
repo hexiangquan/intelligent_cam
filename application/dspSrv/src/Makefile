@@ -59,7 +59,7 @@ CPP_FLAGS ?=
 
 # Link libs and options
 LD_FLAGS += -L$(SDK_LIB_DIR) -L$(APP_LIB_DIR)
-LD_LIBS := -lpthread -lm -lcamctrl -llog -lnetutils -lmsg -lnetproto -lsyscommu -lcrc
+LD_LIBS := -lpthread -lm -lcamctrl -llog -lnetutils -lmsg -lnetproto -lsyscommu -lcrc -lfileutils
 
 # Comment this out if you want to see full compiler and linker output.
 #override VERBOSE = @
@@ -69,7 +69,7 @@ COMPILE = $(VERBOSE) $(CSTOOL_PREFIX)g++ $(CPP_FLAGS) $(C_FLAGS) $(CPP_FLAGS) -c
 LINK = $(VERBOSE) $(CSTOOL_PREFIX)g++ $(LD_FLAGS)
 AR = $(VERBOSE) $(CSTOOL_PREFIX)ar
 
-.PHONY: clean install exe rebuild 
+.PHONY: clean install exe rebuild tags
 
 all: exe install
 
@@ -91,3 +91,6 @@ clean:
 	@echo Removing generated files..
 	$(VERBOSE) -rm -rf $(EXEC) $(OBJ_DIR) *~ *.d .dep
 	$(VERBOSE) -rm -rf $(APP_INC)/*~
+
+tags: $(EXEC_SRC) $(HEADERS)
+	ctags  $(EXEC_SRC) $(HEADERS)

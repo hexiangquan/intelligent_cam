@@ -47,8 +47,8 @@
  * macros                                       *
  *----------------------------------------------*/
 
-#define ICAM_VERSION		(20130124)
-#define FIRMWARE_VER		"iCam_v1.04"
+#define ICAM_VERSION		(20130730)
+#define FIRMWARE_VER		"iCam_v1.06"
 #define HARDWARE_VER		"IPNC_v1.02"
 
 /*----------------------------------------------*

@@ -44,21 +44,23 @@
 
 /* List of ioctls */
 #pragma pack(1)
-#define IMGCTRL_MAGIC_NO	's'
-#define IMGCTRL_S_LUM		_IOW(IMGCTRL_MAGIC_NO, 1, struct hdcam_lum_info *)
-#define IMGCTRL_G_LUM		_IOR(IMGCTRL_MAGIC_NO, 2, struct hdcam_lum_info *)
-#define IMGCTRL_S_CHROMA	_IOW(IMGCTRL_MAGIC_NO, 3, struct hdcam_chroma_info *)
-#define IMGCTRL_G_CHROMA	_IOR(IMGCTRL_MAGIC_NO, 4, struct hdcam_chroma_info *)
-#define IMGCTRL_S_ABCFG		_IOW(IMGCTRL_MAGIC_NO, 5, struct hdcam_ab_cfg *)
-#define IMGCTRL_S_AWBCFG	_IOW(IMGCTRL_MAGIC_NO, 6, struct hdcam_awb_cfg *)
-#define IMGCTRL_S_ENHCFG	_IOW(IMGCTRL_MAGIC_NO, 7, struct hdcam_img_enhance_cfg *)
-#define IMGCTRL_G_VER		_IOR(IMGCTRL_MAGIC_NO, 8, __u32 *)
-#define IMGCTRL_S_SPECCAP	_IOW(IMGCTRL_MAGIC_NO, 9, struct hdcam_img_enhance_cfg *)
-#define IMGCTRL_SPECTRIG	_IOR(IMGCTRL_MAGIC_NO, 10, __u16 *)
-#define IMGCTRL_TRIGCAP		_IO(IMGCTRL_MAGIC_NO, 11)
+#define IMGCTRL_MAGIC_NO		's'
+#define IMGCTRL_S_LUM			_IOW(IMGCTRL_MAGIC_NO, 1, struct hdcam_lum_info *)
+#define IMGCTRL_G_LUM			_IOR(IMGCTRL_MAGIC_NO, 2, struct hdcam_lum_info *)
+#define IMGCTRL_S_CHROMA		_IOW(IMGCTRL_MAGIC_NO, 3, struct hdcam_chroma_info *)
+#define IMGCTRL_G_CHROMA		_IOR(IMGCTRL_MAGIC_NO, 4, struct hdcam_chroma_info *)
+#define IMGCTRL_S_ABCFG			_IOW(IMGCTRL_MAGIC_NO, 5, struct hdcam_ab_cfg *)
+#define IMGCTRL_S_AWBCFG		_IOW(IMGCTRL_MAGIC_NO, 6, struct hdcam_awb_cfg *)
+#define IMGCTRL_S_ENHCFG		_IOW(IMGCTRL_MAGIC_NO, 7, struct hdcam_img_enhance_cfg *)
+#define IMGCTRL_G_VER			_IOR(IMGCTRL_MAGIC_NO, 8, __u32 *)
+#define IMGCTRL_S_SPECCAP		_IOW(IMGCTRL_MAGIC_NO, 9, struct hdcam_lum_info *)
+#define IMGCTRL_SPECTRIG		_IOR(IMGCTRL_MAGIC_NO, 10, __u16 *)
+#define IMGCTRL_TRIGCAP			_IO(IMGCTRL_MAGIC_NO, 11)
+#define IMGCTRL_S_SPECSTROBE	_IOW(IMGCTRL_MAGIC_NO, 12, __u16 *)
+#define IMGCTRL_S_DAYNIGHT		_IOW(IMGCTRL_MAGIC_NO, 13, __u16 *)
 
 //#ifdef _DEBUG
-#define IMGCTRL_HW_TEST		_IO(IMGCTRL_MAGIC_NO, 12)
+#define IMGCTRL_HW_TEST		_IO(IMGCTRL_MAGIC_NO, 20)
 //#endif
 #pragma  pack()
 
@@ -153,6 +155,7 @@ struct hdcam_awb_cfg{
 #define HDCAM_ENH_FLAG_NF_EN			(1 << 4)	//enable nosie filter
 #define HDCAM_ENH_FLAG_DRC_EN			(1 << 5)	//enable dynamic range compression
 #define HDCAM_ENH_FLAG_BRIGHT_EN		(1 << 6)	//enable brightness 
+#define HDCAM_ENH_FLAG_ACSYNC_EN		(1 << 7)	//enable exposure sync with AC
 
 struct hdcam_img_enhance_cfg{
 	__u16	flags;			//control flag
@@ -161,7 +164,8 @@ struct hdcam_img_enhance_cfg{
 	__u16	brightness;		//value of brightness, unused at current ver.
 	__u16	saturation;		//value of saturation, unused at current ver.
 	__u16	drcStrength;	//strength of DRC
-	__u16	reserved[2];	//reserved
+	__u16	acSyncOffset;	//offset for AC Sync
+	__u16	reserved;		//reserved
 };
 
 /*
@@ -170,18 +174,34 @@ struct hdcam_img_enhance_cfg{
 struct hdcam_spec_cap_cfg{
 	__u32	exposureTime;	// Unit: us
 	__u16	globalGain;		// Range: 0~1023
-	__u16	strobeCtrl;		// Bit[0:1]- strobe0, strobe1, 1-enable, 1-disable
+	__u16	strobeCtrl;		// Bit[0:2]- strobe0-2, 1-enable, 1-disable
 	__u32	aeMinExpTime;	// AE for special capture, Min exposure time, us
 	__u32	aeMaxExpTime;	// AE for special capture Max exposure time, us 
 	__u16	aeMinGain;		// AE for special capture, Min global gain, 0~1023
 	__u16	aeMaxGain;		// AE for special capture, Max global gain, 0~1023
 	__u16	aeTargetVal;	// AE for special capture, target value, 0~255
 	__u16	flags;			// flags for ctrl
-	__u32	reserved[2];
+	__u16	redGain;		// Fixed red gain, 0~511
+	__u16	greenGain;		// Fixed green gain, 0~511
+	__u16	blueGain;		// Fixed blue gain, 0~511
+	__u16	awbMinRedGain;	// AWB for special capture, min red gain, 0~511
+	__u16	awbMaxRedGain;	// AWB for special capture, max red gain, 0~511
+	__u16	awbMinGreenGain;// AWB for special capture, min green gain, 0~511
+	__u16	awbMaxGreenGain;// AWB for special capture, max green gain, 0~511
+	__u16	awbMinBlueGain; // AWB for special capture, min blue gain, 0~511
+	__u16	awbMaxBlueGain;	// AWB for special capture, max blue gain, 0~511
+	__u16	reserved[5];	
 };
 
 /* bits define for flags of spec cap cfg */
 #define HDCAM_SPEC_CAP_AE_EN	(1 << 0)
+#define HDCAM_SEPC_CAP_AG_EN	(1 << 1)
+#define HDCAM_SPEC_CAP_AWB_EN	(1 << 2)
+#define HDCAM_SEPC_CAP_AA_EN	(1 << 3) // auto aperture
+
+/* day night mode */
+#define HDCAM_DAY_MODE			0	
+#define HDCAM_NIGHT_MODE		1	
 
 #endif /* end of #ifdef _IMG_CTRL_H_ */
 

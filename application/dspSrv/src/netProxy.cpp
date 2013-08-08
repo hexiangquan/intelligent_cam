@@ -30,7 +30,7 @@ int NetProxy::CheckExit(uint32_t cmd)
 		DBG("%s, got chan exit cmd...", name.c_str());
 		err = E_NO;
 	} else {
-		DBG("%s, waitCmd, unexpected cmd: 0x%X", name.c_str(), cmd);
+		//DBG("%s, waitCmd, unexpected cmd: 0x%X", name.c_str(), cmd);
 		msg.cmd = cmd + 1; 
 		msg.params[0] = SYS_ERR_MODE;
 		err = E_INVAL;
@@ -102,8 +102,8 @@ int NetProxy::WaitCmd(uint32_t cmd, SysMsg& msg, size_t len)
 		// wait cmd from dsp
 		err = sys_commu_read(syslink, &msg, len);
 		if(err < 0 ) {
-			if( ++cnt > MAX_ERR_CNT) {
 				ERR("%s, read msg failed.", name.c_str());
+			if( ++cnt > MAX_ERR_CNT) {
 				break;
 			} else {
 				continue;
@@ -148,11 +148,12 @@ int NetProxy::TransferLoop()
 		// wait cmd from dsp
 		err = sys_commu_read(syslink, pMsg, bufSize);
 		if(err < 0 ) {
+			ERR("%s, read msg failed.", name.c_str());
 			usleep(1000);
 			if(++cnt > MAX_ERR_CNT) {
-				//ERR("read msg failed.");
 				cnt = 0;
-				continue;//break;
+				INFO("%s, too much time without cmd, break...", name.c_str());
+				break;
 			} else {
 				continue;
 			}
@@ -172,6 +173,8 @@ int NetProxy::TransferLoop()
 			CheckExit(pMsg->cmd);
 		}
 	}
+
+	DBG("%s, exit transfer loop...", name.c_str());
 
 	return err;
 }

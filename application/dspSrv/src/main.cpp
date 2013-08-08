@@ -92,6 +92,7 @@ int main(int argc, char **argv)
 
 	// create channel for file server
 	DspFileSrv fileSrv(LINK_FILE_BASE, FILE_CHAN_LEN, "file");
+	fileSrv.Run();
 
 	// wait stop signal
 	pthread_cond_wait(&g_cond, &g_mutex);
@@ -101,6 +102,8 @@ int main(int argc, char **argv)
 		netSrv[i]->Stop();
 		delete netSrv[i];
 	}
+
+	fileSrv.Stop();
 
 	pthread_cond_destroy(&g_cond);
 	pthread_mutex_destroy(&g_mutex);

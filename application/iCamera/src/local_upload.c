@@ -357,7 +357,7 @@ static Int32 local_dir_send(LocalUploadHandle hLocalUpload, const char *dirName,
 
 	dir = opendir(dirName);
 	if(!dir) {
-		ERRSTR("opendir <%s> err", dirName);
+		//ERRSTR("opendir <%s> err", dirName);
 		err = E_NOTEXIST;
 		goto exit;
 	}

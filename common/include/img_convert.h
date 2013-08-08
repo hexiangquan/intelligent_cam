@@ -100,7 +100,8 @@ typedef struct _ImgConvDynParams {
 	Uint8			brigtness;		/* luma params, can only be set when init */
 	Uint8			contrast;		/* luma params, can only be set when init */
 	Uint8			sharpness;		/* sharpness gain value */
-	Uint8			reserved[5];
+	Uint8			saturation;		/* saturation, 0~255 */
+	Uint8			reserved[4];
 }ImgConvDynParams;
 
 /* Input args for process, not used */

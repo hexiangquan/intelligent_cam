@@ -55,7 +55,7 @@
  *----------------------------------------------*/
 #define PROGRAM_NAME		"camBroadcast"
 #define CAM_TCP_SRV_PORT	9200
-#define BROADCAST_INTERVAL	10	
+#define BROADCAST_INTERVAL	5	
 #define MSG_NAME			"/tmp/"PROGRAM_NAME
 #define MSG_TRANS_TIMEOUT	6
 #define DEST_PORT			(9800)

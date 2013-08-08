@@ -520,8 +520,10 @@ static Int32 previewer_set_nf(struct prev_module_param *modParam, struct prev_nf
 		.shft_val = 0,
 		.spread_val = 3,
 		.apply_lsc_gain = 0,
-		.thr = { 120, 130, 135, 140, 150, 160, 170, 200 },
-		.str = { 16, 16, 15, 15, 15, 15, 15, 15 },
+		.thr = { 1023, 1023, 1023, 1023, 1023, 1023, 1023, 1023,},
+		//120, 130, 135, 140, 150, 160, 170, 200 },
+		.str = { 31, 31, 31, 31, 31, 31, 31, 31,},
+		//16, 16, 15, 15, 15, 15, 15, 15 },
 		.edge_det_min_thr = 0,
 		.edge_det_max_thr = 2047
 	};
@@ -563,6 +565,67 @@ static Int32 previewer_set_lum(struct prev_module_param *modParam, struct prev_l
 		lum->contrast = CONTRAST_ADJ(attrs->contrast);
 		modParam->param = lum;
 		modParam->len = sizeof (struct prev_lum_adj);
+	} else {
+		modParam->param = NULL;
+		modParam->len = 0;
+	}
+
+	return E_NO;
+}
+
+/**
+ * previewer_set_rgb2rgb -- adjust saturation by setting RGB2RGB coefficient
+ */
+static Int32 previewer_set_rgb2rgb(struct prev_module_param *modParam, struct prev_rgb2rgb *rgb2rgb, PreviewAttrs *attrs)
+{
+	if(attrs->saturation != 128) {
+		DBG("set saturation: %u", attrs->saturation);
+
+		/* calculate coefficient */
+		int k = attrs->saturation * 1024 / 128;
+		int coef;
+		int mask = 0x0F;
+
+		/* calculate RGB table */
+		memset(rgb2rgb, 0, sizeof(*rgb2rgb));
+		coef = (717 *(k - 1024)*256)/(1024*1024);
+		rgb2rgb->coef_rr.integer = (coef >> 8) & mask;
+		rgb2rgb->coef_rr.decimal = coef & 0xFF;
+
+		coef = (601 *(1024 - k)*256)/(1024*1024);
+		rgb2rgb->coef_gr.integer = (coef >> 8) & mask;
+		rgb2rgb->coef_gr.decimal = coef & 0xFF;
+
+		coef = (117 *(1024 - k)*256)/(1024*1024);
+		rgb2rgb->coef_br.integer = (coef >> 8) & mask;
+		rgb2rgb->coef_br.decimal = coef & 0xFF;
+
+		coef = (601 *(1024 - k)*256)/(1024*1024);
+		rgb2rgb->coef_rg.integer = (coef >> 8) & mask;
+		rgb2rgb->coef_rg.decimal = coef & 0xFF;
+
+		coef = (717 *(k - 1024)*256)/(1024*1024);
+		rgb2rgb->coef_gg.integer = (coef >> 8) & mask;
+		rgb2rgb->coef_gg.decimal = coef & 0xFF;
+
+		coef = (117 *(1024 - k)*256)/(1024*1024);
+		rgb2rgb->coef_bg.integer = (coef >> 8) & mask;
+		rgb2rgb->coef_bg.decimal = coef & 0xFF;
+
+		coef = (306 *(1024 - k)*256)/(1024*1024);
+		rgb2rgb->coef_rb.integer = (coef >> 8) & mask;
+		rgb2rgb->coef_rb.decimal = coef & 0xFF;
+
+		coef = (311 *(1024 - k)*256)/(1024*1024);
+		rgb2rgb->coef_gb.integer = (coef >> 8) & mask;
+		rgb2rgb->coef_gb.decimal = coef & 0xFF;
+
+		coef = (717 *(k - 1024)*256)/(1024*1024);
+		rgb2rgb->coef_bb.integer = (coef >> 8) & mask;
+		rgb2rgb->coef_bb.decimal = coef & 0xFF;
+		
+		modParam->param = rgb2rgb;
+		modParam->len = sizeof (struct prev_rgb2rgb);
 	} else {
 		modParam->param = NULL;
 		modParam->len = 0;
@@ -766,6 +829,7 @@ Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
 	struct prev_wb wb;
 	struct prev_yee yee;
 	struct prev_rgb2yuv rgb2yuv;
+	struct prev_rgb2rgb rgb2rgb;
 	
 	Bool bypass;
 
@@ -791,8 +855,8 @@ Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
 		case PREV_NF1:
 		case PREV_NF2:
 			/* sharpness and noise filter can't be set at same time */
-			if(!(attrs->ctrlFlags & CONV_FLAG_EE_EN))
-				previewer_set_nf(&modParam, &nf, attrs->ctrlFlags & CONV_FLAG_NF_EN);
+			//if(!(attrs->ctrlFlags & CONV_FLAG_EE_EN))
+			previewer_set_nf(&modParam, &nf, attrs->ctrlFlags & CONV_FLAG_NF_EN);
 			break;
 		case PREV_WB:
 			previewer_set_wb(fdPrev, &modParam, &wb, NULL);
@@ -809,6 +873,9 @@ Int32 previewer_cap_update(int fdPrev, PreviewAttrs *attrs)
 			break;
 		case PREV_RGB2YUV:
 			previewer_set_y_offset(fdPrev, &modParam, &rgb2yuv, attrs);
+			break;
+		case PREV_RGB2RGB_1:
+			previewer_set_rgb2rgb(&modParam, &rgb2rgb, attrs);
 			break;
 		default:
 			/* using defaults */

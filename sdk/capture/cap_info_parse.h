@@ -72,6 +72,8 @@ typedef struct _RawCapInfo {
 	Uint16		redGain;
 	Uint16		greenGain;
 	Uint16		blueGain;
+	Uint16		envLum;		/* lum value of the environment */
+	Uint16 		trigId;		/* trigger id set when send capture cmd */
 	Uint16		reserved;
 }RawCapInfo;
 

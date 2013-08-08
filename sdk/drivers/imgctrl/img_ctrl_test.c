@@ -7,6 +7,7 @@
 
 #define DEV_NAME		"/dev/imgctrl"
 #define SPEC_TRIG_CNT	10
+#define HW_LOOP_CNT		(-1)
 
 typedef struct _TestParams {
 	const char *devName;
@@ -14,14 +15,24 @@ typedef struct _TestParams {
 	int awbEn;
 	int hwTestEn;
 	int loopCnt;
+	int hwCnt;
 }TestParams;
 
-static void hw_test(int fd)
+static void hw_test(int fd, int loopCnt)
 {
-	int err = 0;
+	int err = 0, i = 0;
+
+	DBG("fpga hw test start.");
 	
-	while(!err) {
+	while(1) {
 		err = ioctl(fd, IMGCTRL_HW_TEST, NULL);
+		if(err < 0) {
+			ERR("<%d> hw test failed.", i);
+		}
+
+		i++;
+		if(loopCnt > 0 && i > loopCnt)
+			break;
 		usleep(100000);
 	}
 }
@@ -77,7 +88,7 @@ static Bool main_loop(TestParams *params)
 	}
 
 	if(params->hwTestEn)
-		hw_test(fd);
+		hw_test(fd, params->hwCnt);
 	
 	/* test lum info */
 	int err;
@@ -209,6 +220,7 @@ static void usage(void)
 	INFO(" -w awb ctrl, 0-enable, 1-disable, default: enable");
 	INFO(" -t fpga rw test, 0-enable, 1-disable, default: disable");
 	INFO(" -n special trigger loop cnt, default: %d", SPEC_TRIG_CNT);
+	INFO(" -c fpga rw test loop num, default: %d", HW_LOOP_CNT);
     INFO("Example:");
     INFO(" use default params: ./imgctrlTest");
     INFO(" use specific params: ./imgctrlTest -s /dev/imgctrl");
@@ -221,10 +233,11 @@ int main(int argc, char **argv)
 	TestParams params;
 	
 	params.devName = DEV_NAME;
-	params.abEn = 1;
-	params.awbEn = 1;
-	params.hwTestEn = 0;
+	params.abEn = 0;
+	params.awbEn = 0;
+	params.hwTestEn = 1;
 	params.loopCnt = SPEC_TRIG_CNT;
+	params.hwCnt = HW_LOOP_CNT;
 
 	while ((c = getopt(argc, argv, options)) != -1) {
 		switch (c) {
@@ -242,6 +255,9 @@ int main(int argc, char **argv)
 			break;
 		case 'n':
 			params.loopCnt = atoi(optarg);
+			break;
+		case 'c':
+			params.hwCnt = atoi(optarg);
 			break;
 		case 'h':
 		default:

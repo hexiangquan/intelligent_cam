@@ -9,9 +9,10 @@
 # 0x83000000    12 MB   Video driver memory (Linux)
 # 0x83C00000    68 MB   CMEM
 # 0x88000000    BOTTOM  ADDRESS
+# 0x9000000     196 MB  CMEM  -- modified DDR2
 
 load () {
-    modprobe cmemk phys_start=0x83C00000 phys_end=0x88000000 allowOverlap=1 phys_start_1=0x00001000 phys_end_1=0x00008000 pools_1=1x28672 useHeapIfPoolUnavailable=1
+    modprobe cmemk phys_start=0x83C00000 phys_end=0x90000000 allowOverlap=1 phys_start_1=0x00001000 phys_end_1=0x00008000 pools_1=1x28672 useHeapIfPoolUnavailable=1
     modprobe irqk 
     modprobe edmak
     modprobe dm365mmap
@@ -19,6 +20,7 @@ load () {
 	modprobe ext_io
 	modprobe img_ctrl
 	modprobe sys_link
+	modprobe rom
 }
 
 unload () {
@@ -30,7 +32,10 @@ unload () {
 	rmmod ext_io 2>/dev/null
 	rmmod img_ctrl 2>/dev/null
 	rmmod sys_link 2>/dev/null
+	rmmod rom 2>/dev/null
 }
+
+#	rmmod fpga 2>/dev/null
 
 case "$1" in
       start) 

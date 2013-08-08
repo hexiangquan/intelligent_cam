@@ -64,7 +64,7 @@
 #define CAM_CTRL_TIMEOUT			5	//second
 #define CAM_CTRL_BUF_SIZE			(8 * 1024 * 1024)
 #define ARM_PROG_NAME				"/home/root/iCamera"
-#define FPGA_FIRMAWRE				"/home/root/fpga.bin"
+#define FPGA_FIRMAWRE				"/home/root/fpga.rbf"
 
 /*----------------------------------------------*
  * routines' implementations                    *

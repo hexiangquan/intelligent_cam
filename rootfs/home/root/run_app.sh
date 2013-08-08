@@ -56,8 +56,27 @@ CheckAppStatus()
 INSTALL_DIR="/home/root"
 UPDATE_DIR="update"
 BACKUP_DIR="backup"
-APP_LIST="iCamera camCtrlSrv camBroadcast"
-CFG_FILE="cam.cfg"
+APP_LIST="iCamera camCtrlSrv camBroadcast dspSrv"
+CFG_FILE=""
+UPDATE_PACK="update.tar.gz"
+UDDATE_PROG="update.sh"
+
+# UpdatePacket -- Check update packet and run this packet
+# If a update packet exist, unpack and run the update script
+UpdatePacket()
+{
+	cd $UPDATE_DIR
+	if [ -e "$UPDATE_PACK" ]; then
+		tar zxf $UPDATE_PACK
+		if [ $0 == "0" ] && [ -f "$UPDATE_PROG" ]; then
+			chmod +x $UPDATE_PROG
+			./$UPDATE_PROG	
+		fi
+	fi
+
+	cd ..
+}
+
 
 # CheckUpdate -- Check update file and overwrite current version
 # @ Name -- Process Name

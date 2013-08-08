@@ -101,7 +101,7 @@ int sys_commu_read(int fd, SysMsg *msg, int len)
 		return ret;
 		
 	#ifdef SYS_COMMU_CRC_EN
-	if(msg->dataLen) {
+	if(msg->dataLen && ret >= sizeof(*msg) + msg->dataLen) {
 		Uint8 *data = (Uint8 *)msg + sizeof(SysMsg);
 		Uint32 crc = crc16(data, msg->dataLen);
 		if(crc != msg->checksum) {

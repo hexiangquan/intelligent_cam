@@ -218,6 +218,17 @@ static inline Int32 recv_sync_end(int sock)
     return E_NO;
 }
  
+static Int32 recv_cmd_hdr(int sock, TcpCmdHeader *hdr)
+{
+	Int32 rc;
+	
+	/* Recieve command header */
+	rc = recv(sock, hdr, sizeof(TcpCmdHeader), 0);
+	if(rc != sizeof(TcpCmdHeader))
+		return (rc < 0 ? E_TIMEOUT : E_CONNECT);
+
+	return E_NO;
+}
 
 /*****************************************************************************
  Prototype    : recv_cmd_data
@@ -237,29 +248,22 @@ static inline Int32 recv_sync_end(int sock)
     Modification : Created function
 
 *****************************************************************************/
-inline Int32 recv_cmd_data(int sock, TcpCmdHeader *hdr, Int8 *dataBuf, Uint32 bufSize)
+static inline Int32 recv_cmd_data(int sock, Uint32 len, Int8 *dataBuf, Uint32 bufSize)
 {
 	Int32 rc;
 	
-	/* Recieve command header */
-	if((rc = recv(sock, hdr, sizeof(TcpCmdHeader), 0)) != sizeof(TcpCmdHeader))
-		goto err_quit;
-
 	/* Recieve data */
-	if(hdr->dataLen) {
-		if(!dataBuf || hdr->dataLen > bufSize) {
-			ERR("data buffer is NULL or cmd data len %d > buf len %d", hdr->dataLen, bufSize);
+	if(len) {
+		if(!dataBuf || len > bufSize) {
+			ERR("data buffer is NULL or cmd data len %d > buf len %d", len, bufSize);
 			return E_NOMEM;
 		}
 
 		/* Recv additive data */
-		if((rc = recvn(sock, dataBuf, hdr->dataLen, 0)) != (Int32)hdr->dataLen)
+		if((rc = recvn(sock, dataBuf, len, 0)) != (Int32)len)
 			goto err_quit;
 	}
 
-#ifdef TCP_CMD_DBG
-	DBG("Recv Cmd 0x%X", hdr->cmd);
-#endif
 	return E_NO;
 
 err_quit:
@@ -301,8 +305,41 @@ Int32 tcp_cmd_recv(int sock, TcpCmdHeader *hdr, void *dataBuf, Int32 bufLen)
 	if(ret)
 		return ret;
 
+	ret = recv_cmd_hdr(sock, hdr);
+	if(ret)
+		return ret;
+
 	/* Recieve cmd data */
-	ret = recv_cmd_data(sock, hdr, dataBuf, bufLen);
+	ret = recv_cmd_data(sock, hdr->dataLen, dataBuf, bufLen);
+	if(ret)
+		return ret;
+	
+	/* Recieve sync end */
+	return recv_sync_end(sock);
+}
+
+Int32 tcp_cmd_hdr_recv(int sock, TcpCmdHeader *hdr)
+{
+	Int32 ret;
+
+	if(sock < 0 ||  !hdr)
+		return E_INVAL;
+
+	/* Recieve sync data */
+	ret = recv_sync_start(sock);
+	if(ret)
+		return ret;
+
+	/* Recieve command header */
+	return recv_cmd_hdr(sock, hdr);
+}
+
+Int32 tcp_cmd_data_recv(int sock, const TcpCmdHeader *hdr, void *dataBuf, Int32 bufLen)
+{
+	Int32 ret;
+	
+	/* Recieve cmd data */
+	ret = recv_cmd_data(sock, hdr->dataLen, dataBuf, bufLen);
 	if(ret)
 		return ret;
 	

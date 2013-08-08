@@ -233,7 +233,7 @@ Int32 img_trans_connect(ImgTransHandle hTrans, Uint32 timeoutSec)
 		return E_CONNECT;
 	}
 
-	DBG("img trans, connect to img server ok");
+	//DBG("img trans, connect to img server ok");
 
 	if(hTrans->timeout)
 		set_sock_send_timeout(sock, hTrans->timeout);
@@ -315,7 +315,7 @@ Int32 img_trans_send(ImgTransHandle hTrans, const ImgHdrInfo *info, const void *
 			if(send(hTrans->sock, syncEnd, sizeof(syncEnd), 0) == sizeof(syncEnd))
 				return E_NO;
 
-	ERRSTR("send data error");
+	//ERRSTR("send data error");
 	return E_TRANS;
 }
 

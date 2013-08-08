@@ -28,7 +28,7 @@ int TcpProxy::SendData(const void *pData, size_t len)
 	ret = sendn(sock, pData, len, 0);
 
 	if(ret < 0) {
-		ERRSTR("send data failed");
+		ERRSTR("%s, send data failed", name.c_str());
 		msg.params[0] = (errno == EWOULDBLOCK ? SYS_ERR_TIMEOUT : SYS_ERR_TRANS);
 	} else {
 		msg.params[0] = ret;
@@ -57,7 +57,7 @@ int TcpProxy::RecvData(void *pBuf, size_t bufLen)
 	if(ret <= 0) {
 		pMsg->params[0] = (errno == EWOULDBLOCK ? SYS_ERR_TIMEOUT : SYS_ERR_TRANS);
 		pMsg->dataLen = 0;
-		ERRSTR("recv err, ret: %d", ret);
+		ERRSTR("%s, recv err, ret: %d", name.c_str(), ret);
 	} else {
 		pMsg->params[0] = ret;
 		pMsg->dataLen = ret;
@@ -66,7 +66,7 @@ int TcpProxy::RecvData(void *pBuf, size_t bufLen)
 	//reply msg
 	ret = sys_commu_write(syslink, pMsg);
 	if(ret < 0) {
-		ERR("reply msg failed");
+		ERR("%s, reply msg failed", name.c_str());
 	}
 
 	return ret;	
@@ -85,7 +85,7 @@ int TcpServer::BindPort(uint16_t port)
 	// create listen port
 	listenFd = socket_tcp_server(port, LISTEN_MAX_NUM);
 	if(listenFd < 0) {
-		ERR("listen failed.");
+		ERR("%s, listen failed.", name.c_str());
 		return E_IO;
 	}
 
@@ -120,37 +120,46 @@ int TcpServer::EstablishLink()
 		pTimeval = &tv;
 	}
 
-	DBG("start accept, timeout: %d ms", timeout);
+	DBG("%s, start accept, timeout: %d ms", name.c_str(), timeout);
 
 	struct sockaddr_in addr;
 	socklen_t len = sizeof(addr);
 
-	// wait connections
-	fd_set rdSet;
-	int fdMax = listenFd + 1;
-	FD_ZERO(&rdSet);
-	FD_SET(listenFd, &rdSet);
-	err = select(fdMax, &rdSet, NULL, NULL, pTimeval);
-	if(err < 0 || !FD_ISSET(listenFd, &rdSet)) {
-		ERRSTR("select err");
-		err = E_IO;
-		msg.params[0] = SYS_ERR_TIMEOUT;
-		goto reply_msg;
+	while(!Exit()) {
+		// wait connections
+		fd_set rdSet;
+		int fdMax = MAX(listenFd, syslink) + 1;
+
+		FD_ZERO(&rdSet);
+		FD_SET(listenFd, &rdSet);
+		FD_SET(syslink, &rdSet);
+		err = select(fdMax, &rdSet, NULL, NULL, pTimeval);
+		if(err < 0 ) {
+			ERRSTR("%s, select err", name.c_str());
+			err = E_IO;
+			msg.params[0] = SYS_ERR_TIMEOUT;
+			break;
+		}
+
+		if(FD_ISSET(listenFd, &rdSet)) {
+			// accept incoming connections
+			bzero(&addr, sizeof(addr));
+			sock = accept(listenFd, (struct sockaddr *)&addr, &len);
+			if(sock < 0) {
+				ERRSTR("%s, accept err.", name.c_str());
+				msg.params[0] = SYS_ERR_IO;
+				break;
+			}	
+			msg.params[0] = SYS_ERR_NO;
+			DBG("%s, tcp server proxy, %s connected...", name.c_str(), inet_ntoa(addr.sin_addr));
+			break;
+		}
+		
+		if(FD_ISSET(syslink, &rdSet)) {
+			// maybe DSP restart
+			WaitCmd(0, msg, sizeof(msg));
+		}
 	}
-
-	// accept incoming connections
-	bzero(&addr, sizeof(addr));
-	sock = accept(listenFd, (struct sockaddr *)&addr, &len);
-	if(sock < 0) {
-		ERRSTR("accept err.");
-		msg.params[0] = SYS_ERR_IO;
-		goto reply_msg;
-	}	
-
-	msg.params[0] = SYS_ERR_NO;
-	DBG("tcp server proxy, %s connected...", inet_ntoa(addr.sin_addr));
-
-reply_msg:
 
 	msg.cmd = SYS_CMD_ACCEPT_RET;
 	msg.dataLen = 0;
@@ -164,7 +173,9 @@ reply_msg:
  */
 int TcpServer::InitTrasnfer()
 {
-	DBG("tcp server run ...");
+	DBG("%s, tcp server run ...", name.c_str());
+
+	waitAcceptCmd = true;
 
 	//listen
 	int err = StartListen();
@@ -195,7 +206,7 @@ int TcpClient::ConnectServer()
 		return err;
 
 	// parse server ip and port
-	DBG("tcp client, server info: %s:%u", msg.addrInfo.addr, msg.addrInfo.port);
+	DBG("%s, tcp client, server info: %s:%u", name.c_str(), msg.addrInfo.addr, msg.addrInfo.port);
 
 	if(sock > 0)
 		close(sock);
@@ -203,7 +214,7 @@ int TcpClient::ConnectServer()
 	// create socket 
 	sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if(sock < 0) {
-		ERRSTR("create sock failed");
+		ERRSTR("%s, create sock failed", name.c_str());
 		return E_IO;
 	}
 
@@ -213,10 +224,10 @@ int TcpClient::ConnectServer()
 	err = connect(sock, (struct sockaddr *)&addr, sizeof(addr));
 	if(err < 0) {
 		msg.header.params[0] = SYS_ERR_REFUSED;
-		ERRSTR("tcp client, connect server failed");
+		ERRSTR("%s, connect server failed", name.c_str());
 		err = E_REFUSED;
 	} else {
-		DBG("tcp client, connect server ok.");
+		DBG("%s, connect server ok.", name.c_str());
 		msg.header.params[0] = SYS_ERR_NO;
 		err = E_NO;
 	}

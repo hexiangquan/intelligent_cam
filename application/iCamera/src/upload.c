@@ -31,6 +31,11 @@
 #include <pthread.h>
 #include "jpg_encoder.h"
 #include "rtp_upload.h"
+#include "h264_upload.h"
+#include "sys_commu.h"
+#include "syslink_proto.h"
+#include "list.h"
+#include <sys/ioctl.h>
 
 /*----------------------------------------------*
  * external variables                           *
@@ -65,12 +70,21 @@ static Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data);
 #define MSG_RECV_TIMEOUT	25	//second
 #define HEAT_BEAT_INTERVAL	60	//second
 
+#define CAP_INFO_LEN		1024
+
 //#define TEST_SEND_TIME
 #define PRINT_FPS			1
 
 /*----------------------------------------------*
  * routines' implementations                    *
  *----------------------------------------------*/
+
+typedef struct {
+	struct list_head list;
+	ImgMsg frame;
+}ListEntry;
+
+
 /* structure for this module */
 struct UploadObj {
 	const UploadFxns		*fxns;
@@ -86,7 +100,12 @@ struct UploadObj {
 	const char				*savePath;
 	Int32					frameCnt;
 	time_t 					lastSnd;
+	int						syslink;
+	struct list_head		head;
+	Int32					cacheNum;
 };
+
+
 
 /* fxns for none upload */
 const UploadFxns NONE_UPLOAD_FXNS = {
@@ -99,6 +118,122 @@ const UploadFxns NONE_UPLOAD_FXNS = {
 	.setParams = NULL,
 	.saveFrame = NULL,
 };
+
+static Int32 upload_cache_frame(UploadHandle hUpload, ImgMsg *frame)
+{
+	if(frame->rawInfo.capMode != RCI_CAP_TYPE_SPEC_TRIG)
+		return E_INVAL;
+
+	BufPoolHandle hPool = buffer_get_pool(frame->hBuf);
+
+	/* should not cache buffer anymore if there is no space */
+	if(buf_pool_get_free_num(hPool) <= 1) {
+		DBG("no buf in pool, not catched~");
+		return E_NOSPC;
+	}
+
+	ListEntry *item = malloc(sizeof(*item));
+
+	if(!item)
+		return E_NOMEM;
+
+	DBG("cache one frame, id: %u", frame->rawInfo.trigId);
+
+	item->frame = *frame;
+	list_add_tail(&item->list, &hUpload->head);
+	return E_NO;
+}
+
+/**
+ * upload_msg_process -- process msg
+ */
+static void upload_msg_process(UploadHandle hUpload, MsgHandle hMsg)
+{
+	Int32 	ret;
+	ImgMsg	msgBuf;
+	
+	/* recv msg */
+	ret = msg_recv(hMsg, (MsgHeader *)&msgBuf, sizeof(msgBuf), 0);
+	if(ret < 0) {
+		//ERR("recv msg err: %s", str_err(ret));
+		return;
+	}
+
+	/* process msg */
+	MsgHeader *msgHdr = &msgBuf.header;
+	switch(msgHdr->cmd) {
+	case APPCMD_NEW_DATA:
+		ret = E_MODE;
+		if(hUpload->syslink > 0)
+			ret = upload_cache_frame(hUpload, &msgBuf);
+		if(ret)
+			ret = upload_send_frame(hUpload, &msgBuf);
+		break;
+	case APPCMD_EXIT:
+		hUpload->exit = TRUE;
+		break;
+	default:
+		ERR("unkown cmd: 0x%X", (unsigned int)msgHdr->cmd);
+		ret = E_UNSUPT;
+		break;
+	}
+	
+}
+
+/**
+ * upload_sync_cap_info -- sync capture info with cached frame
+ */
+static Int32 upload_sync_cap_info(UploadHandle hUpload)
+{
+	int fd = hUpload->syslink;
+	int ret;
+	struct {
+		SysMsg hdr;
+		SysCapInfo capInfo;
+	} msgBuf;
+
+
+	while(1) {
+		ret = sys_commu_read(fd, &msgBuf.hdr, sizeof(msgBuf));
+		if(ret < 0)
+			break;
+		
+		if(msgBuf.hdr.cmd != SYS_CMD_ADD_INFO)
+			continue;
+
+		DBG("recv cap info from dsp, id: %u", msgBuf.capInfo.index);
+		/* send cached frame */
+		ListEntry *item, *backup;
+		list_for_each_entry_safe(item, backup, &hUpload->head, list) {
+			ImgMsg *frame = &item->frame;
+			if(frame->rawInfo.trigId == msgBuf.capInfo.index) {
+				/* same frame */
+				DBG("cap info recv, sync frame: %u", msgBuf.capInfo.index);
+				/* copy data to end of img */
+				Int8 *img = buffer_get_user_addr(frame->hBuf);
+				Uint32 dataLen = msgBuf.hdr.dataLen;
+				Uint32 freeSize = buffer_get_size(frame->hBuf) - frame->dimension.size;
+				
+				if(img && freeSize >= dataLen) {
+					memcpy(img + frame->dimension.size, &msgBuf.capInfo, dataLen);
+					frame->dimension.size += dataLen;
+				}
+				
+				/* send to net */
+				upload_send_frame(hUpload, frame);
+			} else {
+				/* free buf handle */
+				buf_pool_free(frame->hBuf);
+			}
+
+			/* no matter this entry is sync or not, delete it and free the memory */
+			list_del(&item->list);
+			free(item);
+		}
+	}
+	
+	return E_NO;
+}
 
 /*****************************************************************************
  Prototype    : upload_thread
@@ -121,9 +256,11 @@ static void *upload_thread(void *arg)
 
 	UploadHandle	hUpload = (UploadHandle)arg;
 	Int32			ret;
-	ImgMsg			msgBuf;
 	time_t			lastTime = time(NULL);
 	MsgHandle		hMsg;
+	fd_set			rdSet;
+	int				fdMsg, fdMax;
+	struct timeval  tmVal;	
 
 	/* init for thread env */
 	hMsg = msg_create(hUpload->msgName, MSG_MAIN, 0);
@@ -131,6 +268,9 @@ static void *upload_thread(void *arg)
 		goto exit;
 
 	ret = msg_set_recv_timeout(hMsg, MSG_RECV_TIMEOUT);
+	fdMsg = msg_get_fd(hMsg);
+	tmVal.tv_sec = MSG_RECV_TIMEOUT;
+	tmVal.tv_usec = 0;
 
 	DBG("upload thread start...");
 
@@ -145,28 +285,31 @@ static void *upload_thread(void *arg)
 				lastTime = time(NULL);
 			}	
 		}
-				
-		/* recv msg */
-		ret = msg_recv(hMsg, (MsgHeader *)&msgBuf, sizeof(msgBuf), 0);
-		if(ret < 0) {
-			//ERR("recv msg err: %s", str_err(ret));
+
+		/* wait data ready */
+		FD_ZERO(&rdSet);
+		if(hUpload->syslink > 0)
+			FD_SET(hUpload->syslink, &rdSet);
+		FD_SET(fdMsg, &rdSet);
+
+		fdMax = MAX(hUpload->syslink, fdMsg) + 1;
+		ret = select(fdMax, &rdSet, NULL, NULL, &tmVal);
+		if(ret < 0 && errno != EINTR) {
+			ERRSTR("select err");
+			usleep(1000);
 			continue;
 		}
-	
-		/* process msg */
-		MsgHeader *msgHdr = &msgBuf.header;
-		switch(msgHdr->cmd) {
-		case APPCMD_NEW_DATA:
-			ret = upload_send_frame(hUpload, &msgBuf);
-			break;
-		case APPCMD_EXIT:
-			hUpload->exit = TRUE;
-			break;
-		default:
-			ERR("unkown cmd: 0x%X", (unsigned int)msgHdr->cmd);
-			ret = E_UNSUPT;
-			break;
+		
+		if(FD_ISSET(hUpload->syslink, &rdSet)) {
+			/* process capture info */
+			upload_sync_cap_info(hUpload);
 		}
+
+		if(FD_ISSET(fdMsg, &rdSet)) {
+			/* process msg */
+			upload_msg_process(hUpload, hMsg);
+		}
+					
 	}
 
 exit:
@@ -229,6 +372,10 @@ UploadHandle upload_create(UploadAttrs *attrs, UploadParams *params)
 		hUpload->fxns = &RTP_UPLOAD_FXNS;
 		hUpload->protol = CAM_UPLOAD_PROTO_RTP;
 		break;
+	case CAM_UPLOAD_PROTO_H264:
+		hUpload->fxns = &H264_UPLOAD_FXNS;
+		hUpload->protol = CAM_UPLOAD_PROTO_H264;
+		break;
 	case CAM_UPLOAD_PROTO_NONE:
 	default:
 		hUpload->flags &= ~UPLOAD_FLAG_ANSYNC;
@@ -247,6 +394,19 @@ UploadHandle upload_create(UploadAttrs *attrs, UploadParams *params)
 			goto err_quit;
 		}
 	}
+
+	INIT_LIST_HEAD(&hUpload->head);
+	if(hUpload->flags & UPLOAD_FLAG_WAIT_INFO) {
+		struct syslink_attrs attrs;
+		attrs.info_base = LINK_CAP_BASE;
+		strncpy((char *)attrs.name, "cap_info", sizeof(attrs.name));
+		hUpload->syslink = sys_commu_open(&attrs);
+		uint32_t timeout = 5;
+		if(hUpload->syslink > 0)
+			ioctl(hUpload->syslink, SYSLINK_S_TIMEOUT, &timeout);
+	}
+
+	hUpload->lastSnd = time(NULL);
 	
 	/* init lock */
 	pthread_mutex_init(&hUpload->mutex, NULL);
@@ -258,8 +418,6 @@ UploadHandle upload_create(UploadAttrs *attrs, UploadParams *params)
 			goto err_quit;
 		}
 	}
-
-	hUpload->lastSnd = time(NULL);
 
 	/* wait a while for thread to start */	
 	//usleep(100000);
@@ -310,6 +468,16 @@ Int32 upload_delete(UploadHandle hUpload, MsgHandle hCurMsg)
 		hUpload->fxns->delete(hUpload->handle);
 
 	pthread_mutex_destroy(&hUpload->mutex);
+
+	ListEntry *item, *backup;
+	list_for_each_entry_safe(item, backup, &hUpload->head, list) {
+		/* free buf handle */
+		if(hUpload->flags & UPLOAD_FLAG_FREE_BUF)
+			buf_pool_free(item->frame.hBuf);
+		/* no matter this entry is sync or not, delete it and free the memory */
+		list_del(&item->list);
+		free(item);
+	}
 	
 	free(hUpload);
 
@@ -487,7 +655,7 @@ static Int32 upload_send_frame(UploadHandle hUpload, const ImgMsg *data)
 	if(!hUpload->isConnected) {
 		err = upload_connect(hUpload, hUpload->connectTimeout);
 		if(err) {
-			ERR("not connected server");
+			//ERR("not connected server");
 			goto save_frame;
 		}
 	}
@@ -683,8 +851,12 @@ Int32 upload_run(UploadHandle hUpload, MsgHandle hCurMsg, const ImgMsg *data)
 		if(hUpload->isConnected)
 			err = msg_send(hCurMsg, hUpload->msgName, (MsgHeader *)data, 0);
 		if(err) {
+			/* try catch frame first */
+			if(hUpload->syslink > 0)
+				err = upload_cache_frame(hUpload, (ImgMsg *)data);
 			/* save if server is not connected or send msg err */
-			err = upload_save_frame(hUpload, data, err);
+			if(err)
+				err = upload_save_frame(hUpload, data, err);
 		}
 		return err;
 	} else {

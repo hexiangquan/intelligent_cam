@@ -347,6 +347,7 @@ static Int32 upload_update(EncoderHandle hEnc, UploadParams *params)
 		if(hEnc->hPoolEnc) {
 			uploadAttrs.flags |= UPLOAD_FLAG_FREE_BUF; //free buffer after send when using pool
 			uploadAttrs.flags |= UPLOAD_FLAG_ANSYNC;
+			uploadAttrs.flags |= UPLOAD_FLAG_WAIT_INFO;
 		}
 		uploadAttrs.msgName = MSG_IMG_TX;
 		uploadAttrs.reConTimeout = UPLOAD_RECON_TIMEOUT;

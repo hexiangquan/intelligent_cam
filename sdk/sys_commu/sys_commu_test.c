@@ -13,6 +13,23 @@ typedef struct _TestParams {
 	const char *chanName;
 }TestParams;
 
+static int chan_open(const char *dev, Uint32 addr, const char *name)
+{
+	int fd = open(dev, O_RDWR);
+	assert(fd > 0);
+	if(fd < 0)
+		return E_IO;
+
+	struct syslink_attrs attrs;
+	attrs.info_base = addr;
+	strncpy(attrs.name, name, sizeof(attrs.name));
+	DBG("%s, set syslink attrs!", name);
+	int err = ioctl(fd, SYSLINK_S_ATTRS, &attrs);
+	assert(err == 0);
+
+	return fd;
+}
+
 /* test between process */
 static void *transfer_thread(void *arg)
 {
@@ -24,17 +41,9 @@ static void *transfer_thread(void *arg)
 
 	DBG("%s thread start!", params->chanName);
 
-	fd = open(params->devName, O_RDWR);
-	assert(fd > 0);
+	fd = chan_open(params->devName, params->baseAddr, params->chanName);
 	if(fd < 0)
 		goto exit;
-
-	struct syslink_attrs attrs;
-	attrs.info_base = params->baseAddr;
-	strncpy(attrs.name, params->chanName, sizeof(attrs.name));
-	DBG("%s, set syslink attrs!", params->chanName);
-	err = ioctl(fd, SYSLINK_S_ATTRS, &attrs);
-	assert(err == 0);
 
 	int i = 0;
 	int len = params->bufSize;
@@ -64,7 +73,7 @@ static void *transfer_thread(void *arg)
 
 	DBG("%s, start read write loop!", params->chanName);
 	
-	while(++i < params->loopCnt) {
+	while(1) {
 
 		FD_ZERO(&rdSet);
 		FD_SET(fd, &rdSet);
@@ -153,6 +162,11 @@ static void *transfer_thread(void *arg)
 		#endif 
 		
 		usleep(1000);
+
+		++i;
+		
+		if(params->loopCnt > 0 && i > params->loopCnt)
+			break;
 	}
 
 	ret = TRUE;
@@ -196,6 +210,7 @@ Bool main_loop(TestParams *params)
 	return TRUE;
 	
 }
+
 
 static void usage(void)
 {

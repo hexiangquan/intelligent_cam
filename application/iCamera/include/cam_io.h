@@ -48,7 +48,7 @@ typedef enum {
 }CamStrobeSwitchMode;
 
 typedef struct {
-	Uint16	status;			//current status, bit[0:1]--strobe[0:1]
+	Uint16	status;			//current status, bit[0:2]--strobe[0:2]
 	Uint16	switchMode;		//switch mode, see CamStrobeSwitchMode
 	Uint16	ctrlFlags;		//see macros for CAM_STROBE_FLAG_XXX above
 	Uint16	thresholdOn;	//lum threshold for turn on strobe in auto switch mode
@@ -61,7 +61,8 @@ typedef struct {
 	Uint8	sigVal;			//output signals value, bit[0:2]-stobe[0:2], 
 	Uint8	outMode;		//trig or freq output, bit[0:2]-strobe[0:2]
 	Uint8	acSyncEn;		//sync with AC signals or not
-	Uint8	reserved[5];		
+	Uint8	specCapEn;		//used for special trigger, bit[0:2] - strobe[0:2], 1-enable when special trigger
+	Uint8	reserved[4];		
 } CamStrobeCtrlParam;
 
 #endif

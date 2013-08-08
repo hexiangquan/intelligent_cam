@@ -99,6 +99,7 @@ static void convert_previewer_attrs(ImgConvDynParams *dynParams, PreviewAttrs *p
 	prevAttrs->contrast = dynParams->contrast;
 	prevAttrs->gamma = dynParams->gamma;
 	prevAttrs->sharpness = dynParams->sharpness;
+	prevAttrs->saturation = dynParams->saturation;
 }
 
 /*****************************************************************************

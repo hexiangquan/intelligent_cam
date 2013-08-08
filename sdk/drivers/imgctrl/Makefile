@@ -81,7 +81,7 @@ install:
 	-cp -p $(HEADERS) $(SDK_INC_DIR)
 
 clean:
-	-rm -rf *.o *mod* *.ko .cmem* .tmp*
+	-rm -rf *.o *mod* *.ko .cmem* .tmp* Module*
 
 rebuild: clean default
 

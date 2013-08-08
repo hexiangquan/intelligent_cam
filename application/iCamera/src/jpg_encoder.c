@@ -50,7 +50,7 @@ static Int32 add_append_data(ImgMsg *img, AlgBuf *buf)
 	info->timeStamp = img->timeStamp;
 	memcpy(&info->roadInfo,&img->roadInfo, sizeof(ImgRoadInfo));
 	memcpy(info->capInfo, img->capInfo, sizeof(info->capInfo));
-	info->offset = sizeof(*info);
+	info->offset = sizeof(ImgAppendInfo);
 	info->magicNum = IMG_APPEND_MAGIC;
 	
 	return E_NO;

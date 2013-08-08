@@ -30,7 +30,7 @@
 #define IMG_ENC_NAME			"imgEncoder"
 #define VID_ENC_NAME			"vidEncoder"
 
-#define IMG_ENC_POOL_BUF_NUM	2
+#define IMG_ENC_POOL_BUF_NUM	5
 #define VID_ENC_POOL_BUF_NUM	0
 
 #define SD0_MNT_PATH			"/media/mmcblk0"

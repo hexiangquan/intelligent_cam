@@ -40,6 +40,7 @@
 #include "display.h"
 #include "cam_plate_recog.h"
 #include "cam_face_recog.h"
+#include "h264_upload.h"
 
 /*----------------------------------------------*
  * external variables                           *
@@ -81,6 +82,7 @@ extern const AppParams c_appParamsDef;
 #define IMG_CTRL_DEV			"/dev/imgctrl"
 #define IMG_EXTIO_DEV			"/dev/extio"
 #define ETH_NAME				"eth0"
+#define NET_CFG					"cam_net.cfg"
 
 typedef Int32 (*PmCtrlFxn)(ParamsMngHandle hParamsMng, void *data, Int32 size);
 
@@ -186,6 +188,25 @@ ParamsMngHandle params_mng_create(const char *cfgFile)
 	if(useDefault) {
 		DBG("using default params");
 		hParamsMng->appParams = c_appParamsDef;
+	}
+
+	/* read network params seperately */
+	if(stat(NET_CFG, &fstat) == 0 && S_ISREG(fstat.st_mode) &&
+		fstat.st_size >= sizeof(CamNetworkInfo) + sizeof(Uint32)) {
+		FILE *fp = fopen(NET_CFG, "rb");
+		if(fp) {
+			/* read crc */
+			Uint32 crc = 0;
+			fread(&crc, sizeof(crc), 1, fp);
+			CamNetworkInfo netInfo;
+			fread(&netInfo, sizeof(netInfo), 1, fp);
+			if(crc == crc16(&netInfo, sizeof(netInfo))) {
+				DBG("using net info from "NET_CFG);
+				hParamsMng->appParams.networkInfo = netInfo;
+			}
+			
+			fclose(fp);
+		}
 	}
 
 	/* init mutex */
@@ -305,6 +326,7 @@ Int32 params_mng_write_back(ParamsMngHandle hParamsMng)
 	} else  {
 		//DBG("params mng, writing cfg file done.");
 		ret = E_NO;
+		fflush(hParamsMng->fpCfg);	
 	}
 
 exit:
@@ -606,6 +628,7 @@ static Int32 set_img_adj_params(ParamsMngHandle hParamsMng, void *data, Int32 si
 		return E_INVAL;
 	}
 
+	DBG("drc: %u/%u", params->dayCfg.drcStrength, params->nightCfg.drcStrength);
 	hParamsMng->appParams.imgAdjParams = *params;
 
 	if(hParamsMng->fdImgCtrl > 0) {
@@ -634,13 +657,19 @@ static Int32 set_img_adj_params(ParamsMngHandle hParamsMng, void *data, Int32 si
 			cfg.flags |= HDCAM_ENH_FLAG_DRC_EN;
 		if(adj->flags & CAM_IMG_BRIGHTNESS_EN)
 			cfg.flags |= HDCAM_ENH_FLAG_BRIGHT_EN;
+		if(adj->flags & CAM_IMG_ACSYNC_EN)
+			cfg.flags |= HDCAM_ENH_FLAG_ACSYNC_EN;
 
 		cfg.brightness = adj->brightness;
 		cfg.contrast = adj->contrast;
 		cfg.drcStrength = adj->drcStrength;
 		cfg.saturation = adj->saturation;
 		cfg.sharpness = adj->sharpness;
-		cfg.reserved[0] = cfg.reserved[1] = 0;
+		cfg.acSyncOffset = adj->acSyncOffset;
+		cfg.reserved = 0;
+
+		DBG("set img adj params, drc: %u, enable: %d", 
+			cfg.drcStrength, (adj->flags & CAM_IMG_DRC_EN) ? 1 : 0);
 
 		if(ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_ENHCFG, &cfg) < 0) {
 			return E_IO;
@@ -903,6 +932,7 @@ static Int32 get_img_conv_dyn(ParamsMngHandle hParamsMng, void *data, Int32 size
 	params->inputFmt = hParamsMng->capInputInfo.colorSpace;
 	params->inputWidth = hParamsMng->capInputInfo.width;
 	params->inputHeight = hParamsMng->capInputInfo.height;
+	params->saturation = adjCfg->saturation;
 	
 	/* Set control flags */
 	if(adjCfg->flags & CAM_IMG_GAMMA_EN)
@@ -1471,10 +1501,21 @@ static Int32 set_network_info(ParamsMngHandle hParamsMng, void *data, Int32 size
 		hParamsMng->flags |= PM_FLAG_NET_CFG_DONE;
 	}
 
+	if(memcmp(&appCfg->networkInfo, info, sizeof(*info))) {
+		/* Save to file */
+		FILE *fp = fopen(NET_CFG, "wb");
+		if(fp) {
+			Uint32 crc = crc16(info, sizeof(*info));
+			fwrite(&crc, sizeof(crc), 1, fp);
+			fwrite(info, sizeof(*info), 1, fp);
+			fflush(fp);
+			fclose(fp);
+			DBG("write net info to file %s done.", NET_CFG);
+		}
 	
-	/* Copy data */
-	appCfg->networkInfo = *info;
-
+		/* Copy data */
+		appCfg->networkInfo = *info;
+	}
 	return E_NO;
 }
 
@@ -1501,9 +1542,9 @@ static Int32 get_network_info(ParamsMngHandle hParamsMng, void *data, Int32 size
 		return E_INVAL;
 
 	AppParams *appCfg = &hParamsMng->appParams;
-	CamNetworkInfo *info = &appCfg->networkInfo;
+	//CamNetworkInfo *info = &appCfg->networkInfo;
 
-	get_local_ip(info->ipAddr, sizeof(info->ipAddr));
+	//get_local_ip(info->ipAddr, sizeof(info->ipAddr));
 	
 	/* Copy data */
 	*(CamNetworkInfo *)data = appCfg->networkInfo;
@@ -3119,11 +3160,11 @@ static Int32 get_vid_upload_params(ParamsMngHandle hParamsMng, void *data, Int32
 
 	AppParams *appCfg = &hParamsMng->appParams;
 	UploadParams *params = (UploadParams *)data;
-	RtpUploadParams *rtpParams = (RtpUploadParams *)params->paramsBuf;
 	
 	if(appCfg->rtpParams.flags & CAM_RTP_FLAG_EN) {
 		/* Copy data */
 		params->protol = CAM_UPLOAD_PROTO_RTP;
+		RtpUploadParams *rtpParams = (RtpUploadParams *)params->paramsBuf;
 		rtpParams->streamName = appCfg->rtpParams.streamName;
 		rtpParams->rtspPort = appCfg->rtpParams.rtspSrvPort;
 		rtpParams->fmt = FMT_H264;
@@ -3143,8 +3184,13 @@ static Int32 get_vid_upload_params(ParamsMngHandle hParamsMng, void *data, Int32
 			DBG("rtp enable save");
 		}
 	} else {
-		/* not send */
-		params->protol = CAM_UPLOAD_PROTO_NONE;
+		/* Use TCP protol */
+		params->protol = CAM_UPLOAD_PROTO_H264;
+		H264UploadParams *h264Params = (H264UploadParams *)params->paramsBuf;
+		h264Params->size = sizeof(*h264Params);
+		strncpy(h264Params->srvIP, appCfg->rtpParams.streamName, sizeof(h264Params->srvIP));
+		h264Params->port = appCfg->rtpParams.rtspSrvPort;
+		h264Params->transTimeout = 5;
 	}
 
 	return E_NO;
@@ -3195,6 +3241,9 @@ static Int32 day_night_switch(ParamsMngHandle hParamsMng, void *data, Int32 size
 		/* set to hardware */
 		ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_CHROMA, &rgbGains);
 	}
+
+	__u16 status = (mode == CAM_DAY_MODE) ? HDCAM_DAY_MODE : HDCAM_NIGHT_MODE;
+	ioctl(hParamsMng->fdImgCtrl, IMGCTRL_S_DAYNIGHT, &status);
 	
 	return E_NO;
 }
