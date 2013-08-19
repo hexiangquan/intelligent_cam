@@ -58,25 +58,6 @@ UPDATE_DIR="update"
 BACKUP_DIR="backup"
 APP_LIST="iCamera camCtrlSrv camBroadcast dspSrv"
 CFG_FILE=""
-UPDATE_PACK="update.tar.gz"
-UDDATE_PROG="update.sh"
-
-# UpdatePacket -- Check update packet and run this packet
-# If a update packet exist, unpack and run the update script
-UpdatePacket()
-{
-	cd $UPDATE_DIR
-	if [ -e "$UPDATE_PACK" ]; then
-		tar zxf $UPDATE_PACK
-		if [ $0 == "0" ] && [ -f "$UPDATE_PROG" ]; then
-			chmod +x $UPDATE_PROG
-			./$UPDATE_PROG	
-		fi
-	fi
-
-	cd ..
-}
-
 
 # CheckUpdate -- Check update file and overwrite current version
 # @ Name -- Process Name
@@ -110,7 +91,7 @@ StopApp()
 		if [ "-$PID" != "-" ]; then
 			echo "Killing process $APP ..."
 			kill -2 $PID
-			sleep 1
+			sleep 2
 		fi
 
 		PID=`GetPID $APP`
@@ -121,6 +102,7 @@ StopApp()
 	done
 }
 
+UPDATE_SH="check_update.sh"
 
 # StartApp -- Start running app process
 # @ Name -- Process name
@@ -129,9 +111,12 @@ StopApp()
 # If current app is not killed by SIG_INT, this fuction will kill it by SIG_ABORT
 StartApp()
 {
+	if [ -e "$UPADTE_SH" ]; then
+		./$UPDATE_SH	
+	fi
+
 	for APP in $APP_LIST; do
 		echo -e "\n----- Run app $APP -----"
-		CheckUpdate "$APP" "$UPDATE_DIR" "$CFG_FILE";
 		if [ -e "$APP" ]; then
 			./$APP &
 			sleep 1
